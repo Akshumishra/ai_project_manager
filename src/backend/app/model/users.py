@@ -9,8 +9,7 @@ class User(BaseModel):
     name = Column(String, nullable=False)
     email = Column(String, unique=True, nullable=False, index=True)
     password_hash = Column(String, nullable=True)
-    slack_id = Column(String, nullable=True)
-    oauth_token = Column(String, nullable=True)
+   
 
     detail = relationship(
         "UserDetail", back_populates="user", uselist=False, cascade="all, delete-orphan"

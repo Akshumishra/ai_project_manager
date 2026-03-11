@@ -14,5 +14,6 @@ class UserDetail(BaseModel):
     skills = Column(Text, nullable=True)
     experience = Column(Text, nullable=True)
     designation = Column(String, nullable=True)
-
+    slack_id = Column(String, nullable=True)
+    
     user = relationship("User", back_populates="detail")
