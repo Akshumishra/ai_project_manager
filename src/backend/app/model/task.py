@@ -24,7 +24,7 @@ class Task(BaseModel):
     status = Column(
         Enum(TaskStatus, name="task_status_enum"),
         nullable=False,
-        default=TaskStatus.todo,
+        default=TaskStatus.TODO,
     )
     project_member_id = Column(
         UUID(as_uuid=True), ForeignKey("project_members.id"), nullable=True
