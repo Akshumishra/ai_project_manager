@@ -7,10 +7,10 @@ from src.backend.app.model.base import BaseModel
 
 
 class TaskStatus(str, enum.Enum):
-    todo = "todo"
-    inprogress = "inprogress"
-    completed = "completed"
-    blocked = "blocked"
+    TODO = "todo"
+    INPROGRESS = "inprogress"
+    COMPLETED = "completed"
+    BLOCKED = "blocked"
 
 
 class Task(BaseModel):

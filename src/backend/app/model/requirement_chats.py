@@ -1,5 +1,4 @@
-from sqlalchemy import Column, String, Text, ForeignKey
-from sqlalchemy.orm import relationship
+from sqlalchemy import Column, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 
 from src.backend.app.model.base import BaseModel
@@ -11,7 +10,6 @@ class RequirementChat(BaseModel):
     role = Column(String, nullable=False)
     content = Column(Text, nullable=False)
     project_member_id = Column(
-        UUID(as_uuid=True), ForeignKey("project_members.id"), nullable=False
+        UUID(as_uuid=True), nullable=True
     )
 
-    project_member = relationship("ProjectMember", back_populates="requirement_chats")

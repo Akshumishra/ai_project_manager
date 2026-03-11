@@ -14,7 +14,7 @@ class Project(BaseModel):
     created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
 
     creator = relationship("User", back_populates="projects", foreign_keys=[created_by])
-    stack_details = relationship(
+    slack_details = relationship(
         "ProjectSlackDetail", back_populates="project", cascade="all, delete-orphan"
     )
     members = relationship(
@@ -34,7 +34,7 @@ class ProjectSlackDetail(BaseModel):
     channel_id = Column(String, nullable=True)
     bot_token = Column(String, nullable=True)
 
-    project = relationship("Project", back_populates="stack_details")
+    project = relationship("Project", back_populates="slack_details")
 
 
 class ProjectMember(BaseModel):
@@ -47,4 +47,3 @@ class ProjectMember(BaseModel):
     project = relationship("Project", back_populates="members")
     user = relationship("User", back_populates="memberships")
     tasks = relationship("Task", back_populates="assignee")
-    requirement_chats = relationship("RequirementChat", back_populates="project_member")
