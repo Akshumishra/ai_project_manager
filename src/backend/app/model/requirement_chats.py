@@ -6,7 +6,7 @@ from src.backend.app.model.base import BaseModel
 
 
 class RequirementChat(BaseModel):
-    __tablename__ = "requirment_chats"
+    __tablename__ = "requirement_chats"
 
     role = Column(String, nullable=False)
     content = Column(Text, nullable=False)

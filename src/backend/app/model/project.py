@@ -15,7 +15,7 @@ class Project(BaseModel):
 
     creator = relationship("User", back_populates="projects", foreign_keys=[created_by])
     stack_details = relationship(
-        "ProjectStackDetail", back_populates="project", cascade="all, delete-orphan"
+        "ProjectSlackDetail", back_populates="project", cascade="all, delete-orphan"
     )
     members = relationship(
         "ProjectMember", back_populates="project", cascade="all, delete-orphan"
@@ -26,8 +26,8 @@ class Project(BaseModel):
     )
 
 
-class ProjectStackDetail(BaseModel):
-    __tablename__ = "project_stack_details"
+class ProjectSlackDetail(BaseModel):
+    __tablename__ = "project_slack_details"
 
     project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
     workspace_id = Column(String, nullable=True)

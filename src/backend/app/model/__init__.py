@@ -1,15 +1,15 @@
 from .users import User
 from .user_detail import UserDetail
-from .project import Project, ProjectStackDetail, ProjectMember
+from .project import Project, ProjectSlackDetail, ProjectMember
 from .task import Task
 from .document import Document, DocumentBlock
-from .requirment_chat import RequirementChat
+from .requirement_chats import RequirementChat
 
 __all__ = [
     "User",
     "UserDetail",
     "Project",
-    "ProjectStackDetail",
+    "ProjectSlackDetail",
     "ProjectMember",
     "Task",
     "Document",
