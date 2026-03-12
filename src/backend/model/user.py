@@ -3,13 +3,13 @@ from sqlalchemy.orm import relationship
 
 from src.backend.app.model.base import BaseModel
 
+
 class User(BaseModel):
     __tablename__ = "users"
 
     name = Column(String, nullable=False)
     email = Column(String, unique=True, nullable=False, index=True)
-    password_hash = Column(String, nullable=False)
-   
+    password_hash = Column(String, nullable=True)  # Null for invited users
 
     detail = relationship(
         "UserDetail", back_populates="user", uselist=False, cascade="all, delete-orphan"

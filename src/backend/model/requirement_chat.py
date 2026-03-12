@@ -9,7 +9,4 @@ class RequirementChat(BaseModel):
 
     role = Column(String, nullable=False)
     content = Column(Text, nullable=False)
-    project_member_id = Column(
-        UUID(as_uuid=True), nullable=True
-    )
-
+    project_member_id = Column(UUID(as_uuid=True), nullable=True)
