@@ -208,4 +208,4 @@ __marimo__/
 
 .vscode/
 node_modules/
-db/insert_dummy_data.py
+insert_dummy_data.py
