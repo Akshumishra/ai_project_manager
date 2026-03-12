@@ -3,7 +3,7 @@ from sqlalchemy.orm import relationship
 from sqlalchemy import UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 
-from src.backend.app.model.base import BaseModel
+from src.backend.model.base import BaseModel
 
 
 class Document(BaseModel):

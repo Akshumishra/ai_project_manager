@@ -1,7 +1,7 @@
 from sqlalchemy import Column, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 
-from src.backend.app.model.base import BaseModel
+from src.backend.model.base import BaseModel
 
 
 class RequirementChat(BaseModel):

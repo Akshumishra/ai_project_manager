@@ -3,7 +3,7 @@ from sqlalchemy import Column, String, Text, ForeignKey, DateTime, Enum
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import UUID
 
-from src.backend.app.model.base import BaseModel
+from src.backend.model.base import BaseModel
 
 
 class TaskStatus(str, enum.Enum):
