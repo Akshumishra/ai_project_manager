@@ -3,6 +3,8 @@ __pycache__/
 *.py[codz]
 *$py.class
 
+src/backend/scripts/insert_dummy_data.py
+
 # C extensions
 *.so
 

@@ -1,0 +1,2 @@
+AGENT_MODEL = "gpt-4o-mini"
+AGENT_TEMPERATURE = 0
