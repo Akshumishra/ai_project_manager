@@ -109,6 +109,10 @@ async def slack_events(request: Request):
     question = user_message.replace(mention_str, "").strip()
     logger.info(f"Received question: '{question}' from user {slack_user_id} in channel {channel_id}")
 
+    # DEBUG: Write to a file since terminal output is hard to capture
+    with open("/tmp/slack_debug.log", "a") as f:
+        f.write(f"USER: {slack_user_id}, CHANNEL: {channel_id}, QUESTION: {question}\n")
+
     logger.debug(f"Looking up project for channel_id={channel_id}")
     project_id = get_project_id_from_channel(channel_id)
     if not project_id:

@@ -20,7 +20,8 @@ def get_project_id_from_channel(channel_id: str) -> str | None:
         if project_id:
             logger.debug(f"Found project_id: {project_id} for channel: {channel_id}")
         else:
-            logger.warning(f"No project found for channel: {channel_id}")
+            res = session.execute(text("SELECT current_setting('app.project_id', true)")).fetchone()
+            logger.warning(f"No project found for channel: {channel_id}. Session app.project_id: {res[0]!r}")
         return project_id
     except Exception as e:
         logger.error(f"Error looking up project for channel {channel_id}: {e}", exc_info=True)
@@ -41,6 +42,12 @@ def get_project_member_id(project_id: str, slack_user_id: str) -> str | None:
     """)
     session = SessionLocal()
     try:
+        # Set the project_id in the session for Row Level Security (RLS)
+        session.execute(
+            text("SET LOCAL app.project_id = :project_id"),
+            {"project_id": project_id}
+        )
+        
         row = session.execute(
             query,
             {"project_id": project_id, "slack_id": slack_user_id}
