@@ -1,14 +1,15 @@
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
+
 from src.backend.db.database import get_db
-from backend.requirement_gather.services.project import (
-    create_project_with_owner,
-    get_project_detail,
-)
-from backend.requirement_gather.services.requirement_gather import (
+from src.backend.requirement_gather.services.requirement_gather import (
     run_requirement_agent,
     start_requirement_agent,
+)
+from src.backend.requirement_gather.services.project import (
+    create_project_with_owner,
+    get_project_detail
 )
 
 router = APIRouter()
@@ -22,7 +23,7 @@ class CreateProjectRequest(BaseModel):
 
 class RequirementAgentRequest(BaseModel):
     user_id: str
-    message: str 
+    message: str
 
 
 @router.post("/projects")
@@ -48,7 +49,11 @@ def get_project(project_id: str, db: Session = Depends(get_db)):
 
 
 @router.post("/projects/{project_id}/requirement-agent")
-def run_agent(project_id: str, request: RequirementAgentRequest, db: Session = Depends(get_db)):
+def run_agent(
+    project_id: str,
+    request: RequirementAgentRequest,
+    db: Session = Depends(get_db)
+):
 
     response = run_requirement_agent(
         db=db,
@@ -61,7 +66,12 @@ def run_agent(project_id: str, request: RequirementAgentRequest, db: Session = D
 
 
 @router.get("/projects/{project_id}/requirement-agent")
-def start_agent(project_id: str, user_id: str, background: str = None, db: Session = Depends(get_db)):
+def start_agent(
+    project_id: str,
+    user_id: str,
+    background: str | None = None,
+    db: Session = Depends(get_db)
+):
     response = start_requirement_agent(
         db=db,
         user_id=user_id,

@@ -106,6 +106,8 @@ Rules for responses:
 - Keep the conversation short. Try to ask necessary questions concisely.
 - Do not blindly agree; offer strategic suggestions.
 - Do not stall; move to generating the document as soon as you have a solid high-level understanding.
+
+provide final requirement document in markdons format.
 """
 
 USER_PROMPT = """

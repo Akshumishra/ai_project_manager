@@ -1,8 +1,8 @@
 from sqlalchemy.orm import Session
+from fastapi import HTTPException
 
 from src.backend.model.project import Project, ProjectMember
 from src.backend.model.user import User
-from fastapi import HTTPException
 
 
 def create_project_with_owner(

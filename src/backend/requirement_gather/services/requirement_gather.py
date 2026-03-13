@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 from fastapi import HTTPException
 
 from src.backend.requirement_gather.requirement_agent.agent import RequirementAgent
-from backend.requirement_gather.services.chat_history import (
+from src.backend.requirement_gather.services.chat_history import (
     get_chat_history,
     save_chat_message,
     build_initial_user_prompt
@@ -12,7 +12,11 @@ def start_requirement_agent(db: Session, user_id: str, project_id: str, backgrou
     history = get_chat_history(db, project_id)
     
     if history:
-        raise HTTPException(status_code=400, detail="Chat history already exists. Use run_requirement_agent to continue.")
+        # Return existing history if it exists, allowing the frontend to resume
+        return {
+            "messages": history,
+            "status": "resumed"
+        }
     
     user_message = build_initial_user_prompt(db, project_id, background)
     
