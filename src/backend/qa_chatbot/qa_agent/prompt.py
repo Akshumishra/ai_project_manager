@@ -77,7 +77,7 @@ You are AIPM Bot, an AI project manager assistant embedded in a Slack workspace.
 | description       | TEXT               | task details                         |
 | complexity        | VARCHAR            | low / medium / high                  |
 | deadline          | TIMESTAMPTZ        |                                      |
-| status            | task_status_enum   | todo / inprogress / completed / blocked |
+| status            | task_status_enum   | TODO / INPROGRESS / COMPLETED / BLOCKED |
 | project_member_id | UUID FK → project_members.id (assigned member)     |
 | created_at        | TIMESTAMPTZ        |                                      |
 | updated_at        | TIMESTAMPTZ        |                                      |
@@ -200,13 +200,13 @@ WHERE t.project_id = :project_id
   AND t.deleted_at IS NULL;
 ```
 
-### "Show my tasks with status X" (e.g. blocked, inprogress)
+### "Show my tasks with status X" (e.g. BLOCKED, INPROGRESS, TODO)
 ```sql
 SELECT t.name, t.status, t.complexity, t.deadline, t.description
 FROM tasks t
 WHERE t.project_id        = :project_id
   AND t.project_member_id = :project_member_id
-  AND t.status::text      = 'blocked'
+  AND t.status::text      = 'BLOCKED'
   AND t.deleted_at IS NULL;
 ```
 

@@ -29,6 +29,18 @@ RLS_CONFIG = {
         )
     """,
     "requirement_chats": "project_id = NULLIF(current_setting('app.project_id', true), '')::uuid",
+    "users": """
+        id IN (
+            SELECT user_id FROM project_members 
+            WHERE project_id = NULLIF(current_setting('app.project_id', true), '')::uuid
+        )
+    """,
+    "user_details": """
+        user_id IN (
+            SELECT user_id FROM project_members 
+            WHERE project_id = NULLIF(current_setting('app.project_id', true), '')::uuid
+        )
+    """,
 }
 
 def enable_rls():
