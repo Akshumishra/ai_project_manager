@@ -1,6 +1,4 @@
-class DefaultConstants:
-    MODEL = "gpt-4.1-nano"
-    TEMPERATURE = 0.5
+from src.backend.constants import DefaultConstants
 
 class RequirementAgentConstants(DefaultConstants):
     MODEL = "gpt-4.1-mini"

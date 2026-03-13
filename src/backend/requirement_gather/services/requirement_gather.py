@@ -20,14 +20,6 @@ def start_requirement_agent(db: Session, user_id: UUID, project_id: UUID, backgr
     
     user_message = build_initial_user_prompt(db, project_id, background)
     
-    save_chat_message(
-        db=db,
-        project_id=project_id,
-        role="user",
-        content=user_message,
-        user_id=user_id
-    )
-    
     history.append({
         "role": "user",
         "content": user_message

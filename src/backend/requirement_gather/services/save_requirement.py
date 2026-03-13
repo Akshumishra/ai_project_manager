@@ -22,9 +22,31 @@ def save_requirement_spec_in_db(
     """
     try:
         project_title = db.query(Project.name).filter(Project.id == project_id).scalar()
+        document_title = f"{project_title} - Requirement"
+        old_docs = (
+            db.query(Document)
+            .filter(
+                Document.project_id == project_id,
+                Document.title.in_(
+                    [
+                        document_title,
+                        f"{project_title} - Requirement Specification",
+                        "{project_title} - Requirement Specification",
+                        "Requirement Specification",
+                    ]
+                ),
+            )
+            .all()
+        )
+
+        for old_doc in old_docs:
+            db.delete(old_doc)
+        if old_docs:
+            db.flush()
+
         new_doc = Document(
             project_id=project_id,
-            title=f"{project_title} - Requirement Specification",
+            title=document_title,
             created_by=user_id
         )
         db.add(new_doc)
