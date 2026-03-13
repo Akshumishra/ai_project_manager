@@ -1,5 +1,7 @@
-import resend
 import logging
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from src.backend.config import Config
 
 logger = logging.getLogger(__name__)
@@ -7,18 +9,18 @@ logger = logging.getLogger(__name__)
 
 async def send_invitation_email(to_email: str, project_name: str, inviter_name: str):
     """
-    Sends an invitation email using Resend.
+    Main entry point for sending invitation emails.
+    Tries SMTP (primary) then Resend (fallback).
     """
-    if not Config.RESEND_API_KEY:
-        logger.warning(
-            f"RESEND_API_KEY not set. Skipping invitation email to {to_email}"
-        )
-        return
-
-    resend.api_key = Config.RESEND_API_KEY
-
     subject = f"Invitation to collaborate on {project_name}"
-    html_content = f"""
+    html_content = _get_invitation_html(to_email, project_name, inviter_name)
+
+    result = _send_via_smtp(to_email, subject, html_content)
+    return result
+
+
+def _get_invitation_html(to_email: str, project_name: str, inviter_name: str) -> str:
+    return f"""
     <div style="font-family: sans-serif; line-height: 1.5; color: #333;">
         <h2>Hello!</h2>
         <p><strong>{inviter_name}</strong> has invited you to collaborate on the project <strong>"{project_name}"</strong> in AI Project Manager.</p>
@@ -36,17 +38,21 @@ async def send_invitation_email(to_email: str, project_name: str, inviter_name: 
     </div>
     """
 
+def _send_via_smtp(to_email: str, subject: str, html_content: str):
     try:
-        r = resend.Emails.send(
-            {
-                "from": Config.EMAILS_FROM or "onboarding@resend.dev",
-                "to": to_email,
-                "subject": subject,
-                "html": html_content,
-            }
-        )
-        logger.info(
-            f"Invitation email sent via Resend to {to_email}. ID: {r.get('id')}"
-        )
+        msg = MIMEMultipart()
+        msg['From'] = Config.EMAILS_FROM
+        msg['To'] = to_email
+        msg['Subject'] = subject
+        msg.attach(MIMEText(html_content, 'html'))
+
+        with smtplib.SMTP(Config.SMTP_SERVER, Config.SMTP_PORT) as server:
+            server.starttls()
+            server.login(Config.SMTP_USERNAME, Config.SMTP_PASSWORD)
+            server.send_message(msg)
+
+        logger.info(f"Email sent via SMTP to {to_email}")
+        return {"status": "sent", "provider": "smtp"}
     except Exception as e:
-        logger.error(f"Failed to send email to {to_email} via Resend: {str(e)}")
+        logger.error(f"SMTP failed: {e}")
+        return None
