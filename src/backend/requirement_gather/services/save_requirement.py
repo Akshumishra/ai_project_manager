@@ -1,8 +1,7 @@
 from sqlalchemy.orm import Session
 from uuid import UUID
-
 from src.backend.model.document import Document, DocumentBlock
-from src.backend.model.project import Project
+from src.backend.model.project import Project, ProjectWorkflowStatus
 
 
 def save_requirement_spec_in_db(
@@ -71,6 +70,22 @@ def save_requirement_spec_in_db(
                 last_edited_by=user_id
             )
             db.add(block)
+
+        # Update Workflow Status
+        workflow_status = db.query(ProjectWorkflowStatus).filter(
+            ProjectWorkflowStatus.project_id == project_id,
+            ProjectWorkflowStatus.workflow_name == "requirement_gathering"
+        ).first()
+
+        if workflow_status:
+            workflow_status.status = "completed"
+        else:
+            workflow_status = ProjectWorkflowStatus(
+                project_id=project_id,
+                workflow_name="requirement_gathering",
+                status="completed"
+            )
+            db.add(workflow_status)
 
         db.commit()
         return True, "Requirement specification saved successfully."

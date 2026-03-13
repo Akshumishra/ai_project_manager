@@ -53,7 +53,14 @@ def build_initial_user_prompt(db: Session, project_id: UUID, background: str = N
     project_detail = get_project_detail(db, project_id)
     project_title = project_detail["project_title"].strip()
     project_description = project_detail["project_description"].strip()
+    
+    if not background:
+        member = db.query(ProjectMember).filter(ProjectMember.project_id == project_id).first()
+        if member and member.background:
+            background = str(member.background.value) if hasattr(member.background, "value") else str(member.background)
+    
     bg_text = background if background else "Unknown"
+    
     prompt = USER_PROMPT.format(
         project_title=project_title,
         project_description=project_description,
