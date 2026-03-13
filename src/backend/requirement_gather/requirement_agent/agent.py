@@ -1,6 +1,7 @@
 from langchain.agents import create_agent
 from langchain_openai import ChatOpenAI
 from typing import Any, Dict, List
+from uuid import UUID
 
 from src.backend.requirement_gather.requirement_agent.prompt import SYSTEM_PROMPT
 from src.backend.config import Config
@@ -10,7 +11,7 @@ from src.backend.requirement_gather.constants import RequirementAgentConstants
 
 class RequirementAgent:
 
-    def __init__(self, user_id: str, project_id: str):
+    def __init__(self, user_id: UUID, project_id: UUID):
         self.user_id = user_id
         self.project_id = project_id
         self.llm = self._create_llm()

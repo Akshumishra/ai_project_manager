@@ -1,5 +1,6 @@
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
+from uuid import UUID
 
 from src.backend.requirement_gather.requirement_agent.agent import RequirementAgent
 from src.backend.requirement_gather.services.chat_history import (
@@ -8,11 +9,10 @@ from src.backend.requirement_gather.services.chat_history import (
     build_initial_user_prompt
 )
 
-def start_requirement_agent(db: Session, user_id: str, project_id: str, background: str = None):
+def start_requirement_agent(db: Session, user_id: UUID, project_id: UUID, background: str = None):
     history = get_chat_history(db, project_id)
     
     if history:
-        # Return existing history if it exists, allowing the frontend to resume
         return {
             "messages": history,
             "status": "resumed"
@@ -54,7 +54,7 @@ def start_requirement_agent(db: Session, user_id: str, project_id: str, backgrou
     
     return response
 
-def run_requirement_agent(db: Session, user_id: str, project_id: str, user_message: str = None, background: str = None):
+def run_requirement_agent(db: Session, user_id: UUID, project_id: UUID, user_message: str = None, background: str = None):
     history = get_chat_history(db, project_id)
     
 

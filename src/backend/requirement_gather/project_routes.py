@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
+from uuid import UUID
 
 from src.backend.db.database import get_db
 from src.backend.requirement_gather.services.requirement_gather import (
@@ -11,19 +11,9 @@ from src.backend.requirement_gather.services.project import (
     create_project_with_owner,
     get_project_detail
 )
+from src.backend.requirement_gather.schemas import CreateProjectRequest, RequirementAgentRequest
 
 router = APIRouter()
-
-
-class CreateProjectRequest(BaseModel):
-    user_id: str
-    project_title: str
-    project_description: str
-
-
-class RequirementAgentRequest(BaseModel):
-    user_id: str
-    message: str
 
 
 @router.post("/projects")
@@ -39,7 +29,7 @@ def create_project(request: CreateProjectRequest, db: Session = Depends(get_db))
 
 
 @router.get("/projects/{project_id}")
-def get_project(project_id: str, db: Session = Depends(get_db)):
+def get_project(project_id: UUID, db: Session = Depends(get_db)):
     project = get_project_detail(db, project_id)
 
     if not project:
@@ -50,7 +40,7 @@ def get_project(project_id: str, db: Session = Depends(get_db)):
 
 @router.post("/projects/{project_id}/requirement-agent")
 def run_agent(
-    project_id: str,
+    project_id: UUID,
     request: RequirementAgentRequest,
     db: Session = Depends(get_db)
 ):
@@ -67,8 +57,8 @@ def run_agent(
 
 @router.get("/projects/{project_id}/requirement-agent")
 def start_agent(
-    project_id: str,
-    user_id: str,
+    project_id: UUID,
+    user_id: UUID,
     background: str | None = None,
     db: Session = Depends(get_db)
 ):

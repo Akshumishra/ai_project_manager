@@ -1,5 +1,6 @@
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
+from uuid import UUID
 
 from src.backend.model.project import Project, ProjectMember
 from src.backend.model.user import User
@@ -7,7 +8,7 @@ from src.backend.model.user import User
 
 def create_project_with_owner(
     db: Session,
-    user_id: str,
+    user_id: UUID,
     project_title: str,
     project_description: str,
 ) -> dict:
@@ -40,7 +41,7 @@ def create_project_with_owner(
         "project_description": project.description or "",
     }
 
-def get_project_detail(db: Session, project_id: str) -> dict | None:
+def get_project_detail(db: Session, project_id: UUID) -> dict | None:
     project = (
         db.query(Project)
         .filter(Project.id == project_id)

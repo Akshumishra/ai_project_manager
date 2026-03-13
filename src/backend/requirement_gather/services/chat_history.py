@@ -1,4 +1,5 @@
 from sqlalchemy.orm import Session
+from uuid import UUID
 
 from src.backend.model.requirement_chat import RequirementChat
 from src.backend.model.project import ProjectMember
@@ -6,7 +7,7 @@ from src.backend.requirement_gather.requirement_agent.prompt import USER_PROMPT
 from src.backend.requirement_gather.services.project import get_project_detail
 
 
-def get_chat_history(db: Session, project_id: str) -> list:
+def get_chat_history(db: Session, project_id: UUID) -> list:
     chats = (
         db.query(RequirementChat)
         .filter(RequirementChat.project_id == project_id)
@@ -30,7 +31,7 @@ def initialize_chat_history(user_prompt: str, history: list):
         })
     return history
 
-def save_chat_message(db: Session, project_id: str, role: str, content: str, user_id: str = None):
+def save_chat_message(db: Session, project_id: UUID, role: str, content: str, user_id: UUID = None):
     project_member_id = None
     if user_id:
         member = db.query(ProjectMember).filter(
@@ -48,7 +49,7 @@ def save_chat_message(db: Session, project_id: str, role: str, content: str, use
     db.add(chat)
     db.commit()
         
-def build_initial_user_prompt(db: Session, project_id: str, background: str = None) -> str:
+def build_initial_user_prompt(db: Session, project_id: UUID, background: str = None) -> str:
     project_detail = get_project_detail(db, project_id)
     project_title = project_detail["project_title"].strip()
     project_description = project_detail["project_description"].strip()

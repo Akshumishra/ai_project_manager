@@ -1,11 +1,12 @@
 from langchain_core.tools import tool
 from sqlalchemy.orm import Session
+from uuid import UUID
 
 from src.backend.db.database import SessionLocal
 from src.backend.requirement_gather.services.save_requirement import save_requirement_spec_in_db
 
 
-def make_save_requirement_spec_tool(user_id: str, project_id: str):
+def make_save_requirement_spec_tool(user_id: UUID, project_id: UUID):
 
     @tool
     def save_requirement_spec(

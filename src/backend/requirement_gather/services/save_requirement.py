@@ -1,4 +1,5 @@
 from sqlalchemy.orm import Session
+from uuid import UUID
 
 from src.backend.model.document import Document, DocumentBlock
 from src.backend.model.project import Project
@@ -6,8 +7,8 @@ from src.backend.model.project import Project
 
 def save_requirement_spec_in_db(
     db: Session,
-    user_id: str,
-    project_id: str,
+    user_id: UUID,
+    project_id: UUID,
     problem_the_project_solves: str,
     target_users: str,
     project_goal: str,
