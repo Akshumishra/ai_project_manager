@@ -43,7 +43,8 @@ def create_document(data: schemas.DocumentCreate, db: Session, current_user: Use
     return {"document_id": str(document.id), "initial_block_id": str(block.id)}
 
 
-def get_document(document_id: UUID, db: Session):
+def get_document(document_id: UUID, db: Session, current_user: User):
+    utils.verify_document_access(document_id, current_user.id, db)
     redis_key = f"doc:{document_id}"
     cached = redis_client.get(redis_key)
     if cached:
@@ -81,7 +82,8 @@ def get_document(document_id: UUID, db: Session):
     return response
 
 
-async def insert_block(document_id: UUID, data: schemas.BlockCreate, db: Session):
+async def insert_block(document_id: UUID, data: schemas.BlockCreate, db: Session, current_user: User):
+    utils.verify_document_access(document_id, current_user.id, db)
     document = db.query(Document).filter(Document.id == document_id).first()
     if not document:
         raise HTTPException(404, "Document not found")
@@ -163,10 +165,13 @@ async def insert_block(document_id: UUID, data: schemas.BlockCreate, db: Session
     }
 
 
-async def edit_block(block_id: str, data: schemas.BlockUpdate, db: Session):
+async def edit_block(block_id: str, data: schemas.BlockUpdate, db: Session, current_user: User):
     block = db.query(DocumentBlock).filter(DocumentBlock.id == block_id).first()
     if not block:
         raise HTTPException(404, "Block not found")
+    
+    utils.verify_document_access(block.doc_id, current_user.id, db)
+    
     doc_id = block.doc_id
     try:
         redis_client.set(
@@ -193,10 +198,13 @@ async def edit_block(block_id: str, data: schemas.BlockUpdate, db: Session):
     return {"message": "updated"}
 
 
-async def delete_block(block_id: str, db: Session):
+async def delete_block(block_id: str, db: Session, current_user: User):
     block = db.query(DocumentBlock).filter(DocumentBlock.id == block_id).first()
     if not block:
         raise HTTPException(404, "Block not found")
+    
+    utils.verify_document_access(block.doc_id, current_user.id, db)
+    
     doc_id = block.doc_id
     db.delete(block)
     db.commit()
