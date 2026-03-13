@@ -20,9 +20,8 @@ def create_document(
 
 @router.get("/{document_id}")
 def get_document(
-    document_id: UUID, 
+    document_id: UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     return services.get_document(document_id, db, current_user)
-

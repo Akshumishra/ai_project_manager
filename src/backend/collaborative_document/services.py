@@ -5,7 +5,10 @@ from sqlalchemy.exc import IntegrityError
 from uuid import UUID
 import json, time, random, redis
 
-from . import schemas, utils, websocket
+from .utils import utils
+
+from . import schemas
+from src.backend.collaborative_document.routes.websocket import manager
 from src.backend.db.redis import redis_client
 from src.backend.model.document import Document, DocumentBlock
 from src.backend.model.project import Project, ProjectMember
@@ -82,7 +85,9 @@ def get_document(document_id: UUID, db: Session, current_user: User):
     return response
 
 
-async def insert_block(document_id: UUID, data: schemas.BlockCreate, db: Session, current_user: User):
+async def insert_block(
+    document_id: UUID, data: schemas.BlockCreate, db: Session, current_user: User
+):
     utils.verify_document_access(document_id, current_user.id, db)
     document = db.query(Document).filter(Document.id == document_id).first()
     if not document:
@@ -149,7 +154,7 @@ async def insert_block(document_id: UUID, data: schemas.BlockCreate, db: Session
         doc_data["blocks"].sort(key=lambda x: x["position_key"])
         redis_client.set(redis_key, json.dumps(doc_data))
 
-    await websocket.manager.broadcast_to_doc(
+    await manager.broadcast_to_doc(
         str(document_id),
         {
             "type": "insert",
@@ -165,13 +170,15 @@ async def insert_block(document_id: UUID, data: schemas.BlockCreate, db: Session
     }
 
 
-async def edit_block(block_id: str, data: schemas.BlockUpdate, db: Session, current_user: User):
+async def edit_block(
+    block_id: str, data: schemas.BlockUpdate, db: Session, current_user: User
+):
     block = db.query(DocumentBlock).filter(DocumentBlock.id == block_id).first()
     if not block:
         raise HTTPException(404, "Block not found")
-    
+
     utils.verify_document_access(block.doc_id, current_user.id, db)
-    
+
     doc_id = block.doc_id
     try:
         redis_client.set(
@@ -202,9 +209,9 @@ async def delete_block(block_id: str, db: Session, current_user: User):
     block = db.query(DocumentBlock).filter(DocumentBlock.id == block_id).first()
     if not block:
         raise HTTPException(404, "Block not found")
-    
+
     utils.verify_document_access(block.doc_id, current_user.id, db)
-    
+
     doc_id = block.doc_id
     db.delete(block)
     db.commit()
@@ -216,7 +223,7 @@ async def delete_block(block_id: str, db: Session, current_user: User):
             b for b in doc_data["blocks"] if b["block_id"] != block_id
         ]
         redis_client.set(redis_key, json.dumps(doc_data))
-    await websocket.manager.broadcast_to_doc(
+    await manager.broadcast_to_doc(
         str(doc_id), {"type": "delete", "block_id": block_id, "timestamp": time.time()}
     )
     return {"message": "Block deleted"}
