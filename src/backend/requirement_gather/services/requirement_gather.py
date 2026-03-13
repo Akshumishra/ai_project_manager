@@ -18,12 +18,12 @@ def start_requirement_agent(db: Session, user_id: UUID, project_id: UUID, backgr
             "status": "resumed"
         }
     
-    user_message = build_initial_user_prompt(db, project_id, background)
-    
-    history.append({
-        "role": "user",
-        "content": user_message
-    })
+    project_context = build_initial_user_prompt(db, project_id, background)
+
+    history = [
+        {"role": "system", "content": project_context},
+        *history
+    ]
     
     agent = RequirementAgent(user_id, project_id)
     
@@ -49,7 +49,6 @@ def start_requirement_agent(db: Session, user_id: UUID, project_id: UUID, backgr
 def run_requirement_agent(db: Session, user_id: UUID, project_id: UUID, user_message: str = None, background: str = None):
     history = get_chat_history(db, project_id)
     
-
     save_chat_message(
         db=db,
         project_id=project_id,
@@ -58,10 +57,13 @@ def run_requirement_agent(db: Session, user_id: UUID, project_id: UUID, user_mes
         user_id=user_id
     )
 
-    history.append({
-        "role": "user",
-        "content": user_message
-    })
+    project_context = build_initial_user_prompt(db, project_id, background)
+
+    history = [
+        {"role": "system", "content": project_context},
+        *history,
+        {"role": "user", "content": user_message}
+    ]
 
     agent = RequirementAgent(user_id, project_id)
 

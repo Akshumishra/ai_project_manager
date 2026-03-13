@@ -20,7 +20,8 @@ def create_project(request: CreateProjectRequest, db: Session = Depends(get_db))
         db=db,
         user_id=request.user_id,
         project_title=request.project_title,
-        project_description=request.project_description
+        project_description=request.project_description,
+        background=request.background
     )
 
     return project

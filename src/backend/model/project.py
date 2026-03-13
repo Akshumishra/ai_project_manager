@@ -1,9 +1,13 @@
-from sqlalchemy import Column, String, Text, ForeignKey
+from sqlalchemy import Column, String, Text, ForeignKey, Enum, UniqueConstraint
+import enum
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import UUID
 
 from src.backend.model.base import BaseModel
 
+class Background(str, enum.Enum):
+    TECHNICAL = "technical"
+    NON_TECHNICAL = "non_technical"
 
 class Project(BaseModel):
     __tablename__ = "projects"
@@ -43,7 +47,23 @@ class ProjectMember(BaseModel):
     project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     slack_id = Column(String, nullable=True)
+    background = Column(
+        Enum(Background, name="background_enum"),
+        nullable=True,
+    )
 
     project = relationship("Project", back_populates="members")
     user = relationship("User", back_populates="memberships")
     tasks = relationship("Task", back_populates="assignee")
+
+
+class ProjectWorkflowStatus(BaseModel):
+    __tablename__ = "project_workflow_status"
+
+    project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
+    workflow_name = Column(String, nullable=False)
+    status = Column(String, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("project_id", "workflow_name", name="unique_project_workflow"),
+    )
