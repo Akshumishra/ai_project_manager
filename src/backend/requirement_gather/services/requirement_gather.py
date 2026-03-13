@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 from fastapi import HTTPException
 
 from src.backend.requirement_gather.requirement_agent.agent import RequirementAgent
-from src.backend.requirement_gather.services.helping_functions import (
+from backend.requirement_gather.services.chat_history import (
     get_chat_history,
     save_chat_message,
     build_initial_user_prompt

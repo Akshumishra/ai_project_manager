@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from src.backend.model.requirement_chat import RequirementChat
 from src.backend.model.project import ProjectMember
 from src.backend.requirement_gather.requirement_agent.prompt import USER_PROMPT
-from src.backend.requirement_gather.services.project_service import get_project_detail
+from backend.requirement_gather.services.project import get_project_detail
 
 
 def get_chat_history(db: Session, project_id: str) -> list:

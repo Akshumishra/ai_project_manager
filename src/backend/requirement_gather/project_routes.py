@@ -2,11 +2,11 @@ from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from src.backend.db.database import get_db
-from src.backend.requirement_gather.services.project_service import (
+from backend.requirement_gather.services.project import (
     create_project_with_owner,
     get_project_detail,
 )
-from src.backend.requirement_gather.services.requirement_agent_service import (
+from backend.requirement_gather.services.requirement_gather import (
     run_requirement_agent,
     start_requirement_agent,
 )
