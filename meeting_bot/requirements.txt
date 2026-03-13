@@ -1,0 +1,21 @@
+# ── Browser automation ─────────────────────────────────────────────────────────
+playwright>=1.43.0
+
+# ── API Server ────────────────────────────────────────────────────────────────
+fastapi>=0.110.0
+uvicorn>=0.29.0
+pydantic>=2.7.0
+
+# ── Configuration ──────────────────────────────────────────────────────────────
+python-dotenv>=1.0.0
+
+# ── Testing ────────────────────────────────────────────────────────────────────
+pytest>=8.0.0
+pytest-asyncio>=0.23.0
+
+# ── Code quality ───────────────────────────────────────────────────────────────
+ruff>=0.4.0
+
+# ── System dependencies (installed via Homebrew, NOT pip) ──────────────────────
+# brew install ffmpeg
+# brew install blackhole-2ch
