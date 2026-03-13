@@ -12,6 +12,7 @@ from src.backend.collaborative_document.utils.block_sync_worker import (
 )
 
 from src.backend.auth import routes as auth_routes
+from src.backend.project import routes as project_routes
 from src.backend.resume_parsing import routes as resume_routes
 
 # Import all models to ensure they are registered with Base before create_all
@@ -33,8 +34,8 @@ app.include_router(block_routes.router)
 app.include_router(ws_routes.router)
 
 app.include_router(auth_routes.router)
+app.include_router(project_routes.router)
 app.include_router(resume_routes.router)
-
 
 
 @app.on_event("startup")
