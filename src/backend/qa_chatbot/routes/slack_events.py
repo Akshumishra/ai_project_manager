@@ -4,7 +4,7 @@ import requests
 from fastapi import APIRouter, Request
 from langchain_core.messages import HumanMessage, AIMessage
 from src.backend.config import Config
-from src.backend.constants import SLACK_CONVERSATIONS_REPLIES_URL, MAX_TS_HISTORY, SLACK_API_TIMEOUT
+from src.backend.constants import SlackConstants
 from src.backend.qa_chatbot.services.send_slack_message import send_message
 from src.backend.qa_chatbot.services.context_resolver import (
     get_project_id_from_channel,
@@ -23,12 +23,12 @@ logger.info(f"SLACK_BOT_TOKEN set={bool(Config.SLACK_BOT_TOKEN)}")
 processed_ts: set = set()
 
 def get_thread_history(channel_id: str, thread_ts: str) -> list:
-    url = SLACK_CONVERSATIONS_REPLIES_URL
+    url = SlackConstants.CONVERSATIONS_REPLIES_URL
     headers = {"Authorization": f"Bearer {Config.SLACK_BOT_TOKEN}"}
     params  = {"channel": channel_id, "ts": thread_ts}
 
     try:
-        resp = requests.get(url, headers=headers, params=params, timeout=SLACK_API_TIMEOUT)
+        resp = requests.get(url, headers=headers, params=params, timeout=SlackConstants.API_TIMEOUT)
         data = resp.json()
     except Exception as exc:
         logger.error(f"HTTP error fetching thread history: {exc}", exc_info=True)
@@ -86,7 +86,7 @@ async def slack_events(request: Request):
         logger.debug(f"Ignoring duplicate event ts: {ts}")
         return {"status": "duplicate ignored"}
     processed_ts.add(ts)
-    if len(processed_ts) > MAX_TS_HISTORY:
+    if len(processed_ts) > SlackConstants.MAX_TS_HISTORY:
         processed_ts.clear()
 
     if event_type != "message":

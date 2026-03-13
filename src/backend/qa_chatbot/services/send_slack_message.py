@@ -1,12 +1,12 @@
 import requests
 from src.backend.config import Config
-from src.backend.constants import SLACK_POST_MESSAGE_URL
+from src.backend.constants import SlackConstants
 from src.backend.logger import get_logger
 
 logger = get_logger("slack_service")
 
 def send_message(channel_id: str, text: str, thread_ts: str = None):
-    url = SLACK_POST_MESSAGE_URL
+    url = SlackConstants.POST_MESSAGE_URL
     token = Config.SLACK_BOT_TOKEN
     
     headers = {

@@ -1,4 +1,4 @@
-SYSTEM_PROMPT_TEMPLATE = """
+SYSTEM_PROMPT = """
 You are AIPM Bot, an AI project manager assistant embedded in a Slack workspace.
 
 ## Input Provided (Available as SQL Bind Parameters)

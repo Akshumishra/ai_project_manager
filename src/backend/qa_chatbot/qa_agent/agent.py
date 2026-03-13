@@ -2,10 +2,10 @@ from typing import List
 
 from langchain_openai import ChatOpenAI
 from src.backend.config import Config
-from src.backend.qa_chatbot.constants import AGENT_MODEL, AGENT_TEMPERATURE
+from src.backend.qa_chatbot.constants import QAAgentConstants
 from langchain_core.messages import SystemMessage, BaseMessage
 from langchain.agents import create_agent
-from src.backend.qa_chatbot.qa_agent.prompt import SYSTEM_PROMPT_TEMPLATE
+from src.backend.qa_chatbot.qa_agent.prompt import SYSTEM_PROMPT
 from src.backend.qa_chatbot.qa_agent.tools.run_sql_query import make_run_sql_query_tool
 from src.backend.logger import get_logger
 
@@ -30,8 +30,8 @@ class ProjectAwareAgent:
 
     def _create_llm(self) -> ChatOpenAI:
         return ChatOpenAI(
-            model=AGENT_MODEL,
-            temperature=AGENT_TEMPERATURE,
+            model=QAAgentConstants.MODEL,
+            temperature=QAAgentConstants.TEMPERATURE,
             api_key=Config.OPENAI_API_KEY,
         )
 
@@ -48,7 +48,7 @@ class ProjectAwareAgent:
         return create_agent(
             model=self.llm,
             tools=self.tools,
-            system_prompt=SYSTEM_PROMPT_TEMPLATE,
+            system_prompt=SYSTEM_PROMPT,
         )
 
     def run(self, messages: List[BaseMessage]) -> str:

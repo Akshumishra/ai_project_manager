@@ -1,2 +1,3 @@
-AGENT_MODEL = "gpt-4o-mini"
-AGENT_TEMPERATURE = 0
+class QAAgentConstants:
+    MODEL = "gpt-4.1-mini"
+    TEMPERATURE = 0.7

@@ -2,7 +2,6 @@ from langchain_core.tools import tool
 from sqlalchemy import text
 from src.backend.db.database import SessionLocal
 from src.backend.config import Config
-from src.backend.constants import SLACK_POST_MESSAGE_URL
 from src.backend.logger import get_logger
 
 logger = get_logger("sql_tool")
