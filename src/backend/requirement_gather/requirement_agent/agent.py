@@ -57,7 +57,6 @@ class RequirementAgent:
         response_messages = response["messages"]
         last_message = response_messages[-1]
         
-        # Ensure we return a string content, handling potential non-string attributes gracefully
         content = getattr(last_message, "content", "")
         if not isinstance(content, str):
             content = str(content)

@@ -9,7 +9,7 @@ from src.backend.requirement_gather.services.requirement_gather import (
 )
 from src.backend.requirement_gather.services.project import create_project_with_owner
 from src.backend.requirement_gather.schemas import CreateProjectRequest, RequirementAgentRequest
-from src.backend.utils import get_project_detail
+from src.backend.utils.get_project_details import get_project_detail
 
 router = APIRouter()
 

@@ -100,14 +100,13 @@ Respond with only one of these:
 3. A confirmation question
 4. A tool call
 5. A completion message
+6. FINAL documentation should be well structured and in markdown format.
 
 Rules for responses:
 - **Never ask more than one question per message.**
 - Keep the conversation short. Try to ask necessary questions concisely.
 - Do not blindly agree; offer strategic suggestions.
 - Do not stall; move to generating the document as soon as you have a solid high-level understanding.
-
-provide final requirement document in markdons format.
 """
 
 USER_PROMPT = """

@@ -4,7 +4,7 @@ from uuid import UUID
 from src.backend.model.requirement_chat import RequirementChat
 from src.backend.model.project import ProjectMember
 from src.backend.requirement_gather.requirement_agent.prompt import USER_PROMPT
-from src.backend.utils import get_project_detail
+from src.backend.utils.get_project_details import get_project_detail
 
 
 def get_chat_history(db: Session, project_id: UUID) -> list:

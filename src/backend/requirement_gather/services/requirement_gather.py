@@ -1,4 +1,4 @@
-from datetime import datetime, timezone, timedelta
+from typing import List, Dict, Any
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from uuid import UUID
@@ -9,173 +9,82 @@ from src.backend.requirement_gather.services.chat_history import (
     save_chat_message,
     build_initial_user_prompt
 )
+from src.backend.utils.workflow_utils import (
+    set_workflow_status,
+    check_completion_and_redirect,
+    handle_thinking_lock
+)
+from src.backend.requirement_gather.constants import RequirementAgentConstants
 
-from src.backend.model.document import Document
-from src.backend.model.project import ProjectWorkflowStatus
+C = RequirementAgentConstants
+
+def _execute_agent_run(db: Session, user_id: UUID, project_id: UUID, run_messages: List[Dict[str, str]], is_healing: bool = False) -> Dict[str, Any]:
+    """Internal helper to execute the agent, save output, and manage thinking lock."""
+    set_workflow_status(db, project_id, C.WORKFLOW_NAME, "thinking")
+    agent = RequirementAgent(user_id, project_id)
+    
+    try:
+        response = agent.run(run_messages)
+        content = response.get("content")
+        
+        if not content:
+            raise HTTPException(status_code=500, detail="Agent returned empty response")
+        
+        save_chat_message(db=db, project_id=project_id, role="assistant", content=content)
+        
+        if not response.get("saved", False):
+            set_workflow_status(db, project_id, C.WORKFLOW_NAME, "in_progress")
+            
+        if is_healing:
+            return {
+                "messages": get_chat_history(db, project_id),
+                "status": "resumed",
+                "saved": response.get("saved", False)
+            }
+        
+        return response
+
+    except Exception as e:
+        set_workflow_status(db, project_id, C.WORKFLOW_NAME, "in_progress")
+        if isinstance(e, HTTPException):
+            raise e
+        raise HTTPException(status_code=500, detail=f"Agent failed: {str(e)}")
 
 def start_requirement_agent(db: Session, user_id: UUID, project_id: UUID, background: str = None):
-    # 1. Check Workflow Status first for redirection
-    wf_status = db.query(ProjectWorkflowStatus).filter(
-        ProjectWorkflowStatus.project_id == project_id,
-        ProjectWorkflowStatus.workflow_name == "requirement_gathering"
-    ).first()
-
-    if wf_status and wf_status.status == "completed":
-        return {
-            "status": "completed",
-            "saved": True,
-            "redirect": "/tech-doc"
-        }
+    """Entry point for starting or resuming the requirement gathering session."""
+    
+    redirect = check_completion_and_redirect(db, project_id, C.WORKFLOW_NAME, C.REDIRECT_PATH)
+    if redirect:
+        return redirect
 
     history = get_chat_history(db, project_id)
-    
-    # 2. Self-Healing Chat Resumption
-    # If the last message is from 'user', it means the page refreshed before assistant replied.
     is_interrupted = history and history[-1]["role"] == "user"
     
-    # Check for concurrency: is the agent already thinking?
-    is_thinking = wf_status and wf_status.status == "thinking"
-    is_stale = False
-    if is_thinking and wf_status.updated_at:
-        # If thinking for more than 60 seconds, consider it stale/crashed
-        if datetime.now(timezone.utc) - wf_status.updated_at.replace(tzinfo=timezone.utc) > timedelta(seconds=60):
-            is_stale = True
-
-    # If it's thinking and NOT stale, just return history (don't trigger healer)
-    if is_interrupted and is_thinking and not is_stale:
-        return {
-            "messages": history,
-            "status": "resumed",
-            "thinking": True
-        }
+    if is_interrupted and handle_thinking_lock(db, project_id, C.WORKFLOW_NAME):
+        return {"messages": history, "status": "resumed", "thinking": True}
 
     if history and not is_interrupted:
-        return {
-            "messages": history,
-            "status": "resumed"
-        }
+        return {"messages": history, "status": "resumed"}
 
-    # build the dynamic personalized context (non-persistent)
     project_context = build_initial_user_prompt(db, project_id, background)
-
-    # Prepare messages for the LLM
-    # Note: project_context is prepended as a USER message but NOT saved to DB
     run_messages = [{"role": "user", "content": project_context}]
     if history:
         run_messages.extend(history)
     
-    # Set status to thinking for concurrency control during healing
-    if not wf_status:
-        wf_status = ProjectWorkflowStatus(
-            project_id=project_id,
-            workflow_name="requirement_gathering",
-            status="thinking"
-        )
-        db.add(wf_status)
-    else:
-        wf_status.status = "thinking"
-    db.commit()
+    result = _execute_agent_run(db, user_id, project_id, run_messages, is_healing=is_interrupted)
+    if not is_interrupted:
+        result["status"] = "started"
+    return result
 
-    agent = RequirementAgent(user_id, project_id)
+def run_requirement_agent(db: Session, user_id: UUID, project_id: UUID, user_message: str, background: str = None):
+    """Process a new user message in the requirement gathering session."""
     
-    try:
-        response = agent.run(run_messages)
-    except Exception as e:
-        wf_status.status = "in_progress"
-        db.commit()
-        raise HTTPException(status_code=500, detail=f"Agent failed: {str(e)}")
+    save_chat_message(db=db, project_id=project_id, role="user", content=user_message, user_id=user_id)
     
-    content = response.get("content")
-    
-    if not content:
-        wf_status.status = "in_progress"
-        db.commit()
-        raise HTTPException(status_code=500, detail="Agent returned empty response")
-    
-    save_chat_message(
-        db=db,
-        project_id=project_id,
-        role="assistant",
-        content=content
-    )
-    
-    # Reset status only if NOT completed
-    is_saved = response.get("saved", False)
-    if not is_saved:
-        wf_status.status = "in_progress"
-        db.commit()
-
-    if history:
-        return {
-            "messages": get_chat_history(db, project_id),
-            "status": "resumed",
-            "saved": response.get("saved", False)
-        }
-
-    response["status"] = "started"
-    return response
-
-def run_requirement_agent(db: Session, user_id: UUID, project_id: UUID, user_message: str = None, background: str = None):
     history = get_chat_history(db, project_id)
-    
-    save_chat_message(
-        db=db,
-        project_id=project_id,
-        role="user",
-        content=user_message,
-        user_id=user_id
-    )
-
     project_context = build_initial_user_prompt(db, project_id, background)
-
-    # Prepare messages for the LLM: dynamic context + persistent history + new message
-    run_messages = [
-        {"role": "user", "content": project_context},
-        *history,
-        {"role": "user", "content": user_message}
-    ]
-
-    # Set status to thinking for concurrency control
-    wf_status = db.query(ProjectWorkflowStatus).filter(
-        ProjectWorkflowStatus.project_id == project_id,
-        ProjectWorkflowStatus.workflow_name == "requirement_gathering"
-    ).first()
-    if not wf_status:
-        wf_status = ProjectWorkflowStatus(
-            project_id=project_id,
-            workflow_name="requirement_gathering",
-            status="thinking"
-        )
-        db.add(wf_status)
-    else:
-        wf_status.status = "thinking"
-    db.commit()
-
-    agent = RequirementAgent(user_id, project_id)
-
-    try:
-        response = agent.run(run_messages)
-        
-        content = response.get("content")
-        if not content:
-            raise HTTPException(status_code=500, detail="Agent returned empty response")
-
-        save_chat_message(
-            db=db,
-            project_id=project_id,
-            role="assistant",
-            content=content
-        )
-        
-        # Reset status ONLY if it wasn't marked as completed by a tool
-        is_saved = response.get("saved", False)
-        if not is_saved:
-            wf_status.status = "in_progress"
-            db.commit()
-        return response
-
-    except Exception as e:
-        # Reset on error to allow retry
-        wf_status.status = "in_progress"
-        db.commit()
-        raise HTTPException(status_code=500, detail=f"Agent failed: {str(e)}")
+    
+    # Include the full persisted conversation, which now contains the latest user message.
+    run_messages = [{"role": "user", "content": project_context}, *history]
+    
+    return _execute_agent_run(db, user_id, project_id, run_messages)
