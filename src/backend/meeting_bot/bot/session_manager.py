@@ -59,7 +59,15 @@ class SessionManager:
             # ── 1. Start recording BEFORE joining so we capture everything. ──
             logger.info("Starting audio recorder…")
             output_path = await self._recorder.async_start()
-            logger.info("Recording to: %s", output_path)
+            
+            # Give ffmpeg a moment to initialize and check if it's still alive.
+            # If it dies immediately (e.g. invalid device), we shouldn't continue.
+            await asyncio.sleep(2.0)
+            if not self._recorder.is_recording:
+                logger.error("Audio recorder failed to stay alive. Check logs for ffmpeg errors.")
+                raise RuntimeError("Audio recorder failed to start properly (invalid device or configuration).")
+
+            logger.info("Recorder started successfully. Output path: %s", output_path)
 
             # ── 2. Set up browser and join meeting. ───────────────────────────
             await self._bot.setup()

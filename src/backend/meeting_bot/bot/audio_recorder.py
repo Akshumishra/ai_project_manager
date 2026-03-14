@@ -83,13 +83,19 @@ class AudioRecorder:
         logger.info("Starting audio capture → %s", self._output_path)
         logger.debug("ffmpeg command: %s", " ".join(cmd))
 
-        self._process = subprocess.Popen(
-            cmd,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.PIPE,  # Capture stderr to surface useful error messages.
-        )
-        logger.info("ffmpeg PID=%d recording started.", self._process.pid)
+        try:
+            self._process = subprocess.Popen(
+                cmd,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
+                text=False, # We want raw bytes for stdin.write('q\n')
+            )
+            logger.info("ffmpeg PID=%d recording started.", self._process.pid)
+        except Exception as e:
+            logger.error("Failed to spawn ffmpeg: %s", e)
+            raise RuntimeError(f"Failed to start ffmpeg: {e}")
+
         return self._output_path
 
     def stop(self) -> Path | None:
@@ -105,20 +111,20 @@ class AudioRecorder:
 
         logger.info("Stopping audio capture (PID=%d)…", self._process.pid)
 
-        try:
-            if self._process.stdin:
-                try:
-                    # ffmpeg stops cleanly when it receives 'q' on stdin.
-                    self._process.stdin.write(b"q\n")
-                    self._process.stdin.flush()
-                except (BrokenPipeError, OSError):
-                    # Process might already be dead.
-                    pass
-        except Exception as exc:
-            logger.debug("Error while sending stop signal to ffmpeg: %s", exc)
+        if self._process.stdin:
+            try:
+                # ffmpeg stops cleanly when it receives 'q' on stdin.
+                self._process.stdin.write(b"q\n")
+                self._process.stdin.flush()
+                self._process.stdin.close() # Ensure it's closed
+            except (BrokenPipeError, OSError):
+                # Process might already be dead.
+                pass
+            except Exception as exc:
+                logger.debug("Error while sending stop signal to ffmpeg: %s", exc)
 
         try:
-            self._process.wait(timeout=10)
+            self._process.wait(timeout=5)
             logger.info("ffmpeg exited (returncode=%d).", self._process.returncode)
         except subprocess.TimeoutExpired:
             logger.warning("ffmpeg did not exit in time — killing process.")
@@ -128,13 +134,19 @@ class AudioRecorder:
         # Log any critical ffmpeg errors.
         try:
             if self._process.stderr:
-                stderr_tail = self._process.stderr.read().decode(errors="replace")[
-                    -500:
-                ]
-                if stderr_tail:
-                    logger.debug("ffmpeg stderr tail:\n%s", stderr_tail)
-        except Exception:
-            pass
+                # Use .read() as the process is finishing/finished
+                stderr_all = self._process.stderr.read().decode(errors="replace")
+                if self._process.returncode not in (None, 0, 255):
+                    logger.error("ffmpeg failed with returncode %d. Stderr:\n%s", 
+                                 self._process.returncode, stderr_all)
+                elif stderr_all:
+                    logger.debug("ffmpeg stderr tail:\n%s", stderr_all[-500:])
+        except Exception as e:
+            # We use a very simple print if logger itself fails or pipe is broken
+            try:
+                logger.debug("Could not read ffmpeg stderr (possibly already dead): %s", e)
+            except Exception:
+                pass
 
         self._process = None
         logger.info("Recording session finalized.")
@@ -157,19 +169,37 @@ class AudioRecorder:
         """
         Find the AVFoundation audio device index for *device_name*.
 
-        Runs ``ffmpeg -f avfoundation -list_devices true -i ""`` and parses
-        the stderr output. Falls back to the raw device name if parsing fails
-        (ffmpeg accepts both indices and names for `-i`).
+        Short-circuits if *device_name* is already a numeric string.
+        Otherwise, runs ``ffmpeg -f avfoundation -list_devices true -i ""``
+        and parses the stderr output.
         """
+        if device_name.isdigit():
+            logger.debug("Device name '%s' is already an index.", device_name)
+            return device_name
+
         try:
-            result = subprocess.run(
+            logger.debug("Resolving audio device index for: %s", device_name)
+            # Use stdin=DEVNULL to avoid background suspension
+            process = subprocess.Popen(
                 ["ffmpeg", "-f", "avfoundation", "-list_devices", "true", "-i", ""],
-                capture_output=True,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
                 text=True,
-                timeout=10,
             )
-            # Device list appears in stderr.
-            output = result.stderr
+            try:
+                # ffmpeg device list is on stderr
+                _, stderr = process.communicate(timeout=5)
+                output = stderr
+            except subprocess.TimeoutExpired:
+                process.kill()
+                # Re-reap the process to avoids zombies
+                process.wait()
+                logger.warning("ffmpeg device listing timed out. Falling back to name.")
+                return device_name
+            except Exception as e:
+                logger.warning("Error during ffmpeg device listing: %s", e)
+                return device_name
 
             # Parse lines like: [AVFoundation indev @ ...] [3] BlackHole 2ch
             in_audio_section = False
@@ -188,6 +218,8 @@ class AudioRecorder:
                             "Resolved '%s' → device index %s.", device_name, idx
                         )
                         return idx
+        except subprocess.TimeoutExpired:
+            logger.warning("ffmpeg device listing timed out. Falling back to name.")
         except Exception as exc:
             logger.warning("Could not auto-resolve audio device index: %s", exc)
 
