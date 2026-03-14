@@ -166,32 +166,10 @@ def _delete_old_documents(db: Session, project_id: UUID, titles: List[str]):
     if old_docs:
         db.flush()
 
-def _create_document_blocks(db: Session, doc_id: UUID, user_id: UUID, markdown: str):
-    """Parses markdown and saves it as individual document blocks."""
-    parsed = split_markdown_sections(markdown)
-    blocks_to_save: List[tuple[str, str, str]] = []
+# Helper functions removed as they are replaced by collaborative_document.services
 
-    intro = parsed["intro"]
-    if intro:
-        blocks_to_save.append(("0000_intro", "markdown", intro))
-
-    for index, section in enumerate(parsed["sections"], start=1):
-        position_key = f"{index:04d}_{_slugify_heading(section['heading'])}"
-        blocks_to_save.append((position_key, "markdown", section["content"]))
-
-    if not blocks_to_save:
-        blocks_to_save.append(("0000_full_doc", "markdown", (markdown or "").strip()))
-
-    for position_key, block_type, content in blocks_to_save:
-        db.add(
-            DocumentBlock(
-                doc_id=doc_id,
-                content=content,
-                position_key=position_key,
-                type=block_type,
-                last_edited_by=user_id,
-            )
-        )
+from src.backend.collaborative_document import services as doc_services, schemas as doc_schemas
+from src.backend.model.user import User
 
 def save_markdown_as_section_blocks(
     db: Session,
@@ -210,16 +188,40 @@ def save_markdown_as_section_blocks(
         # 1. Cleanup
         _delete_old_documents(db, project_id, title_candidates)
 
-        # 2. Create Document
-        new_doc = Document(project_id=project_id, title=document_title, created_by=user_id)
-        db.add(new_doc)
-        db.flush()
+        # 2. Prepare user and data
+        current_user = db.query(User).filter(User.id == user_id).first()
+        if not current_user:
+            raise HTTPException(status_code=404, detail="User not found")
 
-        # 3. Create Blocks
-        _create_document_blocks(db, new_doc.id, user_id, document_markdown)
+        parsed = split_markdown_sections(document_markdown)
+        doc_create_data = doc_schemas.DocumentCreate(
+            title=document_title,
+            project_id=project_id
+        )
 
-        db.commit()
-        return str(new_doc.id)
+        blocks_payload = []
+        intro = parsed["intro"]
+        if intro:
+            blocks_payload.append(doc_schemas.BlockCreate(content=intro, type="markdown"))
+
+        for section in parsed["sections"]:
+            content = section["content"]
+            blocks_payload.append(doc_schemas.BlockCreate(content=content, type="markdown"))
+
+        if not blocks_payload:
+            blocks_payload.append(doc_schemas.BlockCreate(content=(document_markdown or "").strip(), type="markdown"))
+
+        # 3. Create Document and Blocks via collaborative service
+        result = doc_services.create_document_with_blocks(
+            data=doc_create_data,
+            blocks_data=blocks_payload,
+            db=db,
+            current_user=current_user
+        )
+
+        return result["document_id"]
+    except HTTPException:
+        raise
     except Exception as exc:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(exc))
