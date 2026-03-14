@@ -206,7 +206,11 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 
+<<<<<<< HEAD
 .vscode/
 .DS_Store
 node_modules/
 package-lock.json
+=======
+insert_dummy_data.py
+>>>>>>> 16760ee (fix: updated .gitignore)
