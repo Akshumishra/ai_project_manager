@@ -163,7 +163,16 @@ function AppContent() {
         syncStatus={syncStatus}
         documentData={documentData}
         onLogout={logout}
-        onBack={() => navigate(-1)}
+        onBack={() => {
+          if (location.pathname === '/') return;
+          if (location.pathname.startsWith('/project/') || 
+              location.pathname.startsWith('/requirement-agent') || 
+              location.pathname.startsWith('/tech-doc')) {
+            navigate('/');
+          } else {
+            navigate(-1);
+          }
+        }}
       />
 
       <div className="app-main-layout">

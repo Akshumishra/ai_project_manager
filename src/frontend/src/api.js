@@ -67,7 +67,7 @@ export const saveRequirementDocRequest = async (projectId, payload) => {
 };
 
 export const startTechDocAgentRequest = async (projectId, userId) => {
-  const { data } = await api.get(`/api/agent/projects/${projectId}/tech-doc-agent/start?user_id=${encodeURIComponent(userId)}`);
+  const { data } = await api.get(`/api/agent/projects/${projectId}/tech-doc-agent?user_id=${encodeURIComponent(userId)}`);
   return data;
 };
 

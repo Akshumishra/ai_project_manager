@@ -68,6 +68,15 @@ def add_project_member(
     )
 
 
+@router.get("/{project_id}/members", response_model=List[schemas.MemberRead])
+def get_project_members(
+    project_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return services.get_project_members(project_id, db, current_user)
+
+
 @router.get(
     "/{project_id}/tasks",
     response_model=List[schemas.TaskRead],

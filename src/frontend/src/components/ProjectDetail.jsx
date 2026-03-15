@@ -2,13 +2,18 @@ import { useCallback, useEffect, useState } from 'react';
 import api, { getProjectTasksRequest, createProjectTaskRequest } from '../api';
 import { useAuth } from '../context/AuthContext';
 import InviteModal from './InviteModal';
+import ProjectMembersModal from './ProjectMembersModal';
+import AddTaskModal from './AddTaskModal';
 
 export default function ProjectDetail({ projectId, onSelectDocument, onBack }) {
   const [documents, setDocuments] = useState([]);
   const [tasks, setTasks] = useState([]);
+  const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('documents');
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+  const [isMembersModalOpen, setIsMembersModalOpen] = useState(false);
+  const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const { user } = useAuth();
 
   const fetchDocuments = useCallback(async () => {
@@ -29,6 +34,15 @@ export default function ProjectDetail({ projectId, onSelectDocument, onBack }) {
     }
   }, [projectId]);
 
+  const fetchMembers = useCallback(async () => {
+    try {
+      const res = await api.get(`/api/projects/${projectId}/members`);
+      setMembers(res.data);
+    } catch (err) {
+      console.error('Failed to fetch members:', err);
+    }
+  }, [projectId]);
+
   useEffect(() => {
     const load = async () => {
       setLoading(true);
@@ -46,7 +60,7 @@ export default function ProjectDetail({ projectId, onSelectDocument, onBack }) {
         } catch (e) {
           console.warn("Status check failed in detail page", e);
         }
-        await Promise.all([fetchDocuments(), fetchTasks()]);
+        await Promise.all([fetchDocuments(), fetchTasks(), fetchMembers()]);
       }
       setLoading(false);
     };
@@ -98,24 +112,12 @@ export default function ProjectDetail({ projectId, onSelectDocument, onBack }) {
     }
   };
 
-  const handleCreateTask = async () => {
-    const name = prompt('Task title:');
-    if (!name) return;
-    const description = prompt('Task description (optional):') || '';
-    const deadlineInput = prompt('Deadline (YYYY-MM-DD, optional):');
-    const payload = {
-      name,
-      description,
-      deadline: deadlineInput ? new Date(deadlineInput).toISOString() : null,
-    };
+  const handleCreateTask = () => {
+    setIsTaskModalOpen(true);
+  };
 
-    try {
-      const created = await createProjectTaskRequest(projectId, payload);
-      setTasks(prev => [created, ...prev]);
-    } catch (err) {
-      console.error('Failed to create task:', err);
-      alert('Failed to create task');
-    }
+  const onTaskCreated = (newTask) => {
+    setTasks(prev => [newTask, ...prev]);
   };
 
   if (loading) {
@@ -147,6 +149,12 @@ export default function ProjectDetail({ projectId, onSelectDocument, onBack }) {
                 <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/>
               </svg>
               Add Member
+            </button>
+            <button className="btn btn-outline" onClick={() => setIsMembersModalOpen(true)}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '6px' }}>
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+              </svg>
+              View All Members
             </button>
           </div>
         </header>
@@ -265,8 +273,57 @@ export default function ProjectDetail({ projectId, onSelectDocument, onBack }) {
                       </div>
                       <p className="task-description">{task.description}</p>
                       <div className="task-meta">
-                        {task.deadline && (
-                          <span>Deadline: {new Date(task.deadline).toLocaleDateString()}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                          {task.deadline && (
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                              {new Date(task.deadline).toLocaleDateString()}
+                            </span>
+                          )}
+                          {task.complexity && (
+                            <span className={`badge-complexity ${task.complexity.toLowerCase()}`} style={{
+                              padding: '2px 8px',
+                              borderRadius: '12px',
+                              fontSize: '10px',
+                              fontWeight: '700',
+                              textTransform: 'uppercase',
+                              backgroundColor: task.complexity.toLowerCase() === 'critical' ? '#fee2e2' : 
+                                             task.complexity.toLowerCase() === 'high' ? '#ffedd5' :
+                                             task.complexity.toLowerCase() === 'medium' ? '#f0f9ff' : '#f0fdf4',
+                              color: task.complexity.toLowerCase() === 'critical' ? '#991b1b' : 
+                                     task.complexity.toLowerCase() === 'high' ? '#9a3412' :
+                                     task.complexity.toLowerCase() === 'medium' ? '#075985' : '#166534',
+                            }}>
+                              {task.complexity}
+                            </span>
+                          )}
+                        </div>
+                        {task.assignee_name && (
+                          <div className="task-assignee" style={{ 
+                            marginTop: '12px',
+                            paddingTop: '12px',
+                            borderTop: '1px solid var(--gray-100)',
+                            display: 'flex', 
+                            alignItems: 'center',
+                            fontSize: '12px',
+                            color: 'var(--gray-600)'
+                          }}>
+                            <div style={{ 
+                              width: '24px', 
+                              height: '24px', 
+                              borderRadius: '50%', 
+                              background: 'var(--brand-600)', 
+                              color: 'white',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              marginRight: '8px',
+                              fontSize: '10px',
+                              fontWeight: 'bold'
+                            }}>
+                              {task.assignee_name.charAt(0).toUpperCase()}
+                            </div>
+                            <span style={{ fontWeight: '500' }}>{task.assignee_name}</span>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -281,6 +338,20 @@ export default function ProjectDetail({ projectId, onSelectDocument, onBack }) {
           projectId={projectId} 
           isOpen={isInviteModalOpen} 
           onClose={() => setIsInviteModalOpen(false)} 
+        />
+
+        <ProjectMembersModal
+          projectId={projectId}
+          isOpen={isMembersModalOpen}
+          onClose={() => setIsMembersModalOpen(false)}
+        />
+
+        <AddTaskModal
+          isOpen={isTaskModalOpen}
+          onClose={() => setIsTaskModalOpen(false)}
+          projectId={projectId}
+          onSuccess={onTaskCreated}
+          members={members}
         />
       </div>
     </div>

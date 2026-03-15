@@ -1,71 +1,108 @@
 import json
+import uuid
 from sqlalchemy.orm import Session
 
 from src.backend.db.redis import redis_client
 from src.backend.db.database import SessionLocal
 from src.backend.model.document import DocumentBlock
 
-
 def flush_dirty_blocks():
-
     db: Session = SessionLocal()
-
     try:
+        # 1. Process Pending Inserts
+        # Use SMEMBERS to get IDs added via SADD in services.py
+        insert_ids = redis_client.smembers("pending_inserts")
+        for b_id in insert_ids:
+            # b_id is a string from Redis
+            data_json = redis_client.get(f"pending_insert:{b_id}")
+            if not data_json:
+                redis_client.srem("pending_inserts", b_id)
+                continue
+            
+            data = json.loads(data_json)
+            
+            # Optimization: If it's already marked for deletion, skip insertion
+            if redis_client.sismember("pending_deletes", b_id):
+                redis_client.srem("pending_inserts", b_id)
+                redis_client.srem("pending_deletes", b_id)
+                redis_client.delete(f"pending_insert:{b_id}")
+                continue
 
-        # edge case 2.4, 2.5: Get oldest dirty blocks (up to 50 at a time) using ZRANGE
+            # Actual DB Insert with collision resolution
+            try:
+                # DocumentBlock might already exist if fallback to DB occurred during insert_block
+                existing = db.query(DocumentBlock).filter(DocumentBlock.id == b_id).first()
+                if not existing:
+                    new_key = data["position_key"]
+                    MAX_COLLISION_RETRIES = 3
+                    for attempt in range(MAX_COLLISION_RETRIES):
+                        try:
+                            block = DocumentBlock(
+                                id=data["block_id"],
+                                doc_id=data["doc_id"],
+                                content=data["content"],
+                                position_key=new_key,
+                                type=data["type"]
+                            )
+                            db.add(block)
+                            db.commit()
+                            break
+                        except Exception as e:
+                            db.rollback()
+                            if "uq_doc_position" in str(e).lower():
+                                import random
+                                new_key = str(float(new_key) + random.uniform(0.0001, 0.0099))
+                                if attempt == MAX_COLLISION_RETRIES - 1:
+                                    print(f"Permanent collision for {b_id} at {new_key}")
+                            else:
+                                raise e
+                
+                # Success or already exists or permanent collision handled - remove from queue
+                redis_client.srem("pending_inserts", b_id)
+                redis_client.delete(f"pending_insert:{b_id}")
+            except Exception as e:
+                db.rollback()
+                print(f"Critical sync error for {b_id}:", e)
+                # If it's a structural error (not just a collision), we still remove 
+                # to prevent infinite loop. In a production system, we'd move to a dead-letter queue.
+                redis_client.srem("pending_inserts", b_id)
+
+        # 2. Process Pending Edits (Content updates)
         block_ids = redis_client.zrange("dirty_blocks", 0, 49)
-
-        if not block_ids:
-            return
-
-        # block_ids are strings (UUIDs) from Redis, no need to convert to int
-
-        # split into batches of 10 to avoid too large transactions
-        batches = [block_ids[i : i + 10] for i in range(0, len(block_ids), 10)]
-
-        for batch in batches:
-
-            for block_id in batch:
-
-                data = redis_client.get(f"block_update:{block_id}")
-
-                if not data:
-                    # payload expired or removed, pop it from queue
-                    redis_client.zrem("dirty_blocks", str(block_id))
+        if block_ids:
+            for block_id in block_ids:
+                data_json = redis_client.get(f"block_update:{block_id}")
+                if not data_json:
+                    redis_client.zrem("dirty_blocks", block_id)
                     continue
-
-                data = json.loads(data)
-
-                import uuid
-
-                try:
-                    uuid_obj = uuid.UUID(str(block_id))
-                except ValueError:
-                    continue
-
-                block = (
-                    db.query(DocumentBlock).filter(DocumentBlock.id == uuid_obj).first()
-                )
-
+                
+                data = json.loads(data_json)
+                block = db.query(DocumentBlock).filter(DocumentBlock.id == block_id).first()
                 if block:
                     block.content = data.get("content", block.content)
                     block.type = data.get("type", block.type)
-
+            
             try:
                 db.commit()
+                redis_client.zrem("dirty_blocks", *block_ids)
             except Exception as e:
                 db.rollback()
-                print("DB Commit error for batch:", e)
-                # Continue with next batch so one bad block doesn't halt the whole queue
-                continue
+                print("Edit sync error:", e)
 
-            # remove processed blocks from the sorted set
-            if batch:
-                redis_client.zrem("dirty_blocks", *[str(b) for b in batch])
+        # 3. Process Pending Deletes
+        delete_ids = redis_client.smembers("pending_deletes")
+        for b_id in delete_ids:
+            try:
+                block = db.query(DocumentBlock).filter(DocumentBlock.id == b_id).first()
+                if block:
+                    db.delete(block)
+                    db.commit()
+                redis_client.srem("pending_deletes", b_id)
+            except Exception as e:
+                db.rollback()
+                print(f"Delete error for {b_id}:", e)
 
     except Exception as e:
-        db.rollback()
-        print("Batch sync error:", e)
-
+        print("Worker loop error:", e)
     finally:
         db.close()

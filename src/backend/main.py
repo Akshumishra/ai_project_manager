@@ -17,7 +17,6 @@ from src.backend.resume_parsing import routes as resume_routes
 from src.backend.requirement_gather import project_routes as requirement_routes
 from src.backend.technical_doc import tech_doc_route as tech_doc_routes
 
-# Import all models to ensure they are registered with Base before create_all
 import src.backend.model
 
 Base.metadata.create_all(bind=engine)
@@ -44,7 +43,6 @@ app.include_router(tech_doc_routes.router, prefix="/api/agent")
 
 @app.on_event("startup")
 def start_worker():
-    # Initial sweep to recover unsaved edits after a crash
     for _ in range(5):
         flush_dirty_blocks()
 

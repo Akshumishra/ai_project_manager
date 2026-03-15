@@ -11,7 +11,6 @@ from src.backend.technical_doc.schemas import TechDocAgentRequest, SaveTechDocRe
 
 router = APIRouter()
 
-@router.get("/projects/{project_id}/tech-doc-agent/start")
 @router.get("/projects/{project_id}/tech-doc-agent")
 def start_tech_doc_agent(project_id: UUID, user_id: UUID, db: Session = Depends(get_db)):
     response = run_tech_doc_agent(

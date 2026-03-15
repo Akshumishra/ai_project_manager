@@ -11,6 +11,38 @@ import { getActiveProject, setActiveProject, getUserBackground } from "../utils/
 import { useAuth } from "../context/AuthContext";
 
 function ChatMessage({ role, content }) {
+  const specMarker = content.includes("# Requirement Specification") 
+    ? "# Requirement Specification" 
+    : (content.includes("## 1. Executive Summary") ? "## 1. Executive Summary" : null);
+  
+  if (role === "assistant" && specMarker) {
+    const parts = content.split(specMarker);
+    const conversationalPart = parts[0].trim();
+    
+    return (
+      <div className={`message ai`}>
+        <div className="bubble">
+          {conversationalPart && <div dangerouslySetInnerHTML={{ __html: marked.parse(conversationalPart) }} />}
+          <div className="spec-notice" style={{ 
+            marginTop: conversationalPart ? '12px' : '0', 
+            padding: '12px', 
+            borderRadius: '12px',
+            border: '1px solid var(--brand-200)', 
+            background: 'var(--brand-50)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px'
+          }}>
+            <span style={{ fontSize: '20px' }}>📄</span>
+            <p style={{ margin: 0, fontSize: '14px', color: 'var(--brand-700)', fontWeight: '500' }}>
+              Requirement Specification has been updated in the canvas.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={`message ${role === "assistant" ? "ai" : "user"}`}>
       <div className="bubble">
@@ -70,10 +102,14 @@ export default function RequirementAgentPage() {
         const initialMessages = res.messages && res.messages.length > 0 ? res.messages : [{ role: "assistant", content: res.content }];
         setMessages(initialMessages);
         
-        // Extract spec if present in history
-        const lastAI = [...initialMessages].reverse().find(m => m.role === "assistant");
-        if (lastAI && lastAI.content.includes("Requirement Specification")) {
-          setSpecContent(lastAI.content);
+        // Extract spec if present in history or explicitly returned
+        if (res.doc) {
+          setSpecContent(res.doc);
+        } else {
+          const lastAI = [...initialMessages].reverse().find(m => m.role === "assistant");
+          if (lastAI && (lastAI.content.includes("Requirement Specification") || lastAI.content.includes("## 1. Executive Summary"))) {
+            setSpecContent(lastAI.content);
+          }
         }
         
         setChatStatus("Ready to chat");
@@ -109,12 +145,16 @@ export default function RequirementAgentPage() {
       const finalMessages = [...newMessages, { role: "assistant", content: res.content }];
       setMessages(finalMessages);
 
-      if (res.content.includes("Requirement Specification")) {
+      // Prioritize res.doc (extracted from tool calls) over content-based detection
+      if (res.doc) {
+        setSpecContent(res.doc);
+      } else if (res.content && (res.content.includes("Requirement Specification") || res.content.includes("## 1. Executive Summary"))) {
         setSpecContent(res.content);
       }
 
       if (res.saved) {
-        setTimeout(() => navigate(`/tech-doc?project_id=${encodeURIComponent(activeProjectId)}`), 1500);
+        setChatStatus("Finalizing specification...");
+        setTimeout(() => navigate(`/tech-doc?project_id=${encodeURIComponent(activeProjectId)}`), 2000);
       }
     } catch (err) {
       console.error("Message failed:", err);
@@ -127,9 +167,18 @@ export default function RequirementAgentPage() {
   return (
     <div className="agent-workspace">
       <header className="workspace-header">
-        <div className="project-info">
-          <span className="eyebrow">Requirement Gathering</span>
-          <h1>{projectTitle}</h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <button 
+            className="btn-close" 
+            onClick={() => navigate('/')}
+            style={{ fontSize: '24px', background: 'var(--gray-100)', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          >
+            &larr;
+          </button>
+          <div className="project-info">
+            <span className="eyebrow">Requirement Gathering</span>
+            <h1>{projectTitle}</h1>
+          </div>
         </div>
         <div className="agent-status" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <div className="h-stack gap-2">
@@ -140,7 +189,7 @@ export default function RequirementAgentPage() {
       </header>
 
       <div className="workspace-body">
-        <section className="chat-panel">
+        <section className="chat-panel" style={{ borderRight: specContent ? '1px solid #e2e8f0' : 'none' }}>
           <div className="messages" ref={chatBoxRef}>
             {messages.map((m, i) => <ChatMessage key={i} role={m.role} content={m.content} />)}
             {loading && (
@@ -164,22 +213,20 @@ export default function RequirementAgentPage() {
           </div>
         </section>
 
-        <section className="canvas-panel">
-          <div className="canvas-header">
-            <h2>Specification Canvas</h2>
-          </div>
-          <div className="canvas-content">
-            <div className="canvas-container">
-              <div className="inner-canvas-scroller">
-                {specContent ? (
+        {specContent && (
+          <section className="canvas-panel">
+            <div className="canvas-header">
+              <h2>Specification Canvas</h2>
+            </div>
+            <div className="canvas-content">
+              <div className="canvas-container">
+                <div className="inner-canvas-scroller">
                   <div className="markdown-body" dangerouslySetInnerHTML={{ __html: marked.parse(specContent) }} />
-                ) : (
-                  <p className="placeholder">The requirement specification will appear here as the conversation progresses.</p>
-                )}
+                </div>
               </div>
             </div>
-          </div>
-        </section>
+          </section>
+        )}
       </div>
     </div>
   );

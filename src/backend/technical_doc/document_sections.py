@@ -212,7 +212,7 @@ def save_markdown_as_section_blocks(
             blocks_payload.append(doc_schemas.BlockCreate(content=(document_markdown or "").strip(), type="markdown"))
 
         # 3. Create Document and Blocks via collaborative service
-        result = doc_services.create_document_with_blocks(
+        result = doc_services.create_document(
             data=doc_create_data,
             blocks_data=blocks_payload,
             db=db,

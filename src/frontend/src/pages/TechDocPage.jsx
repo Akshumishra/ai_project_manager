@@ -10,6 +10,38 @@ import { useAuth } from "../context/AuthContext";
 import { getActiveProject } from "../utils/storage";
 
 function ChatMessage({ role, content }) {
+  const docMarker = content.includes("— Technical Specification") 
+    ? "— Technical Specification" 
+    : (content.includes("## Architecture Overview") ? "## Architecture Overview" : null);
+  
+  if (role === "assistant" && docMarker) {
+    const parts = content.split(docMarker);
+    const conversationalPart = parts[0].trim();
+    
+    return (
+      <div className={`message ai`}>
+        <div className="bubble">
+          {conversationalPart && <div dangerouslySetInnerHTML={{ __html: marked.parse(conversationalPart) }} />}
+          <div className="spec-notice" style={{ 
+            marginTop: conversationalPart ? '12px' : '0', 
+            padding: '12px', 
+            borderRadius: '12px',
+            border: '1px solid var(--brand-200)', 
+            background: 'var(--brand-50)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px'
+          }}>
+            <span style={{ fontSize: '20px' }}>📄</span>
+            <p style={{ margin: 0, fontSize: '14px', color: 'var(--brand-700)', fontWeight: '500' }}>
+              Technical Specification has been updated in the canvas.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={`message ${role === "assistant" ? "ai" : "user"}`}>
       <div className="bubble">
@@ -58,7 +90,6 @@ export default function TechDocPage() {
           return;
         }
 
-        // Robust message extraction focusing on both content and messages array
         if (data.content || data.message) {
           const initialContent = data.content || data.message;
           setMessages([{ role: "assistant", content: initialContent }]);
@@ -126,9 +157,18 @@ export default function TechDocPage() {
   return (
     <div className="agent-workspace">
       <header className="workspace-header">
-        <div className="project-info">
-          <span className="eyebrow">Technical Document</span>
-          <h1>{projectTitle || "Project Technical Document"}</h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <button 
+            className="btn-close" 
+            onClick={() => navigate('/')}
+            style={{ fontSize: '24px', background: 'var(--gray-100)', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          >
+            &larr;
+          </button>
+          <div className="project-info">
+            <span className="eyebrow">Technical Document</span>
+            <h1>{projectTitle || "Project Technical Document"}</h1>
+          </div>
         </div>
         <div className="agent-status">
           <span className={`status-dot ${loading ? "busy" : "idle"}`}></span>
@@ -169,9 +209,6 @@ export default function TechDocPage() {
           <div className="canvas-header">
             <h2>Technical Document</h2>
             <div className="h-stack gap-2">
-              <button className="btn btn-ghost btn-sm" onClick={() => navigate(-1)}>
-                Back
-              </button>
               <button
                 className="btn btn-primary btn-sm"
                 onClick={handleSave}

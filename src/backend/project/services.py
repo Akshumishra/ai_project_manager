@@ -105,6 +105,9 @@ def get_project_tasks(project_id: UUID, db: Session, current_user: User):
         .order_by(Task.created_at.desc())
         .all()
     )
+    for task in tasks:
+        if task.assignee and task.assignee.user:
+            task.assignee_name = task.assignee.user.name or task.assignee.user.email
     return tasks
 
 
@@ -116,6 +119,7 @@ def create_project_task(
     new_task = Task(
         name=data.name,
         description=data.description,
+        complexity=data.complexity,
         deadline=data.deadline,
         project_id=project.id,
         project_member_id=data.project_member_id,
@@ -124,6 +128,11 @@ def create_project_task(
     db.add(new_task)
     db.commit()
     db.refresh(new_task)
+    
+    # Enrich with assignee_name for the immediate response
+    if new_task.assignee and new_task.assignee.user:
+        new_task.assignee_name = new_task.assignee.user.name or new_task.assignee.user.email
+        
     return new_task
 
 
@@ -180,3 +189,25 @@ def add_project_member(
     )
 
     return {"message": f"User {target_email} added to project."}
+
+
+def get_project_members(project_id: UUID, db: Session, current_user: User):
+    _ensure_project_access(project_id, db, current_user)
+    
+    members = (
+        db.query(User, ProjectMember.id.label("project_member_id"))
+        .join(ProjectMember, ProjectMember.user_id == User.id)
+        .filter(ProjectMember.project_id == project_id)
+        .all()
+    )
+    
+    result = []
+    for user_obj, pm_id in members:
+        result.append({
+            "id": pm_id,
+            "user_id": user_obj.id,
+            "name": user_obj.name,
+            "email": user_obj.email,
+            "status": "Active" if user_obj.password_hash else "Pending"
+        })
+    return result

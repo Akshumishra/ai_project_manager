@@ -37,6 +37,7 @@ class AddMemberRequest(BaseModel):
 class TaskBase(BaseModel):
     name: str
     description: Optional[str] = None
+    complexity: Optional[str] = "Medium"
     deadline: Optional[datetime] = None
     project_member_id: Optional[UUID] = None
 
@@ -49,4 +50,12 @@ class TaskRead(TaskBase):
     model_config = ConfigDict(from_attributes=True)
     id: UUID
     project_id: UUID
+    status: str
+    assignee_name: Optional[str] = None
+
+
+class MemberRead(BaseModel):
+    id: UUID
+    name: str
+    email: str
     status: str

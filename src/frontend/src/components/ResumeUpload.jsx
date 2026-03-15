@@ -95,6 +95,7 @@ export default function ResumeUpload({ onComplete }) {
               <label>Designation</label>
               <input 
                 type="text" 
+                className="input"
                 value={parsedData.designation} 
                 onChange={(e) => updateParsedField('designation', e.target.value)}
                 required 
@@ -105,6 +106,7 @@ export default function ResumeUpload({ onComplete }) {
               <label>Experience (Years)</label>
               <input 
                 type="text" 
+                className="input"
                 value={parsedData.experience_years} 
                 onChange={(e) => updateParsedField('experience_years', e.target.value)}
                 required 
@@ -114,6 +116,7 @@ export default function ResumeUpload({ onComplete }) {
             <div className="form-group">
               <label>Skills (comma separated)</label>
               <textarea 
+                className="input"
                 value={parsedData.skills.join(', ')} 
                 onChange={(e) => updateParsedField('skills', e.target.value.split(',').map(s => s.trim()))}
                 rows={4}

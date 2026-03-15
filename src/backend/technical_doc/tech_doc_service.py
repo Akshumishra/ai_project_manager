@@ -78,6 +78,27 @@ def fetch_requirement_specification_text(db: Session, project_id: UUID) -> str:
     blocks = db.query(DocumentBlock).filter(DocumentBlock.doc_id == doc.id).order_by(DocumentBlock.position_key).all()
     return "\n\n".join(block.content for block in blocks if block.content).strip()
 
+def fetch_technical_specification_text(db: Session, project_id: UUID) -> str:
+    """Retrieves the current technical spec draft text."""
+    tech_doc_title = build_project_document_title(db, project_id, C.TECH_DOC_LABEL)
+    project_title = get_project_detail(db, project_id).get("project_title", "")
+    doc = db.query(Document).filter(
+        Document.project_id == project_id,
+        Document.title.in_([
+            tech_doc_title,
+            f"{project_title} - Technical Specification",
+            "{project_title} - Technical Specification",
+            "Technical Specification",
+            C.TECH_DOC_LABEL
+        ]),
+    ).first()
+
+    if not doc:
+        return ""
+
+    blocks = db.query(DocumentBlock).filter(DocumentBlock.doc_id == doc.id).order_by(DocumentBlock.position_key).all()
+    return "\n\n".join(block.content for block in blocks if block.content).strip()
+
 def build_initial_user_prompt(db: Session, project_id: UUID) -> str:
     """Constructs the starting context for the TechDoc agent."""
     project_detail = get_project_detail(db, project_id)
@@ -118,6 +139,22 @@ def _execute_tech_doc_agent_turn(
             
         if updated_doc:
             response["document"] = updated_doc
+            # Auto-save the updated document to the database
+            try:
+                tech_doc_title = build_project_document_title(db, project_id, C.TECH_DOC_LABEL)
+                save_markdown_as_section_blocks(
+                    db=db,
+                    user_id=user_id,
+                    project_id=project_id,
+                    document_title=tech_doc_title,
+                    document_markdown=updated_doc,
+                    legacy_titles=[
+                        f"{C.TECH_DOC_LABEL}",
+                        "Technical Specification",
+                    ],
+                )
+            except Exception as save_err:
+                print(f"Auto-save failed: {save_err}")
 
         if response.get("content"):
             save_tech_doc_chat_message(db, project_id, "assistant", response["content"])
@@ -163,7 +200,15 @@ def run_tech_doc_agent(
             return {"messages": history, "status": "resumed", "thinking": True}
         
         if history and not is_interrupted:
-            return {"messages": history, "status": "resumed"}
+            return {
+                "messages": history, 
+                "status": "resumed",
+                "document": fetch_technical_specification_text(db, project_id)
+            }
+
+    # If document markdown wasn't provided but exists in DB, fetch it
+    if not current_document_markdown:
+        current_document_markdown = fetch_technical_specification_text(db, project_id)
 
     # 3. Context Preparation
     messages = [{"role": "user", "content": build_initial_user_prompt(db, project_id)}]
