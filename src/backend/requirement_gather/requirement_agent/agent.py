@@ -40,12 +40,13 @@ class RequirementAgent:
             system_prompt=SYSTEM_PROMPT
         )
 
+
     def _was_save_tool_called(self, response_messages: List[Any]) -> bool:
         for message in response_messages:
             tool_calls = getattr(message, "tool_calls", None) or []
 
             for tool_call in tool_calls:
-                if tool_call.get("name") == "save_requirement_spec":
+                if tool_call.get("name") == "save_requirement_specification":
                     return True
 
         return False
@@ -54,7 +55,7 @@ class RequirementAgent:
         for message in reversed(response_messages):
             tool_calls = getattr(message, "tool_calls", None) or []
             for tool_call in tool_calls:
-                if tool_call.get("name") == "save_requirement_spec":
+                if tool_call.get("name") == "save_requirement_specification":
                     return tool_call.get("args", {}).get("markdown_content", "")
         return ""
 

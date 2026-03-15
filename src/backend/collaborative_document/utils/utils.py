@@ -56,3 +56,23 @@ def verify_document_access(document_id: UUID, user_id: UUID, db: Session):
         )
 
     return document
+
+
+def create_blocks_from_text(doc_id: UUID, text: str, db: Session, initial_pos: int = 1000, increment: int = 1000):
+
+    from src.backend.model.document import DocumentBlock
+    
+    lines = [line.strip() for line in text.split("\n") if line.strip()]
+    
+    pos = initial_pos
+    for line in lines:
+        block = DocumentBlock(
+            doc_id=doc_id,
+            content=line,
+            type="markdown",
+            position_key=str(pos)
+        )
+        db.add(block)
+        pos += increment
+    
+    db.flush()

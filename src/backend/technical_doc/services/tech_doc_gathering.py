@@ -8,9 +8,6 @@ from src.backend.model.project import ProjectMember
 from src.backend.model.tech_doc_chat import TechDocChat
 from src.backend.technical_doc.document_sections import (
     build_project_document_title,
-    merge_sectioned_markdown,
-    replace_markdown_section,
-    save_markdown_as_section_blocks,
 )
 from src.backend.utils.get_project_details import get_project_detail
 from src.backend.model.project import ProjectWorkflowStatus
@@ -127,31 +124,19 @@ def _execute_tech_doc_agent_turn(
     try:
         response = agent.run(messages)
         
-        # Doc replacement/merge logic
-        if response.get("section_heading") and response.get("section_markdown"):
-            updated_doc = replace_markdown_section(
-                current_doc,
-                response.get("section_heading"),
-                response.get("section_markdown"),
-            )
-        else:
-            updated_doc = merge_sectioned_markdown(current_doc, response.get("document"))
+        # Simplified doc update logic
+        updated_doc = response.get("document")
             
         if updated_doc:
             response["document"] = updated_doc
-            # Auto-save the updated document to the database
+            # Auto-save the updated document to the database using standardized logic
             try:
-                tech_doc_title = build_project_document_title(db, project_id, C.TECH_DOC_LABEL)
-                save_markdown_as_section_blocks(
+                from src.backend.technical_doc.services.save_tech_doc import save_technical_spec_in_db
+                save_technical_spec_in_db(
                     db=db,
                     user_id=user_id,
                     project_id=project_id,
-                    document_title=tech_doc_title,
-                    document_markdown=updated_doc,
-                    legacy_titles=[
-                        f"{C.TECH_DOC_LABEL}",
-                        "Technical Specification",
-                    ],
+                    markdown_content=updated_doc
                 )
             except Exception as save_err:
                 print(f"Auto-save failed: {save_err}")
@@ -237,21 +222,16 @@ def run_tech_doc_agent(
 
 def save_final_tech_doc(db: Session, user_id: UUID, project_id: UUID, document_markdown: str):
     """Explicitly saves the technical document and updates workflow status to completed."""
-    tech_doc_title = build_project_document_title(db, project_id, C.TECH_DOC_LABEL)
-    project_title = get_project_detail(db, project_id).get("project_title", "")
+    from src.backend.technical_doc.services.save_tech_doc import save_technical_spec_in_db
     
-    doc_id = save_markdown_as_section_blocks(
+    success, message = save_technical_spec_in_db(
         db=db,
         user_id=user_id,
         project_id=project_id,
-        document_title=tech_doc_title,
-        document_markdown=document_markdown,
-        legacy_titles=[
-            f"{project_title} - Technical Specification",
-            "{project_title} - Technical Specification",
-            "Technical Specification",
-        ],
+        markdown_content=document_markdown
     )
     
-    set_workflow_status(db, project_id, C.WORKFLOW_NAME, "completed")
-    return {"status": "success", "doc_id": doc_id}
+    if success:
+        return {"status": "success", "message": message}
+    else:
+        raise HTTPException(status_code=500, detail=message)

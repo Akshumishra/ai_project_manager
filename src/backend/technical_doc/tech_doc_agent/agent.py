@@ -49,20 +49,6 @@ class TechDocAgent:
                     return tool_call.get("args", {}).get("document_markdown", "")
         return ""
 
-    def _extract_section_update(self, response_messages: List[Any]) -> Dict[str, str]:
-        for message in reversed(response_messages):
-            tool_calls = getattr(message, "tool_calls", None) or []
-            for tool_call in tool_calls:
-                if tool_call.get("name") == "update_technical_document_section":
-                    args = tool_call.get("args", {})
-                    return {
-                        "section_heading": args.get("section_heading", ""),
-                        "section_markdown": args.get("section_markdown", ""),
-                    }
-        return {
-            "section_heading": "",
-            "section_markdown": "",
-        }
 
     def _was_save_tool_called(self, response_messages: List[Any]) -> bool:
         for message in response_messages:
@@ -79,12 +65,9 @@ class TechDocAgent:
             "messages": messages
         })
         response_messages = response["messages"]
-        section_update = self._extract_section_update(response_messages)
 
         return {
             "content": response_messages[-1].content,
             "document": self._extract_document(response_messages),
-            "section_heading": section_update["section_heading"],
-            "section_markdown": section_update["section_markdown"],
             "saved": self._was_save_tool_called(response_messages),
         }

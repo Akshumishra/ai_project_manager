@@ -14,19 +14,46 @@ from src.backend.model.project import Project, ProjectMember
 from src.backend.model.user import User
 
 
-def create_document(
+def create_document(data: schemas.DocumentCreate, db: Session, current_user: User):
+    project = db.query(Project).filter(Project.id == data.project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    is_member = (
+        db.query(ProjectMember)
+        .filter(
+            ProjectMember.project_id == data.project_id,
+            ProjectMember.user_id == current_user.id,
+        )
+        .first()
+    )
+
+    if project.created_by != current_user.id and not is_member:
+        raise HTTPException(
+            status_code=403, detail="No access to create documents in this project"
+        )
+
+    document = Document(
+        title=data.title, project_id=data.project_id, created_by=current_user.id
+    )
+    db.add(document)
+    db.flush()
+
+    block = DocumentBlock(doc_id=document.id, position_key="1000")
+    db.add(block)
+    db.commit()
+    return {"document_id": str(document.id), "initial_block_id": str(block.id)}
+
+
+def save_document(
     data: schemas.DocumentCreate,
+    markdown_content: str,
     db: Session,
-    current_user: User,
-    blocks_data: list[schemas.BlockCreate] | None = None,
-    markdown_content: str | None = None,
+    current_user: User
 ):
     """
-    Consolidated function to create a document.
-    Handles:
-    1. Simple creation (1 default empty block)
-    2. Batch creation (using blocks_data)
-    3. Markdown-based creation (parsing markdown into blocks)
+    Saves a document by splitting markdown_content into blocks by line.
+    Initial position_key starts at 1000 and increments by 1000.
     """
     project = db.query(Project).filter(Project.id == data.project_id).first()
     if not project:
@@ -52,50 +79,10 @@ def create_document(
     db.add(document)
     db.flush()
 
-    final_blocks = []
+    utils.create_blocks_from_text(document.id, markdown_content, db)
 
-    # Case 1: Markdown Content
-    if markdown_content:
-        import re
-        sections = re.split(r'(?m)^(## .*)', markdown_content)
-        current_block_content = ""
-        for section in sections:
-            if not section.strip(): continue
-            if section.startswith('## '):
-                if current_block_content.strip():
-                    final_blocks.append(schemas.BlockCreate(content=current_block_content.strip(), type="markdown"))
-                current_block_content = section
-            else:
-                current_block_content += section
-        if current_block_content.strip():
-            final_blocks.append(schemas.BlockCreate(content=current_block_content.strip(), type="markdown"))
-
-    # Case 2: Explicit Blocks Data
-    elif blocks_data:
-        final_blocks = blocks_data
-
-    # Case 3: Default (Empty Block)
-    else:
-        final_blocks = [schemas.BlockCreate(content="", type="paragraph", position_key="1000")]
-
-    # Populate Document
-    for i, block_data in enumerate(final_blocks):
-        position_key = block_data.position_key or str((i + 1) * 1000)
-        block = DocumentBlock(
-            doc_id=document.id,
-            content=block_data.content,
-            type=block_data.type or "paragraph",
-            position_key=position_key
-        )
-        db.add(block)
-    
     db.commit()
-    
-    response = {"document_id": str(document.id)}
-    if len(final_blocks) == 1 and not (markdown_content or blocks_data):
-        pass 
-
-    return response
+    return {"document_id": str(document.id)}
 
 
 def get_document(document_id: UUID, db: Session, current_user: User):
@@ -190,12 +177,11 @@ async def delete_block(block_id: str, db: Session, current_user: User):
     doc_id = _find_doc_id_for_block(block_id, db)
     utils.verify_document_access(doc_id, current_user.id, db)
 
-    # 1. Handle Pending Insert
     if redis_client.exists(f"pending_insert:{block_id}"):
         redis_client.srem("pending_inserts", block_id)
         redis_client.delete(f"pending_insert:{block_id}")
     else:
-        # 2. Handle Persisted Block
+
         try:
             redis_client.sadd("pending_deletes", block_id)
         except (redis.ConnectionError, redis.TimeoutError):
@@ -231,8 +217,6 @@ def delete_document(document_id: UUID, db: Session, current_user: User):
     redis_client.delete(f"doc:{document_id}")
     return {"message": "Document deleted"}
 
-
-# --- Private Helpers ---
 
 def _verify_document_exists(doc_id: UUID, db: Session):
     if not db.query(Document).filter(Document.id == doc_id).first():
@@ -270,7 +254,6 @@ def _update_doc_cache(doc_id: UUID, block_update: dict):
         return
 
     doc_data = json.loads(cached)
-    # Update existing or add new
     found = False
     for b in doc_data["blocks"]:
         if b["block_id"] == block_update["block_id"]:
@@ -297,12 +280,10 @@ def _remove_from_doc_cache(doc_id: UUID, block_id: str):
 
 
 def _find_doc_id_for_block(block_id: str, db: Session) -> UUID:
-    # Check Redis first
     cached = redis_client.get(f"pending_insert:{block_id}")
     if cached:
         return UUID(json.loads(cached)["doc_id"])
     
-    # Fallback to DB
     block = db.query(DocumentBlock).filter(DocumentBlock.id == block_id).first()
     if not block:
         raise HTTPException(404, "Block not found")

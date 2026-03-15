@@ -15,16 +15,15 @@ from src.backend.auth import routes as auth_routes
 from src.backend.project import routes as project_routes
 from src.backend.resume_parsing import routes as resume_routes
 from src.backend.requirement_gather import project_routes as requirement_routes
-from src.backend.technical_doc import tech_doc_route as tech_doc_routes
-
-import src.backend.model
+from src.backend.technical_doc import tech_doc_routes as tech_doc_routes
+from src.backend.config import Config
 
 Base.metadata.create_all(bind=engine)
 app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=Config.ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

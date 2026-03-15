@@ -64,7 +64,10 @@ def start_requirement_agent(db: Session, user_id: UUID, project_id: UUID, backgr
         return {"messages": history, "status": "resumed", "thinking": True}
 
     if history and not is_interrupted:
-        return {"messages": history, "status": "resumed"}
+        return {
+            "messages": history, 
+            "status": "resumed"
+        }
 
     project_context = build_initial_user_prompt(db, project_id, background)
     run_messages = [{"role": "user", "content": project_context}]

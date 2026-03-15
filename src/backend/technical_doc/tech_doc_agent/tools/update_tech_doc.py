@@ -9,16 +9,6 @@ def make_update_tech_doc_tool():
         """
         return "Draft updated on user's screen."
 
-    @tool
-    def update_technical_document_section(section_heading: str, section_markdown: str):
-        """
-        Use this tool to update exactly one existing technical document section.
-        Pass the section heading without the leading ##, and pass the full markdown
-        for that section starting with the matching ## heading.
-        """
-        return f"Section {section_heading} updated on user's screen."
-
     return [
         update_technical_document_draft,
-        update_technical_document_section,
     ]

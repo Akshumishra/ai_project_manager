@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from uuid import UUID
 
 from src.backend.db.database import get_db
-from src.backend.technical_doc.tech_doc_service import (
+from src.backend.technical_doc.services.tech_doc_gathering import (
     run_tech_doc_agent,
     save_final_tech_doc
 )

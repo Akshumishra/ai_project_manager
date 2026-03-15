@@ -47,19 +47,6 @@ export default function ProjectDetail({ projectId, onSelectDocument, onBack }) {
     const load = async () => {
       setLoading(true);
       if (projectId) {
-        // Double check workflow status for robustness
-        try {
-          const statusRes = await api.get(`/api/projects/${projectId}/status`);
-          const reqStatus = workflows.find(w => w.workflow_name === 'requirement_gathering')?.status;
-          const techStatus = workflows.find(w => w.workflow_name === 'tech_doc_gathering')?.status;
-
-          if (reqStatus !== 'completed' || techStatus !== 'completed') {
-             // Let App.jsx handle it or force here
-             // navigate if needed, but App.jsx is better. 
-          }
-        } catch (e) {
-          console.warn("Status check failed in detail page", e);
-        }
         await Promise.all([fetchDocuments(), fetchTasks(), fetchMembers()]);
       }
       setLoading(false);
