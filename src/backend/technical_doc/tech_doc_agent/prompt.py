@@ -53,3 +53,21 @@ Maintain these sections in the document:
 ## Security & Scaling
 ```
 """
+
+USER_PROMPT = """
+Generate the Technical Specification for the following project.
+
+Project Name:
+{project_name}
+
+Requirement Specification:
+{requirement_specification}
+
+Instructions:
+- Carefully analyze the requirements before proposing architecture.
+- Choose a suitable and modern tech stack for this project.
+- Design a scalable and maintainable system architecture.
+- If the user preferences conflict with best practices, explain the trade-offs.
+
+Begin by generating the first draft of the Technical Specification document.
+"""
