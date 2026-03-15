@@ -51,7 +51,7 @@ async def websocket_endpoint(
                 if document:
                     blocks = (
                         db.query(DocumentBlock)
-                        .filter(DocumentBlock.doc_id == document_id)
+                        .filter(DocumentBlock.doc_id == doc_uuid)
                         .order_by(cast(DocumentBlock.position_key, Float))
                         .all()
                     )
@@ -69,7 +69,7 @@ async def websocket_endpoint(
                         ],
                     }
                     redis_client.set(
-                        f"doc:{document_id}", json.dumps(init_data), ex=3000
+                        f"doc:{doc_uuid}", json.dumps(init_data), ex=3000
                     )
                 else:
                     init_data = {"error": "Document not found."}
@@ -104,7 +104,7 @@ async def websocket_endpoint(
                         json.dumps({"content": content, "type": block_type}),
                     )
                     redis_client.zadd("dirty_blocks", {str(block_id): edit_timestamp})
-                    cached_doc = redis_client.get(f"doc:{document_id}")
+                    cached_doc = redis_client.get(f"doc:{doc_uuid}")
                     if cached_doc:
                         doc_data = json.loads(cached_doc)
                         for b in doc_data["blocks"]:
@@ -112,7 +112,7 @@ async def websocket_endpoint(
                                 b["content"] = content
                                 b["type"] = block_type
                                 break
-                        redis_client.set(f"doc:{document_id}", json.dumps(doc_data))
+                        redis_client.set(f"doc:{doc_uuid}", json.dumps(doc_data))
                 except Exception as e:
                     print(f"Redis write error on websocket edit: {e}")
 
@@ -124,7 +124,7 @@ async def websocket_endpoint(
                     "timestamp": edit_timestamp,
                 }
                 await manager.broadcast_to_doc(
-                    document_id, broadcast_msg, exclude=websocket
+                    str(doc_uuid), broadcast_msg, exclude=websocket
                 )
 
     except WebSocketDisconnect:

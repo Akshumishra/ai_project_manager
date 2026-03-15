@@ -102,7 +102,7 @@ async def insert_block(
 
     # Redis-buffered Insert
     try:
-        redis_client.set(f"pending_insert:{new_id}", json.dumps({"doc_id": str(document_id), **block_data}))
+        redis_client.set(f"pending_insert:{new_id}", json.dumps({"doc_id": str(document_id), **block_data}), ex=3600)
         redis_client.sadd("pending_inserts", new_id)
         _update_doc_cache(document_id, block_data)
     except (redis.ConnectionError, redis.TimeoutError):
@@ -228,8 +228,13 @@ def _update_doc_cache(doc_id: UUID, block_update: dict):
     if not found:
         doc_data["blocks"].append(block_update)
     
-    doc_data["blocks"].sort(key=lambda x: x["position_key"])
-    redis_client.set(redis_key, json.dumps(doc_data))
+    doc_data["blocks"].sort(key=lambda x: float(x["position_key"]))
+    
+    ttl = redis_client.ttl(redis_key)
+    if ttl and ttl > 0:
+        redis_client.setex(redis_key, ttl, json.dumps(doc_data))
+    else:
+        redis_client.set(redis_key, json.dumps(doc_data), ex=3000)
 
 
 def _remove_from_doc_cache(doc_id: UUID, block_id: str):
@@ -240,7 +245,12 @@ def _remove_from_doc_cache(doc_id: UUID, block_id: str):
     
     doc_data = json.loads(cached)
     doc_data["blocks"] = [b for b in doc_data["blocks"] if b["block_id"] != block_id]
-    redis_client.set(redis_key, json.dumps(doc_data))
+    
+    ttl = redis_client.ttl(redis_key)
+    if ttl and ttl > 0:
+        redis_client.setex(redis_key, ttl, json.dumps(doc_data))
+    else:
+        redis_client.set(redis_key, json.dumps(doc_data), ex=3000)
 
 
 def _find_doc_id_for_block(block_id: str, db: Session) -> UUID:
@@ -265,7 +275,12 @@ def _sync_title_to_cache(doc_id: UUID, title: str):
     try:
         doc_data = json.loads(cached)
         doc_data["title"] = title
-        redis_client.set(redis_key, json.dumps(doc_data), ex=3000)
+        
+        ttl = redis_client.ttl(redis_key)
+        if ttl and ttl > 0:
+            redis_client.setex(redis_key, ttl, json.dumps(doc_data))
+        else:
+            redis_client.set(redis_key, json.dumps(doc_data), ex=3000)
     except Exception:
         redis_client.delete(redis_key)
 
