@@ -25,3 +25,22 @@ def get_document(
     current_user: User = Depends(get_current_user),
 ):
     return services.get_document(document_id, db, current_user)
+
+
+@router.patch("/{document_id}")
+def update_document(
+    document_id: UUID, 
+    data: schemas.DocumentUpdate, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    return services.update_document(document_id, data, db, current_user)
+
+
+@router.delete("/{document_id}")
+def delete_document(
+    document_id: UUID, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    return services.delete_document(document_id, db, current_user)
