@@ -17,7 +17,6 @@ from meeting_bot.config import get_config
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-# Global orchestrator instance shared by routes
 config = get_config()
 orchestrator = MultiSessionOrchestrator(config)
 
@@ -34,17 +33,27 @@ async def root():
     "/sessions/join", response_model=SessionResponse, status_code=201, tags=["Sessions"]
 )
 async def join_meeting(request: JoinRequest):
-    """Join a single meeting."""
+    """
+    Join a single Google Meet.
+
+    Optionally pass ``project_id`` and ``created_by`` to have the session
+    persisted as a ``Meeting`` record in the database.
+    """
     try:
         session_id = await orchestrator.start_session(
             meet_url=request.url,
             audio_device=request.audio_device,
             max_duration=request.max_duration,
+            project_id=request.project_id,
+            created_by=request.created_by,
+            title=request.title,
+            task_id=request.task_id,
+            agenda=request.agenda,
         )
         return {"session_id": session_id, "url": request.url}
-    except Exception as e:
+    except Exception as exc:
         logger.exception("Failed to start session")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(exc))
 
 
 @router.post(
@@ -62,10 +71,14 @@ async def join_meetings(request: MultiJoinRequest):
                 meet_url=url,
                 audio_device=request.audio_device,
                 max_duration=request.max_duration,
+                project_id=request.project_id,
+                created_by=request.created_by,
+                # title defaults to the URL when not provided individually
+                agenda=request.agenda,
             )
             responses.append({"session_id": session_id, "url": url})
-        except Exception as e:
-            logger.error(f"Failed to start session for {url}: {e}")
+        except Exception as exc:
+            logger.error("Failed to start session for %s: %s", url, exc)
     return responses
 
 
@@ -78,7 +91,11 @@ async def list_sessions():
 
 @router.delete("/sessions/{session_id}", tags=["Sessions"])
 async def stop_session(session_id: str):
-    """Stop an active meeting session."""
+    """
+    Stop an active meeting session.
+
+    Marks the corresponding Meeting record as CANCELLED in the database.
+    """
     success = await orchestrator.stop_session(session_id)
     if not success:
         raise HTTPException(
