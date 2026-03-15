@@ -43,6 +43,9 @@ def run_agent(
     request: RequirementAgentRequest,
     db: Session = Depends(get_db)
 ):
+    # Guard against missing project
+    if not get_project_detail(db, project_id):
+        raise HTTPException(status_code=404, detail="Project not found")
 
     response = run_requirement_agent(
         db=db,
@@ -61,6 +64,9 @@ def start_agent(
     background: str | None = None,
     db: Session = Depends(get_db)
 ):
+    if not get_project_detail(db, project_id):
+        raise HTTPException(status_code=404, detail="Project not found")
+
     response = start_requirement_agent(
         db=db,
         user_id=user_id,

@@ -1,15 +1,16 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from src.backend.requirement_gather.project_routes import router as project_routes
+from src.backend.config import Config
 from src.backend.db.database import engine, Base
 import src.backend.model
 
-app = FastAPI()
 
+app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=Config.ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
