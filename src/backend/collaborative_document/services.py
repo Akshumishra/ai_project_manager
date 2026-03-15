@@ -90,11 +90,11 @@ async def insert_block(
     utils.verify_document_access(document_id, current_user.id, db)
     _verify_document_exists(document_id, db)
 
-    new_id = str(uuid.uuid4())
+    new_id = uuid.uuid4()
     new_key = data.position_key or _calculate_position(document_id, data.prev_block_id, data.next_block_id, db)
 
     block_data = {
-        "block_id": new_id,
+        "block_id": str(new_id),
         "position_key": new_key,
         "content": data.content,
         "type": data.type,
@@ -138,7 +138,13 @@ async def delete_block(block_id: str, db: Session, current_user: User):
     utils.verify_document_access(doc_id, current_user.id, db)
 
     # 1. Handle Pending Insert
-    if redis_client.exists(f"pending_insert:{block_id}"):
+    is_pending = False
+    try:
+        is_pending = redis_client.exists(f"pending_insert:{block_id}")
+    except (redis.ConnectionError, redis.TimeoutError):
+        pass # Fallback to trying delete in DB
+        
+    if is_pending:
         redis_client.srem("pending_inserts", block_id)
         redis_client.delete(f"pending_insert:{block_id}")
     else:
@@ -204,8 +210,9 @@ def _get_block_position(block_id: str, db: Session) -> str:
     raise HTTPException(400, f"Block {block_id} not found")
 
 
-def _persist_block_to_db(block_id: str, doc_id: UUID, key: str, data: schemas.BlockCreate, db: Session):
-    block = DocumentBlock(id=block_id, doc_id=doc_id, position_key=key, content=data.content, type=data.type)
+def _persist_block_to_db(block_id: UUID | str, doc_id: UUID, key: str, data: schemas.BlockCreate, db: Session):
+    b_uuid = UUID(str(block_id)) if isinstance(block_id, str) else block_id
+    block = DocumentBlock(id=b_uuid, doc_id=doc_id, position_key=key, content=data.content, type=data.type)
     db.add(block)
     db.commit()
 
