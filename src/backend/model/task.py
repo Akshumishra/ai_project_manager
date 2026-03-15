@@ -1,5 +1,5 @@
 import enum
-from sqlalchemy import Column, String, Text, ForeignKey, DateTime, Enum
+from sqlalchemy import Column, String, Text, ForeignKey, Enum, Integer, Boolean
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import UUID
 
@@ -8,26 +8,79 @@ from src.backend.model.base import BaseModel
 
 class TaskStatus(str, enum.Enum):
     TODO = "todo"
-    INPROGRESS = "inprogress"
+    IN_PROGRESS = "in_progress"
     COMPLETED = "completed"
     BLOCKED = "blocked"
+
+
+class TaskPriority(str, enum.Enum):
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+
+
+class TaskCategory(str, enum.Enum):
+    BACKEND = "backend"
+    FRONTEND = "frontend"
+    DATABASE = "database"
+    AI_ML = "ai_ml"
+    DEVOPS = "devops"
+    QA = "qa"
+    SECURITY = "security"
+
+
+class TaskComplexity(str, enum.Enum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
 
 
 class Task(BaseModel):
     __tablename__ = "tasks"
 
-    name = Column(String, nullable=False)
-    project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
+    project_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("projects.id"),
+        nullable=False
+    )
+
+    title = Column(String, nullable=False)
+
     description = Column(Text, nullable=True)
-    complexity = Column(String, nullable=True)
-    deadline = Column(DateTime(timezone=True), nullable=True)
+
+    category = Column(
+        Enum(TaskCategory, name="task_category_enum"),
+        nullable=False
+    )
+
+    priority = Column(
+        Enum(TaskPriority, name="task_priority_enum"),
+        nullable=False,
+        default=TaskPriority.MEDIUM
+    )
+
+    complexity = Column(
+        Enum(TaskComplexity, name="task_complexity_enum"),
+        nullable=False,
+        default=TaskComplexity.MEDIUM
+    )
+
+    story_points = Column(Integer, nullable=True)
+
+    estimated_hours = Column(Integer, nullable=True)
+
     status = Column(
         Enum(TaskStatus, name="task_status_enum"),
         nullable=False,
-        default=TaskStatus.TODO,
+        default=TaskStatus.TODO
     )
+
+    ai_generated = Column(Boolean, default=True)
+
     project_member_id = Column(
-        UUID(as_uuid=True), ForeignKey("project_members.id"), nullable=True
+        UUID(as_uuid=True),
+        ForeignKey("project_members.id"),
+        nullable=True
     )
 
     project = relationship("Project", back_populates="tasks")

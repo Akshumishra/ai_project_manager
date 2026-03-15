@@ -1,6 +1,6 @@
 from typing import Optional, List, Dict, Any
 from uuid import UUID
-from fastapi import HTTPException
+from fastapi import HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 
 from src.backend.model.document import Document, DocumentBlock
@@ -220,7 +220,7 @@ def run_tech_doc_agent(
     response["status"] = "started" if is_start else "running"
     return response
 
-def save_final_tech_doc(db: Session, user_id: UUID, project_id: UUID, document_markdown: str):
+def save_final_tech_doc(db: Session, user_id: UUID, project_id: UUID, document_markdown: str, background_tasks: BackgroundTasks = None):
     """Explicitly saves the technical document and updates workflow status to completed."""
     from src.backend.technical_doc.services.save_tech_doc import save_technical_spec_in_db
     
@@ -228,7 +228,8 @@ def save_final_tech_doc(db: Session, user_id: UUID, project_id: UUID, document_m
         db=db,
         user_id=user_id,
         project_id=project_id,
-        markdown_content=document_markdown
+        markdown_content=document_markdown,
+        background_tasks=background_tasks
     )
     
     if success:

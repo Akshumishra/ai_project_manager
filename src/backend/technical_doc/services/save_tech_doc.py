@@ -1,4 +1,5 @@
 from sqlalchemy.orm import Session
+from fastapi import BackgroundTasks
 from uuid import UUID
 
 from src.backend.model.document import Document
@@ -6,13 +7,14 @@ from src.backend.model.project import Project
 from src.backend.model.user import User
 from src.backend.utils.workflow_utils import set_workflow_status
 from src.backend.technical_doc.constants import TechDocAgentConstants
-from src.backend.collaborative_document import services as doc_services, schemas as doc_schemas
+from src.backend.collaborative_document import document_service as doc_services, schemas as doc_schemas
 
 def save_technical_spec_in_db(
     db: Session,
     user_id: UUID,
     project_id: UUID,
     markdown_content: str,
+    background_tasks: BackgroundTasks = None
 ):
     """
     Standardized service to save technical specification into the database
@@ -28,7 +30,6 @@ def save_technical_spec_in_db(
         if not current_user:
             return False, "User not found"
 
-        # Cleanup existing documents with this title to avoid duplicates
         existing_docs = db.query(Document).filter(
             Document.project_id == project_id,
             Document.title == document_title
@@ -46,6 +47,10 @@ def save_technical_spec_in_db(
 
         set_workflow_status(db, project_id, TechDocAgentConstants.WORKFLOW_NAME, "completed")
         db.commit()
+
+        if background_tasks:
+            from src.backend.task_creator.task_creator_services import generate_and_save_tasks
+            background_tasks.add_task(generate_and_save_tasks, db, project_id)
 
         return True, "Technical specification saved successfully."
     except Exception as e:

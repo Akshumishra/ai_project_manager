@@ -1,118 +1,7 @@
-import { marked } from 'marked'
-import DOMPurify from 'dompurify'
 import { memo, useCallback, useEffect, useRef } from 'react'
 import { API } from '../config'
-
-marked.setOptions({ breaks: true })
-
-function detectBlockType(text) {
-  const t = text.trim()
-  if (t.startsWith('|')) return 'table'
-  if (t.startsWith('- ') || /^\d+\./.test(t)) return 'list'
-  if (t.startsWith('```')) return 'code'
-  if (t.startsWith('#')) return 'heading'
-  if (t.startsWith('>')) return 'quote'
-  if (t.startsWith('---')) return 'divider'
-  return 'paragraph'
-}
-
-function renderMarkdown(content) {
-  let html = marked.parse(content || '')
-  if (html.startsWith('<p>') && html.endsWith('</p>\n')) {
-    html = html.slice(3, -5)
-  }
-  return DOMPurify.sanitize(html)
-}
-
-/**
- * Returns the caret character offset from the start of `el`, counting
- * <br> elements as a '\n' character.  This is more accurate than the
- * cloneRange/toString approach when Shift+Enter <br> nodes are present.
- */
-function getCursorOffset(el) {
-  const sel = window.getSelection()
-  if (!sel?.rangeCount) return 0
-  const { startContainer, startOffset } = sel.getRangeAt(0)
-  let offset = 0
-  const walker = document.createTreeWalker(el, NodeFilter.SHOW_ALL)
-  let node = walker.nextNode()
-  while (node) {
-    if (node === startContainer) {
-      if (node.nodeType === Node.TEXT_NODE) offset += startOffset
-      break
-    }
-    if (node.nodeType === Node.TEXT_NODE) {
-      offset += node.length
-    } else if (node.nodeName === 'BR') {
-      offset += 1
-    }
-    node = walker.nextNode()
-  }
-  return offset
-}
-
-/** True when the caret is collapsed at the very beginning of `el`. */
-function caretAtStart(el) {
-  const sel = window.getSelection()
-  if (!sel?.rangeCount || !sel.getRangeAt(0).collapsed) return false
-  return getCursorOffset(el) === 0
-}
-
-/**
- * Read raw text from a contentEditable element, converting <br> → '\n'.
- * Unlike el.innerText, this does NOT append a trailing '\n'.
- */
-function getRawText(el) {
-  let text = ''
-  const walker = document.createTreeWalker(el, NodeFilter.SHOW_ALL)
-  let node = walker.nextNode()
-  while (node) {
-    if (node.nodeType === Node.TEXT_NODE) {
-      text += node.data
-    } else if (node.nodeName === 'BR') {
-      text += '\n'
-    }
-    node = walker.nextNode()
-  }
-  return text
-}
-
-function isFullySelected(el) {
-  const sel = window.getSelection()
-  if (!sel?.rangeCount) return false
-  const selected = sel.getRangeAt(0).toString()
-  // innerText appends a trailing \n — trimEnd to match
-  const content  = el.innerText.trimEnd()
-  return selected.length > 0 && selected.length >= content.length
-}
-
-function moveCursorTo(el, position = 'end') {
-  el.focus()
-  const range = document.createRange()
-  const sel   = window.getSelection()
-  range.selectNodeContents(el)
-  range.collapse(position === 'start')
-  sel.removeAllRanges()
-  sel.addRange(range)
-}
-
-function generatePosition(prevPos, nextPos) {
-  const GAP = 1000.0
-  const p = prevPos ? parseFloat(prevPos) : null
-  const n = nextPos ? parseFloat(nextPos) : null
-
-  let result
-  if (p === null && n === null) {
-    result = GAP
-  } else if (p === null) {
-    result = n / 2.0
-  } else if (n === null) {
-    result = p + GAP
-  } else {
-    result = (p + n) / 2.0
-  }
-  return Number.isInteger(result) ? String(result) : String(result)
-}
+import { getCursorOffset, caretAtStart, getRawText, isFullySelected, moveCursorTo } from '../utils/editorUtils'
+import { detectBlockType, renderMarkdown, generatePosition } from '../utils/blockUtils'
 
 // ------------------------------------------------------------------
 
@@ -287,6 +176,10 @@ function EditorBlock({
       // innerText.trim() handles the trailing \n browsers add
       if (el.innerText.trim() === '') {
         e.preventDefault()
+        const prev = el.previousElementSibling
+        if (prev) {
+          moveCursorTo(prev, 'end')
+        }
         onDelete(block.block_id, el)
         return
       }
@@ -377,7 +270,7 @@ function EditorBlock({
     if (text.startsWith('|')) return
 
     e.preventDefault()
-    const lines = text.split(/\r?\n/).filter(l => l.trim() !== '')
+    const lines = text.split(/\r?\n/)
     if (lines.length === 0) return
 
     if (lines.length === 1) {
@@ -386,27 +279,45 @@ function EditorBlock({
     }
 
     const el = elRef.current
-    const cursor     = getCursorOffset(el)
-    const raw        = getRawText(el)
-    const before     = raw.slice(0, cursor)
-    const after      = raw.slice(cursor)
-    const newCurrent = before + lines[0] + after
-    el.innerText     = newCurrent
-    onUpdate(block.block_id, newCurrent, detectBlockType(newCurrent))
+    const cursor = getCursorOffset(el)
+    const raw = getRawText(el)
+    const before = raw.slice(0, cursor)
+    const after = raw.slice(cursor)
+
+    // Capture initial nextId to keep it stable during sequential insertions.
+    // We skip 'temp_' blocks to give the backend a reliable reference.
+    const blocks = documentData?.blocks || []
+    const idx = blocks.findIndex(b => b.block_id == block.block_id)
+    let stableNextId = null
+    if (idx !== -1) {
+      for (let j = idx + 1; j < blocks.length; j++) {
+        if (!String(blocks[j].block_id).startsWith('temp_')) {
+          stableNextId = blocks[j].block_id
+          break
+        }
+      }
+    }
+
+    // 1. Update current block with 'before' text + first pasted line
+    const firstLineContent = before + lines[0]
+    el.innerText = firstLineContent
+    onUpdate(block.block_id, firstLineContent, detectBlockType(firstLineContent))
 
     let prevId = block.block_id
-    for (let i = 1; i < lines.length; i++) {
-      const line   = lines[i]
-      const blocks = documentData?.blocks || []
-      const idx    = blocks.findIndex(b => b.block_id == prevId)
-      let nextId   = null
-      for (let j = idx + 1; j < blocks.length; j++) {
-        if (!String(blocks[j].block_id).startsWith('temp_')) { nextId = blocks[j].block_id; break }
-      }
-      const data = await onAddAfter(docId, prevId, nextId, line, detectBlockType(line))
+    
+    // 2. Insert middle lines as new blocks
+    for (let i = 1; i < lines.length - 1; i++) {
+      const line = lines[i]
+      const data = await onAddAfter(docId, prevId, stableNextId, line, detectBlockType(line))
       if (data) prevId = data.block_id
     }
 
+    // 3. Insert last line + 'after' text as the final new block
+    const lastLineContent = lines[lines.length - 1] + after
+    const data = await onAddAfter(docId, prevId, stableNextId, lastLineContent, detectBlockType(lastLineContent))
+    if (data) prevId = data.block_id
+
+    // 4. Force a refresh to sync all new blocks and move cursor
     const res = await fetch(`${API}/api/documents/${docId}`)
     if (res.ok) {
       const freshData = await res.json()

@@ -1,48 +1,82 @@
 import React, { useState, useEffect } from 'react';
-import api, { createProjectTaskRequest } from '../api';
+import api, { createProjectTaskRequest, updateProjectTaskRequest } from '../api';
 
-export default function AddTaskModal({ isOpen, onClose, projectId, onSuccess, members }) {
-  const [name, setName] = useState('');
+export default function AddTaskModal({ isOpen, onClose, projectId, onSuccess, members, task = null }) {
+  const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [complexity, setComplexity] = useState('Medium');
   const [deadline, setDeadline] = useState('');
   const [assigneeId, setAssigneeId] = useState('');
+  const [acceptanceCriteria, setAcceptanceCriteria] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const isEditMode = !!task;
+
   useEffect(() => {
     if (isOpen) {
-      setName('');
-      setDescription('');
-      setComplexity('Medium');
-      setDeadline('');
-      setAssigneeId('');
+      if (isEditMode) {
+        setTitle(task.title || '');
+        
+        // Parse description and acceptance criteria
+        const desc = task.description || '';
+        if (desc.includes('### Acceptance Criteria')) {
+          const parts = desc.split('### Acceptance Criteria');
+          setDescription(parts[0].trim());
+          setAcceptanceCriteria(parts[1].trim());
+        } else {
+          setDescription(desc);
+          setAcceptanceCriteria('');
+        }
+
+        setComplexity(task.complexity || 'Medium');
+        setDeadline(task.deadline ? task.deadline.split('T')[0] : '');
+        setAssigneeId(task.project_member_id || '');
+      } else {
+        setTitle('');
+        setDescription('');
+        setAcceptanceCriteria('');
+        setComplexity('Medium');
+        setDeadline('');
+        setAssigneeId('');
+      }
       setError('');
     }
-  }, [isOpen]);
+  }, [isOpen, task, isEditMode]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!name.trim()) return;
+    if (!title.trim()) return;
 
     setLoading(true);
     setError('');
 
+    // Merge description and acceptance criteria
+    let finalDescription = description.trim();
+    if (acceptanceCriteria.trim()) {
+      finalDescription += `\n\n### Acceptance Criteria\n${acceptanceCriteria.trim()}`;
+    }
+
     const payload = {
-      name: name.trim(),
-      description: description.trim(),
+      title: title.trim(),
+      description: finalDescription,
       complexity: complexity,
       deadline: deadline ? new Date(deadline).toISOString() : null,
       project_member_id: assigneeId || null
     };
 
     try {
-      const createdTask = await createProjectTaskRequest(projectId, payload);
-      onSuccess(createdTask);
+      let result;
+      if (isEditMode) {
+        result = await updateProjectTaskRequest(projectId, task.id, payload);
+      } else {
+        result = await createProjectTaskRequest(projectId, payload);
+      }
+      onSuccess(result);
       onClose();
     } catch (err) {
-      console.error('Failed to create task:', err);
-      setError(err.response?.data?.detail || 'Failed to create task. Please try again.');
+      console.error(isEditMode ? 'Failed to update task:' : 'Failed to create task:', err);
+      setError(err.response?.data?.detail || `Failed to ${isEditMode ? 'update' : 'create'} task. Please try again.`);
     } finally {
       setLoading(false);
     }
@@ -54,7 +88,7 @@ export default function AddTaskModal({ isOpen, onClose, projectId, onSuccess, me
     <div className="modal-overlay">
       <div className="modal-content" style={{ maxWidth: '600px' }}>
         <div className="modal-header">
-          <h2>Add New Task</h2>
+          <h2>{isEditMode ? 'Edit Task' : 'Add New Task'}</h2>
           <button className="close-btn" onClick={onClose}>&times;</button>
         </div>
 
@@ -62,14 +96,14 @@ export default function AddTaskModal({ isOpen, onClose, projectId, onSuccess, me
           {error && <div className="modal-alert error">{error}</div>}
 
           <div className="form-group">
-            <label htmlFor="task-name">Task Name</label>
+            <label htmlFor="task-title">Task Title</label>
             <input
-              id="task-name"
+              id="task-title"
               type="text"
               className="input"
               placeholder="e.g. Implement User Authentication"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
               required
               autoFocus
             />
@@ -83,7 +117,19 @@ export default function AddTaskModal({ isOpen, onClose, projectId, onSuccess, me
               placeholder="What are the specific requirements for this task?"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              rows={4}
+              rows={3}
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="task-acceptance">Acceptance Criteria</label>
+            <textarea
+              id="task-acceptance"
+              className="input"
+              placeholder="How do we know this task is complete?"
+              value={acceptanceCriteria}
+              onChange={(e) => setAcceptanceCriteria(e.target.value)}
+              rows={3}
             />
           </div>
 
@@ -134,8 +180,8 @@ export default function AddTaskModal({ isOpen, onClose, projectId, onSuccess, me
 
           <div className="modal-footer">
             <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
-            <button type="submit" className="btn btn-primary" disabled={loading || !name.trim()}>
-              {loading ? 'Creating...' : 'Add Task'}
+            <button type="submit" className="btn btn-primary" disabled={loading || !title.trim()}>
+              {loading ? (isEditMode ? 'Updating...' : 'Creating...') : (isEditMode ? 'Update Task' : 'Add Task')}
             </button>
           </div>
         </form>

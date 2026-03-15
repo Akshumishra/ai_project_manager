@@ -16,6 +16,7 @@ from src.backend.project import routes as project_routes
 from src.backend.resume_parsing import routes as resume_routes
 from src.backend.requirement_gather import project_routes as requirement_routes
 from src.backend.technical_doc import tech_doc_routes as tech_doc_routes
+from src.backend.task_creator import task_creator_routes as task_creator_routes
 from src.backend.config import Config
 
 Base.metadata.create_all(bind=engine)
@@ -38,6 +39,7 @@ app.include_router(project_routes.router)
 app.include_router(resume_routes.router)
 app.include_router(requirement_routes.router, prefix="/api/agent")
 app.include_router(tech_doc_routes.router, prefix="/api/agent")
+app.include_router(task_creator_routes.router)
 
 
 @app.on_event("startup")

@@ -45,6 +45,11 @@ export const createProjectTaskRequest = async (projectId, payload) => {
   return data;
 };
 
+export const updateProjectTaskRequest = async (projectId, taskId, payload) => {
+  const { data } = await api.patch(`/api/projects/${projectId}/tasks/${taskId}`, payload);
+  return data;
+};
+
 // Agent API Endpoints (matching backend prefix /api/agent/projects)
 export const startRequirementAgentRequest = async (projectId, userId, background = null) => {
   let url = `/api/agent/projects/${projectId}/requirement-agent?user_id=${encodeURIComponent(userId)}`;

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from uuid import UUID
-from src.backend.collaborative_document import schemas, services
+from src.backend.collaborative_document import schemas, document_service as services
 from src.backend.db.database import get_db
 from src.backend.auth.utils import get_current_user
 from src.backend.model.user import User

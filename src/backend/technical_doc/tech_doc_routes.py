@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, BackgroundTasks
 from sqlalchemy.orm import Session
 from uuid import UUID
 
@@ -35,11 +35,12 @@ def run_agent(project_id: UUID, request: TechDocAgentRequest, db: Session = Depe
     return response
 
 @router.post("/projects/{project_id}/tech-doc")
-def save_tech_doc(project_id: UUID, request: SaveTechDocRequest, db: Session = Depends(get_db)):
+def save_tech_doc(project_id: UUID, request: SaveTechDocRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     response = save_final_tech_doc(
         db=db,
         user_id=request.user_id,
         project_id=project_id,
-        document_markdown=request.document_markdown
+        document_markdown=request.document_markdown,
+        background_tasks=background_tasks
     )
     return response

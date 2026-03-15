@@ -6,7 +6,7 @@ from src.backend.model.project import Project
 from src.backend.model.user import User
 from src.backend.utils.workflow_utils import set_workflow_status
 from src.backend.requirement_gather.constants import RequirementAgentConstants
-from src.backend.collaborative_document import services as doc_services, schemas as doc_schemas
+from src.backend.collaborative_document import document_service as doc_services, schemas as doc_schemas
 
 def save_requirement_spec_in_db(
     db: Session,

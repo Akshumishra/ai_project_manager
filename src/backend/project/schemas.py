@@ -35,7 +35,7 @@ class AddMemberRequest(BaseModel):
 
 
 class TaskBase(BaseModel):
-    name: str
+    title: str
     description: Optional[str] = None
     complexity: Optional[str] = "Medium"
     deadline: Optional[datetime] = None
@@ -44,6 +44,15 @@ class TaskBase(BaseModel):
 
 class TaskCreate(TaskBase):
     pass
+
+
+class TaskUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    complexity: Optional[str] = None
+    deadline: Optional[datetime] = None
+    project_member_id: Optional[UUID] = None
+    status: Optional[str] = None
 
 
 class TaskRead(TaskBase):

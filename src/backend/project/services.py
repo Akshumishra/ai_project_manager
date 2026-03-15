@@ -117,7 +117,7 @@ def create_project_task(
     project = _ensure_project_access(project_id, db, current_user)
 
     new_task = Task(
-        name=data.name,
+        title=data.title,
         description=data.description,
         complexity=data.complexity,
         deadline=data.deadline,
@@ -211,3 +211,26 @@ def get_project_members(project_id: UUID, db: Session, current_user: User):
             "status": "Active" if user_obj.password_hash else "Pending"
         })
     return result
+
+
+def update_project_task(
+    project_id: UUID, task_id: UUID, data: schemas.TaskUpdate, db: Session, current_user: User
+):
+    _ensure_project_access(project_id, db, current_user)
+    
+    task = db.query(Task).filter(Task.id == task_id, Task.project_id == project_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+        
+    for field, value in data.model_dump(exclude_unset=True).items():
+        setattr(task, field, value)
+        
+    db.commit()
+    db.refresh(task)
+    
+    if task.assignee and task.assignee.user:
+        task.assignee_name = task.assignee.user.name or task.assignee.user.email
+    else:
+        task.assignee_name = None
+        
+    return task

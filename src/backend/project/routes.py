@@ -101,3 +101,14 @@ def create_project_task(
     current_user: User = Depends(get_current_user),
 ):
     return services.create_project_task(project_id, data, db, current_user)
+
+
+@router.patch("/{project_id}/tasks/{task_id}", response_model=schemas.TaskRead)
+def update_project_task(
+    project_id: UUID,
+    task_id: UUID,
+    data: schemas.TaskUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return services.update_project_task(project_id, task_id, data, db, current_user)
