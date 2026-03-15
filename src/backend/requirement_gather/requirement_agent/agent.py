@@ -41,13 +41,28 @@ class RequirementAgent:
         )
 
     def _was_save_tool_called(self, response_messages: List[Any]) -> bool:
-        for message in response_messages:
-            tool_calls = getattr(message, "tool_calls", None) or []
-
-            for tool_call in tool_calls:
-                if tool_call.get("name") == "save_requirement_spec":
-                    return True
-
+        tool_call_to_name = {}
+        for msg in response_messages:
+            tool_calls = getattr(msg, "tool_calls", None) or []
+            for tc in tool_calls:
+                tool_call_to_name[tc.get("id")] = tc.get("name")
+        
+        for msg in response_messages:
+            tid = getattr(msg, "tool_call_id", None)
+            if tid and tool_call_to_name.get(tid) == "save_requirement_spec":
+                content = getattr(msg, "content", "")
+                
+                if isinstance(content, dict):
+                    if content.get("status") == "success":
+                        return True
+                elif isinstance(content, str):
+                    try:
+                        import json
+                        parsed = json.loads(content)
+                        if parsed.get("status") == "success":
+                            return True
+                    except:
+                        pass
         return False
 
     def _extract_doc(self, response_messages: List[Any]) -> str:

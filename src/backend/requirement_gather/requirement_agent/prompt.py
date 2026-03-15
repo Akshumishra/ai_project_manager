@@ -105,7 +105,7 @@ Include:
 
 ## Tools
 
-### save_requirement_specification
+### save_requirement_spec
 
 Parameters:
 {
@@ -131,7 +131,7 @@ Only call this tool **after the user confirms the specification is correct.**
    Ask the user to review and confirm the specification.
 
 5. **Phase 4: Saving**
-   After confirmation, call `save_requirement_specification`.
+   After confirmation, call `save_requirement_spec`.
 
 ## Output Format
 
