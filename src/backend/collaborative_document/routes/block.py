@@ -21,18 +21,18 @@ async def insert_block(
 
 @router.patch("/{block_id}")
 async def edit_block(
-    block_id: str,
+    block_id: UUID,
     data: schemas.BlockUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return await services.edit_block(block_id, data, db, current_user)
+    return await services.edit_block(str(block_id), data, db, current_user)
 
 
 @router.delete("/{block_id}")
 async def delete_block(
-    block_id: str,
+    block_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return await services.delete_block(block_id, db, current_user)
+    return await services.delete_block(str(block_id), db, current_user)

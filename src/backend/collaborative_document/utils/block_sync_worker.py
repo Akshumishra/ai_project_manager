@@ -57,14 +57,14 @@ def flush_dirty_blocks():
                             else:
                                 raise e
                 
-                # Success or already exists or permanent collision handled - remove from queue
+                # Success or already exists - remove from queue
                 redis_client.srem("pending_inserts", b_id)
                 redis_client.delete(f"pending_insert:{b_id}")
             except Exception as e:
                 db.rollback()
                 print(f"Critical sync error for {b_id}:", e)
-                # If it's a structural error (not just a collision), we still remove 
-                # to prevent infinite loop. In a production system, we'd move to a dead-letter queue.
+                # Move to dead-letter queue instead of just deleting
+                redis_client.sadd("dead_letter_inserts", b_id)
                 redis_client.srem("pending_inserts", b_id)
 
         # 2. Process Pending Edits (Content updates)
@@ -80,7 +80,9 @@ def flush_dirty_blocks():
                 block = db.query(DocumentBlock).filter(DocumentBlock.id == block_id).first()
                 if block:
                     block.content = data.get("content", block.content)
-                    block.type = data.get("type", block.type)
+                    new_type = data.get("type")
+                    if new_type is not None:
+                        block.type = new_type
             
             try:
                 db.commit()
