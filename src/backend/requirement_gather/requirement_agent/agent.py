@@ -50,6 +50,14 @@ class RequirementAgent:
 
         return False
 
+    def _extract_doc(self, response_messages: List[Any]) -> str:
+        for message in reversed(response_messages):
+            tool_calls = getattr(message, "tool_calls", None) or []
+            for tool_call in tool_calls:
+                if tool_call.get("name") == "save_requirement_spec":
+                    return tool_call.get("args", {}).get("markdown_content", "")
+        return ""
+
     def run(self, messages: List[Dict[str, str]]) -> Dict[str, Any]:
         response = self.agent.invoke({
             "messages": messages
@@ -63,5 +71,6 @@ class RequirementAgent:
 
         return {
             "content": content,
+            "doc": self._extract_doc(response_messages),
             "saved": self._was_save_tool_called(response_messages),
         }

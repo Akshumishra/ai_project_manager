@@ -8,7 +8,7 @@ from src.backend.requirement_gather.services.requirement_gather import (
     start_requirement_agent,
 )
 from src.backend.requirement_gather.services.project import create_project_with_owner
-from src.backend.requirement_gather.schemas import CreateProjectRequest, RequirementAgentRequest
+from src.backend.requirement_gather.schemas import CreateProjectRequest, RequirementAgentRequest, SaveRequirementRequest
 from src.backend.utils.get_project_details import get_project_detail
 
 router = APIRouter()
@@ -69,3 +69,30 @@ def start_agent(
     )
 
     return response
+
+
+@router.post("/projects/{project_id}/requirement-doc")
+def save_requirement_doc(
+    project_id: UUID,
+    request: SaveRequirementRequest,
+    db: Session = Depends(get_db)
+):
+    from src.backend.requirement_gather.services.save_requirement import save_requirement_spec_in_db
+    
+    success, message = save_requirement_spec_in_db(
+        db=db,
+        user_id=request.user_id,
+        project_id=project_id,
+        problem_the_project_solves=request.problem_the_project_solves,
+        target_users=request.target_users,
+        project_goal=request.project_goal,
+        key_system_capabilities=request.key_system_capabilities,
+        expected_outcome=request.expected_outcome,
+        major_constraints=request.major_constraints,
+        additional_notes=request.additional_notes
+    )
+
+    if not success:
+        raise HTTPException(status_code=500, detail=message)
+
+    return {"status": "success", "message": message}
