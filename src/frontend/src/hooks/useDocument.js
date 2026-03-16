@@ -143,13 +143,15 @@ export function useDocument() {
 
     const timer = setTimeout(async () => {
       debounceTimersRef.current.delete(id);
-      if (socketRef.current?.readyState === WebSocket.OPEN && role === 'editor') {
-        socketRef.current.send(JSON.stringify({
-          type: 'edit',
-          block_id: id,
-          content,
-          block_type: type
-        }));
+      
+      const sent = (role === 'editor') && send({
+        type: 'edit',
+        block_id: id,
+        content,
+        block_type: type
+      });
+
+      if (sent) {
         setSyncStatus('Saved');
       } else if (role === 'editor') {
         try {

@@ -1,231 +1,192 @@
-import React, { useCallback, useEffect, useState } from 'react'
-import { Routes, Route, useNavigate, Navigate, useLocation, useParams } from 'react-router-dom'
-import { useDocument } from './hooks/useDocument'
-import Toolbar from './components/Toolbar'
-import { AuthProvider, useAuth } from './context/AuthContext'
-import Login from './components/Login'
-import Register from './components/Register'
-import Dashboard from './components/Dashboard'
-import ProjectDetail from './components/ProjectDetail'
-import ResumeUpload from './components/ResumeUpload'
-import Sidebar from './components/Sidebar'
+import { useCallback, useEffect, useState } from 'react';
+import { useAuth } from './features/auth/context/AuthContext';
+import Login from './features/auth/components/Login';
+import Register from './features/auth/components/Register';
+import Dashboard from './features/dashboard/components/Dashboard';
+import ProjectDetail from './features/dashboard/components/ProjectDetail';
+import Editor from './features/editor/components/Editor';
+import Toolbar from './features/editor/components/Toolbar';
+import { useDocument } from './features/editor/hooks/useDocument';
+import ResumeUpload from './features/resume/components/ResumeUpload';
+import Sidebar from './shared/components/Sidebar';
+import { getAccessToken } from './shared/api/api';
 
-// New Pages
-import CreateProjectPage from './pages/CreateProjectPage'
-import RequirementAgentPage from './pages/RequirementAgentPage'
-import TechDocPage from './pages/TechDocPage'
-import AddMember from './pages/AddMember'
-import EditorPage from './pages/EditorPage'
-import { getProjectStatusRequest } from './api'
+function App() {
+  const { user, logout, loading: authLoading } = useAuth();
+  const [view, setView] = useState('dashboard'); // 'dashboard', 'project', 'editor', 'resume'
+  const [selectedProjectId, setSelectedProjectId] = useState(null);
+  const [isRegistering, setIsRegistering] = useState(false);
 
-function ProjectDetailRoute() {
-  const { projectId } = useParams()
-  const navigate = useNavigate()
-  const [checking, setChecking] = useState(true)
-
-  useEffect(() => {
-    const checkWorkflow = async () => {
-      try {
-        const statusData = await getProjectStatusRequest(projectId)
-        const workflows = statusData.workflows || []
-        const reqStatus = workflows.find(w => w.workflow_name === 'requirement_gathering')?.status
-        const techStatus = workflows.find(w => w.workflow_name === 'tech_doc_gathering')?.status
-
-        if (reqStatus !== 'completed') {
-          navigate(`/requirement-agent?project_id=${projectId}`, { replace: true })
-        } else if (techStatus !== 'completed') {
-          navigate(`/tech-doc?project_id=${projectId}`, { replace: true })
-        } else {
-          setChecking(false)
-        }
-      } catch (err) {
-        console.error('Workflow check failed:', err)
-        setChecking(false) // Fallback to allow entry if API fails, or could redirect to error
-      }
-    }
-    if (projectId) checkWorkflow()
-  }, [projectId, navigate])
-
-  if (checking) {
-    return (
-      <div className="dashboard-loading">
-        <div className="spinner"></div>
-        <p>Verifying project status...</p>
-      </div>
-    )
-  }
-
-  return (
-    <ProjectDetail
-      projectId={projectId}
-      onSelectDocument={(id) => navigate(`/editor/${id}`)}
-      onBack={() => navigate('/')}
-    />
-  )
-}
-
-function AppContent() {
-  const { user, isAuthenticated, loading, logout } = useAuth()
-  const navigate = useNavigate()
-  const location = useLocation()
-  const [showRegister, setShowRegister] = useState(false)
-  
   const {
-    addBlockAfter,
-    connectWebSocket,
-    role,
     docId, setDocId,
     documentData, setDocumentData,
-    loading: docLoading,
     lastSnapshotRef,
     status,
     syncStatus,
+    role,
     isTypingRef,
     isSelectingRef,
     loadDocument,
     updateBlock,
     deleteBlock,
-    disconnectWebSocket,
-  } = useDocument()
+    addBlockAfter,
+    connectWebSocket,
+    disconnectWebSocket
+  } = useDocument();
 
-  const isReadOnly = role === 'viewer'
-
-  const shouldHideSidebar = () => {
-    const path = location.pathname || ''
-    if (path === '/') return true
-    if (path.startsWith('/create-project')) return true
-    if (path.startsWith('/requirement-agent')) return true
-    if (path.startsWith('/tech-doc')) return true
-    if (path.startsWith('/project')) return true
-    if (path.startsWith('/editor')) return true
-    return false
-  }
-
-  const handleSelectProject = useCallback(async (projectId) => {
-    try {
-      const statusData = await getProjectStatusRequest(projectId)
-      const workflows = statusData.workflows || []
-      
-      const reqStatus = workflows.find(w => w.workflow_name === 'requirement_gathering')?.status
-      const techStatus = workflows.find(w => w.workflow_name === 'tech_doc_gathering')?.status
-
-      if (reqStatus !== 'completed') {
-        navigate(`/requirement-agent?project_id=${projectId}`)
-      } else if (techStatus !== 'completed') {
-        navigate(`/tech-doc?project_id=${projectId}`)
-      } else {
-        navigate(`/project/${projectId}`)
-      }
-    } catch (err) {
-      console.error('Failed to check project status:', err)
-      navigate(`/project/${projectId}`)
+  // If user just logged in and profile is not complete, show resume upload
+  useEffect(() => {
+    if (user && !user.is_profile_complete) {
+      setView('resume');
+    } else if (user && view === 'resume') {
+      setView('dashboard');
     }
-  }, [navigate])
+  }, [user]);
 
-  const handleDelete = useCallback(async (id) => {
-    if (isReadOnly) return
+  const handleSelectProject = (id) => {
+    setSelectedProjectId(id);
+    setView('project');
+  };
+
+  const handleSelectDocument = async (id) => {
+    setDocId(id);
+    const data = await loadDocument(id);
+    if (data) {
+      setView('editor');
+      const token = getAccessToken();
+      connectWebSocket(id, token);
+    }
+  };
+
+  const handleBackToDashboard = () => {
+    setSelectedProjectId(null);
+    setView('dashboard');
+  };
+
+  const handleBackToProject = () => {
+    disconnectWebSocket();
+    setView('project');
+  };
+
+  const handleLogout = () => {
+    disconnectWebSocket();
+    logout();
+    setView('dashboard');
+  };
+
+  const handleBlockDelete = useCallback(async (id) => {
+    if (role === 'viewer') return;
+    const blocks = documentData?.blocks || [];
+    const idx = blocks.findIndex(b => b.block_id === id);
+    if (idx === -1) return;
+
+    let focusTargetId = null;
+    let cursorAt = 'start';
+
+    if (idx > 0) {
+      focusTargetId = blocks[idx - 1].block_id;
+      cursorAt = 'end';
+    } else if (blocks.length > 1) {
+      focusTargetId = blocks[idx + 1].block_id;
+      cursorAt = 'start';
+    }
+
     setDocumentData(prev => {
-      const blocks = prev?.blocks || []
-      if (blocks.length <= 1) {
-        updateBlock(id, '', 'paragraph')
-        return prev
+      if (!prev) return prev;
+      if (prev.blocks.length <= 1) {
+        updateBlock(id, '', 'paragraph', true);
+        return prev;
       }
-      deleteBlock(id)
-      return prev
-    })
-  }, [deleteBlock, isReadOnly, updateBlock, setDocumentData])
 
-  if (loading) {
-    return (
-      <div className="loading-screen">
-        <div className="spinner"></div>
-        <p className="loading-text">Authenticating...</p>
-      </div>
-    )
+      const filtered = prev.blocks.filter(b => b.block_id !== id);
+      const withFocus = filtered.map(b => 
+        b.block_id === focusTargetId 
+          ? { ...b, _focusOnMount: true, _cursorAt: cursorAt } 
+          : b
+      );
+      
+      const next = { ...prev, blocks: withFocus };
+      lastSnapshotRef.current = JSON.stringify(next);
+      return next;
+    });
+
+    await deleteBlock(id);
+  }, [deleteBlock, role, updateBlock, setDocumentData, documentData, lastSnapshotRef]);
+
+  if (authLoading) {
+    return <div className="dashboard-loading">Initializing session...</div>;
   }
 
-  if (!isAuthenticated) {
-    return showRegister ? (
-      <Register onToggle={() => setShowRegister(false)} />
+  if (!user) {
+    return isRegistering ? (
+      <Register onToggle={() => setIsRegistering(false)} />
     ) : (
-      <Login onToggle={() => setShowRegister(true)} />
-    )
-  }
-
-  if (!user?.is_profile_complete) {
-    return <ResumeUpload onComplete={() => navigate('/')} />
+      <Login onToggle={() => setIsRegistering(true)} />
+    );
   }
 
   return (
     <div className="app-shell">
-      <Toolbar
+      <Toolbar 
         status={status}
         syncStatus={syncStatus}
-        documentData={documentData}
-        onLogout={logout}
-        onBack={() => {
-          if (location.pathname === '/') return;
-          if (location.pathname.startsWith('/project/') || 
-              location.pathname.startsWith('/requirement-agent') || 
-              location.pathname.startsWith('/tech-doc')) {
-            navigate('/');
-          } else {
-            navigate(-1);
-          }
-        }}
+        documentData={view === 'editor' ? documentData : null}
+        onLogout={handleLogout}
+        onBack={view === 'editor' ? handleBackToProject : (view === 'project' ? handleBackToDashboard : null)}
       />
 
       <div className="app-main-layout">
-        {!shouldHideSidebar() && (
+        {view !== 'resume' && (
           <Sidebar 
-            activeProjectId={documentData?.project_id} 
+            activeProjectId={selectedProjectId}
             onSelectProject={handleSelectProject}
           />
         )}
-        
+
         <main className="main-content">
-          <Routes>
-            <Route path="/" element={<Dashboard onSelectProject={handleSelectProject} />} />
-            <Route path="/create-project" element={<CreateProjectPage />} />
-            <Route
-              path="/project/:projectId"
-              element={<ProjectDetailRoute />}
+          {view === 'resume' && (
+            <ResumeUpload onComplete={() => setView('dashboard')} />
+          )}
+
+          {view === 'dashboard' && (
+            <Dashboard onSelectProject={handleSelectProject} />
+          )}
+
+          {view === 'project' && (
+            <ProjectDetail 
+              projectId={selectedProjectId} 
+              onSelectDocument={handleSelectDocument}
+              onBack={handleBackToDashboard}
             />
-            <Route path="/requirement-agent" element={<RequirementAgentPage />} />
-            <Route path="/tech-doc" element={<TechDocPage />} />
-            <Route path="/project/:projectId/add-member" element={<AddMember />} />
-            <Route path="/editor/:id" element={
-              <EditorPage 
-                docId={docId}
-                setDocId={setDocId}
-                loadDocument={loadDocument}
-                connectWebSocket={connectWebSocket}
-                disconnectWebSocket={disconnectWebSocket}
-                documentData={documentData}
-                setDocumentData={setDocumentData}
-                loading={docLoading}
-                lastSnapshotRef={lastSnapshotRef}
-                isTypingRef={isTypingRef}
-                isSelectingRef={isSelectingRef}
-                updateBlock={updateBlock}
-                handleDelete={handleDelete}
-                addBlockAfter={addBlockAfter}
-                isReadOnly={isReadOnly}
-              />
-            } />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
+          )}
+
+          {view === 'editor' && (
+            <div className="editor-wrapper">
+              <div className="editor-page">
+                {role === 'viewer' && (
+                  <div className="read-only-banner">
+                    You are in view-only mode. You cannot edit this document.
+                  </div>
+                )}
+                <Editor 
+                  docId={docId}
+                  documentData={documentData}
+                  lastSnapshotRef={lastSnapshotRef}
+                  isTypingRef={isTypingRef}
+                  isSelectingRef={isSelectingRef}
+                  setDocumentData={setDocumentData}
+                  onUpdate={updateBlock}
+                  onDelete={handleBlockDelete}
+                  onAddAfter={addBlockAfter}
+                  isReadOnly={role === 'viewer'}
+                />
+              </div>
+            </div>
+          )}
         </main>
       </div>
     </div>
-  )
+  );
 }
 
-
-export default function App() {
-  return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
-  )
-}
+export default App;
