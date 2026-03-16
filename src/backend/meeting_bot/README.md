@@ -34,7 +34,6 @@ Copy absolute configs layout parameters using the `.env.example` file wrapper ru
 
 ```env
 APP_ENVIRONMENT=development
-GOOGLE_EMAIL=your@gmail.com
 DATABASE_URL=postgresql://user:password@localhost:5432/db
 REDIS_HOST=127.0.0.1
 OPENAI_API_KEY=sk-...

@@ -11,7 +11,7 @@ from meeting_bot.api.schemas import (
     ScheduleCalendarMeetingRequest,
     ScheduleCalendarMeetingResponse,
 )
-from src.backend.services.ai.processor import infer_meeting_participants
+from src.backend.services.llm.processor import infer_meeting_participants
 from src.backend.services.calendar_service import create_calendar_meet
 from src.backend.services.meeting import add_participants, create_meeting
 

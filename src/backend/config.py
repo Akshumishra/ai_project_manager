@@ -22,9 +22,6 @@ class AppConfig(BaseSettings):
     database_url: str | None = Field(default=None, alias="DATABASE_URL")
     openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
 
-    # ── Meeting Bot Specific Configurations ──────────────────────────────────
-    google_email: str = Field(alias="GOOGLE_EMAIL")
-
     # ── OAuth Credential Paths ───────────────────────────────────────────────
     google_credentials_path: Path = Field(
         default_factory=lambda: _project_root / "credentials.json",
