@@ -9,7 +9,7 @@ from src.backend.requirement_gather.services.save_requirement import save_requir
 def make_save_requirement_spec_tool(user_id: UUID, project_id: UUID):
 
     @tool
-    def save_requirement_spec(
+    def save_requirement_specification(
         markdown_content: str,
     ):
         """
@@ -29,7 +29,7 @@ def make_save_requirement_spec_tool(user_id: UUID, project_id: UUID):
             if success:
                 return {
                     "status": "success",
-                    "message": message
+                    "result": message
                 }
             else:
                 return {
@@ -46,4 +46,4 @@ def make_save_requirement_spec_tool(user_id: UUID, project_id: UUID):
         finally:
             db.close()
 
-    return save_requirement_spec
+    return save_requirement_specification

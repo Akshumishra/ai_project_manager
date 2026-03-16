@@ -15,6 +15,9 @@ from src.backend.utils.workflow_utils import (
     handle_thinking_lock
 )
 from src.backend.requirement_gather.constants import RequirementAgentConstants
+from src.backend.utils.workflow_utils import get_workflow_status
+from src.backend.requirement_gather.requirement_agent.tools.get_current_requirement_draft import make_get_requirement_draft_tool
+
 
 C = RequirementAgentConstants
 
@@ -39,9 +42,17 @@ def _execute_agent_run(db: Session, user_id: UUID, project_id: UUID, run_message
             return {
                 "messages": get_chat_history(db, project_id),
                 "status": "resumed",
-                "saved": response.get("saved", False)
+                "saved": response.get("saved", False),
+                "document": response.get("doc")
             }
         
+        wf = get_workflow_status(db, project_id, C.WORKFLOW_NAME)
+        if wf:
+            response["status"] = wf.status
+        
+        if "doc" in response:
+            response["document"] = response.pop("doc")
+
         return response
 
     except Exception as e:
@@ -64,7 +75,16 @@ def start_requirement_agent(db: Session, user_id: UUID, project_id: UUID, backgr
         return {"messages": history, "status": "resumed", "thinking": True}
 
     if history and not is_interrupted:
-        return {"messages": history, "status": "resumed"}
+        get_draft_tool = make_get_requirement_draft_tool(project_id)
+        current_doc = get_draft_tool.invoke({})
+        if "draft found" in current_doc or "no content" in current_doc or "Error" in current_doc:
+            current_doc = ""
+
+        return {
+            "messages": history, 
+            "status": "resumed",
+            "document": current_doc
+        }
 
     project_context = build_initial_user_prompt(db, project_id, background)
     run_messages = [{"role": "user", "content": project_context}]
@@ -84,7 +104,6 @@ def run_requirement_agent(db: Session, user_id: UUID, project_id: UUID, user_mes
     history = get_chat_history(db, project_id)
     project_context = build_initial_user_prompt(db, project_id, background)
     
-    # Include the full persisted conversation, which now contains the latest user message.
     run_messages = [{"role": "user", "content": project_context}, *history]
     
     return _execute_agent_run(db, user_id, project_id, run_messages)

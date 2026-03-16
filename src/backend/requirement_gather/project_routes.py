@@ -10,6 +10,8 @@ from src.backend.requirement_gather.services.requirement_gather import (
 from src.backend.requirement_gather.services.project import create_project_with_owner
 from src.backend.requirement_gather.schemas import CreateProjectRequest, RequirementAgentRequest, SaveRequirementRequest
 from src.backend.utils.get_project_details import get_project_detail
+from src.backend.requirement_gather.services.save_requirement import save_requirement_spec_in_db
+from src.backend.requirement_gather.services.save_requirement import complete_requirement_step
 
 router = APIRouter()
 
@@ -43,9 +45,6 @@ def run_agent(
     request: RequirementAgentRequest,
     db: Session = Depends(get_db)
 ):
-    # Guard against missing project
-    if not get_project_detail(db, project_id):
-        raise HTTPException(status_code=404, detail="Project not found")
 
     response = run_requirement_agent(
         db=db,
@@ -64,9 +63,6 @@ def start_agent(
     background: str | None = None,
     db: Session = Depends(get_db)
 ):
-    if not get_project_detail(db, project_id):
-        raise HTTPException(status_code=404, detail="Project not found")
-
     response = start_requirement_agent(
         db=db,
         user_id=user_id,
@@ -83,7 +79,6 @@ def save_requirement_doc(
     request: SaveRequirementRequest,
     db: Session = Depends(get_db)
 ):
-    from src.backend.requirement_gather.services.save_requirement import save_requirement_spec_in_db
     
     success, message = save_requirement_spec_in_db(
         db=db,
@@ -101,4 +96,11 @@ def save_requirement_doc(
     if not success:
         raise HTTPException(status_code=500, detail=message)
 
+    return {"status": "success", "message": message}
+
+@router.patch("/projects/{project_id}/requirement-complete")
+def mark_requirement_complete(project_id: UUID, db: Session = Depends(get_db)):
+    success, message = complete_requirement_step(db, project_id)
+    if not success:
+        raise HTTPException(status_code=500, detail=message)
     return {"status": "success", "message": message}
