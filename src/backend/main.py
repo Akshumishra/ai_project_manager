@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,11 +16,22 @@ from src.backend.auth import routes as auth_routes
 from src.backend.project import routes as project_routes
 from src.backend.resume_parsing import routes as resume_routes
 
-# Import all models to ensure they are registered with Base before create_all
-import src.backend.model
+from src.backend.model.user import User
+from src.backend.model.project import Project, ProjectMember
+from src.backend.model.document import Document, DocumentBlock
+from src.backend.model.user_detail import UserDetail
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Initial sweep to recover unsaved edits after a crash
+    for _ in range(5):
+        flush_dirty_blocks()
+    
+    start_scheduler()
+    yield
 
 Base.metadata.create_all(bind=engine)
-app = FastAPI()
+app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -38,13 +50,6 @@ app.include_router(project_routes.router)
 app.include_router(resume_routes.router)
 
 
-@app.on_event("startup")
-def start_worker():
-    # Initial sweep to recover unsaved edits after a crash
-    for _ in range(5):
-        flush_dirty_blocks()
-
-    start_scheduler()
 
 
 @app.get("/")
