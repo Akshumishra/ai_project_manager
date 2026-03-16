@@ -4,7 +4,7 @@ import api, { createProjectTaskRequest, updateProjectTaskRequest } from '../api'
 export default function AddTaskModal({ isOpen, onClose, projectId, onSuccess, members, task = null }) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [complexity, setComplexity] = useState('Medium');
+  const [complexity, setComplexity] = useState('medium');
   const [deadline, setDeadline] = useState('');
   const [assigneeId, setAssigneeId] = useState('');
   const [acceptanceCriteria, setAcceptanceCriteria] = useState('');
@@ -29,14 +29,14 @@ export default function AddTaskModal({ isOpen, onClose, projectId, onSuccess, me
           setAcceptanceCriteria('');
         }
 
-        setComplexity(task.complexity || 'Medium');
+        setComplexity((task.complexity || 'medium').toLowerCase());
         setDeadline(task.deadline ? task.deadline.split('T')[0] : '');
         setAssigneeId(task.project_member_id || '');
       } else {
         setTitle('');
         setDescription('');
         setAcceptanceCriteria('');
-        setComplexity('Medium');
+        setComplexity('medium');
         setDeadline('');
         setAssigneeId('');
       }
@@ -142,10 +142,10 @@ export default function AddTaskModal({ isOpen, onClose, projectId, onSuccess, me
                 value={complexity}
                 onChange={(e) => setComplexity(e.target.value)}
               >
-                <option value="Low">Low</option>
-                <option value="Medium">Medium</option>
-                <option value="High">High</option>
-                <option value="Critical">Critical</option>
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+                <option value="critical">Critical</option>
               </select>
             </div>
 

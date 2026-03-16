@@ -6,7 +6,13 @@ from . import schemas, utils
 from src.backend.model.project import Project, ProjectMember, ProjectWorkflowStatus
 from src.backend.model.document import Document
 from src.backend.model.user import User
-from src.backend.model.task import Task, TaskStatus
+from src.backend.model.task import (
+    Task,
+    TaskCategory,
+    TaskComplexity,
+    TaskPriority,
+    TaskStatus,
+)
 from typing import List
 
 
@@ -116,20 +122,44 @@ def get_project_tasks(project_id: UUID, db: Session, current_user: User):
     return tasks
 
 
+def _normalize_task_complexity(value: str | None) -> TaskComplexity:
+    normalized = (value or "medium").strip().lower()
+    if normalized == "critical":
+        return TaskComplexity.HIGH
+    try:
+        return TaskComplexity(normalized)
+    except ValueError:
+        return TaskComplexity.MEDIUM
+
+
+def _normalize_task_status(value: str | None) -> TaskStatus:
+    normalized = (value or TaskStatus.TODO.value).strip().lower()
+    try:
+        return TaskStatus(normalized)
+    except ValueError:
+        return TaskStatus.TODO
+
+
 def create_project_task(
     project_id: UUID, data: schemas.TaskCreate, db: Session, current_user: User
 ):
     project = _ensure_project_access(project_id, db, current_user)
 
-    new_task = Task(
+    task_kwargs = dict(
         title=data.title,
         description=data.description,
-        complexity=data.complexity,
-        deadline=data.deadline,
+        complexity=_normalize_task_complexity(data.complexity),
+        category=TaskCategory.BACKEND,
+        priority=TaskPriority.MEDIUM,
         project_id=project.id,
         project_member_id=data.project_member_id,
         status=TaskStatus.TODO,
+        ai_generated=False,
     )
+    if "deadline" in Task.__table__.columns.keys():
+        task_kwargs["deadline"] = data.deadline
+
+    new_task = Task(**task_kwargs)
     db.add(new_task)
     db.commit()
     db.refresh(new_task)
@@ -228,7 +258,16 @@ def update_project_task(
         raise HTTPException(status_code=404, detail="Task not found")
         
     for field, value in data.model_dump(exclude_unset=True).items():
-        setattr(task, field, value)
+        if field == "complexity":
+            task.complexity = _normalize_task_complexity(value)
+            continue
+        if field == "status":
+            task.status = _normalize_task_status(value)
+            continue
+        if field == "deadline" and "deadline" not in Task.__table__.columns.keys():
+            continue
+        if hasattr(task, field):
+            setattr(task, field, value)
         
     db.commit()
     db.refresh(task)
