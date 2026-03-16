@@ -1,15 +1,3 @@
-"""
-meeting_bot.api.routers.webhooks
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Webhook endpoints for external service integrations (Fireflies.ai).
-
-Security:
-- Transcript data is always re-fetched from Fireflies API to avoid
-  trusting unverified webhook payloads.
-- Internal exception details are never exposed to callers.
-"""
-
 from __future__ import annotations
 
 import asyncio

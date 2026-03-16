@@ -1,19 +1,3 @@
-"""
-src.backend.db.database
-~~~~~~~~~~~~~~~~~~~~~~~
-
-SQLAlchemy engine, session factory, and FastAPI dependency.
-
-The engine is created **lazily** on first use (not at module import time).
-This lets any module safely import ``Base``, ``get_db``, or ``SessionLocal``
-without immediately requiring DATABASE_URL to be set — which is critical for
-the meeting_bot subprocess and for test environments that patch the URL.
-
-Migrations:
-    SQLAlchemy 2.0+ ``DeclarativeBase`` replaces the legacy
-    ``declarative_base()`` function, which is deprecated.
-"""
-
 from __future__ import annotations
 
 import logging

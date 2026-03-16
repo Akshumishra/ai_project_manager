@@ -1,13 +1,3 @@
-"""
-src.backend.services.ai.processor
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-AI-powered processing pipeline for meeting transcripts and participant inference.
-
-Uses LangChain with structured output to ensure type-safe, schema-validated
-responses from GPT-4o.
-"""
-
 from __future__ import annotations
 
 import json

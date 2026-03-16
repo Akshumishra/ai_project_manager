@@ -1,16 +1,3 @@
-"""
-src.backend.config
-~~~~~~~~~~~~~~~~~~
-
-Centralized interface for loading all backend environment variables
-using Pydantic BaseSettings.
-
-Benefits:
-- Automatic type coercion (e.g., str -> int/bool).
-- Automatic .env loading with precedence rules.
-- Validation bounds and structures for complex paths.
-"""
-
 from __future__ import annotations
 
 from pathlib import Path

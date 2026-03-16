@@ -1,15 +1,3 @@
-"""
-src.backend.services.calendar_service
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Google Calendar and Meet API integration for creating calendar events
-with auto-generated Meet links and unlocked room access.
-
-Security notes:
-- Token files are written with restrictive permissions (0o600).
-- File paths are sourced from centralized configuration, not hardcoded.
-"""
-
 from __future__ import annotations
 
 import logging

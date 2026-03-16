@@ -1,13 +1,3 @@
-"""
-src.backend.services.fireflies_client
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Client for the Fireflies.ai GraphQL API.
-
-Handles bot scheduling and transcript fetching with proper timeout
-configuration and centralized secret management.
-"""
-
 from __future__ import annotations
 
 import logging

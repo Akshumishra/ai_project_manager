@@ -1,12 +1,3 @@
-"""
-src.backend.services.ai.schemas
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Pydantic schemas for structured LLM output parsing.
-Used by LangChain's ``with_structured_output()`` to enforce type-safe
-AI model responses.
-"""
-
 from __future__ import annotations
 
 from uuid import UUID

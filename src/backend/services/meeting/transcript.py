@@ -1,11 +1,3 @@
-"""
-src.backend.services.meeting.transcript
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Transcript lifecycle: create stubs, upsert completed transcripts,
-and trigger the automated AI analysis pipeline.
-"""
-
 from __future__ import annotations
 
 import logging

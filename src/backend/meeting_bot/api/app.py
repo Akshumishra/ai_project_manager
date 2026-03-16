@@ -1,18 +1,3 @@
-"""
-meeting_bot.api.app
-~~~~~~~~~~~~~~~~~~~
-
-FastAPI application factory with production-grade middleware configuration.
-
-Changes from legacy version:
-- Replaced deprecated ``@app.on_event("startup"/"shutdown")`` with the
-  modern ``lifespan`` async context manager (FastAPI 0.93+).
-- Added CORS middleware with explicit allowlists.
-- Added security headers middleware.
-- Removed duplicate ``logging.basicConfig()`` call — logging is now
-  configured once in ``main.py``.
-"""
-
 from __future__ import annotations
 
 import logging

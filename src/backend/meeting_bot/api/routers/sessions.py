@@ -1,10 +1,3 @@
-"""
-meeting_bot.api.routers.sessions
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-REST endpoints for scheduling calendar meetings.
-"""
-
 from __future__ import annotations
 
 import asyncio

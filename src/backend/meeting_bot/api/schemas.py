@@ -1,10 +1,3 @@
-"""
-meeting_bot.api.schemas
-~~~~~~~~~~~~~~~~~~~~~~~
-
-Pydantic request/response models for the meeting bot API.
-"""
-
 from __future__ import annotations
 
 from uuid import UUID
