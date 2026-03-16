@@ -103,14 +103,14 @@ async def insert_block(
     # Redis-buffered Insert
     try:
         redis_client.set(f"pending_insert:{new_id}", json.dumps({"doc_id": str(document_id), **block_data}), ex=3600)
-        redis_client.sadd("pending_inserts", str(new_id))
+        redis_client.sadd("pending_inserts", new_id)
         _update_doc_cache(document_id, block_data)
     except (redis.ConnectionError, redis.TimeoutError):
         _persist_block_to_db(new_id, document_id, new_key, data, db)
 
     await _broadcast_update(document_id, "insert", {"block": block_data, "client_id": data.client_id})
     
-    return {"block_id": str(new_id), "position_key": new_key, "client_id": data.client_id}
+    return {"block_id": new_id, "position_key": new_key, "client_id": data.client_id}
 
 
 async def edit_block(block_id: str, data: schemas.BlockUpdate, db: Session, current_user: User):

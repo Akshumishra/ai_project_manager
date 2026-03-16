@@ -15,7 +15,7 @@ def generate_position(prev_pos, next_pos):
         try:
             return float(val)
         except ValueError:
-            return 0.0
+            raise HTTPException(status_code=400, detail=f"Invalid position value: {val}")
 
     p = to_float(prev_pos)
     n = to_float(next_pos)
