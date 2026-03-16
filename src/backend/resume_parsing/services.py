@@ -13,12 +13,7 @@ async def extract_resume_data(resume_text: str) -> schemas.ResumeExtraction:
         temperature=constants.TEMPERATURE
     ).with_structured_output(schemas.ResumeExtraction)
 
-    prompt = f"""
-    {prompts.PROMPT_TEMPLATE}
-
-    Resume:
-    {resume_text}
-    """
+    prompt = prompts.PROMPT_TEMPLATE.format(resume=resume_text)
 
     response = await llm.ainvoke(prompt)
 
