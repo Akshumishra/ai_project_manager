@@ -13,11 +13,14 @@ from src.backend.utils.get_project_details import get_project_detail
 from src.backend.requirement_gather.services.save_requirement import save_requirement_spec_in_db
 from src.backend.requirement_gather.services.save_requirement import complete_requirement_step
 
-router = APIRouter()
+router = APIRouter(prefix="/api/projects", tags=["projects"])
 
 
-@router.post("/projects")
+@router.post("")
 def create_project(request: CreateProjectRequest, db: Session = Depends(get_db)):
+    """
+    Create a new project and assign the requester as the owner.
+    """
     project = create_project_with_owner(
         db=db,
         user_id=request.user_id,
@@ -29,8 +32,11 @@ def create_project(request: CreateProjectRequest, db: Session = Depends(get_db))
     return project
 
 
-@router.get("/projects/{project_id}")
+@router.get("/{project_id}")
 def get_project(project_id: UUID, db: Session = Depends(get_db)):
+    """
+    Retrieve details for a specific project.
+    """
     project = get_project_detail(db, project_id)
 
     if not project:
@@ -39,13 +45,15 @@ def get_project(project_id: UUID, db: Session = Depends(get_db)):
     return project
 
 
-@router.post("/projects/{project_id}/requirement-agent")
+@router.post("/{project_id}/requirement-agent")
 def run_agent(
     project_id: UUID,
     request: RequirementAgentRequest,
     db: Session = Depends(get_db)
 ):
-
+    """
+    Process a user message through the requirement gathering agent.
+    """
     response = run_requirement_agent(
         db=db,
         user_id=request.user_id,
@@ -56,13 +64,17 @@ def run_agent(
     return response
 
 
-@router.get("/projects/{project_id}/requirement-agent")
+@router.get("/{project_id}/requirement-agent")
 def start_agent(
     project_id: UUID,
     user_id: UUID,
     background: str | None = None,
     db: Session = Depends(get_db)
 ):
+    """
+    Initialize or resume the requirement gathering session for a project.
+    Checks if a draft exists and returns it along with chat history.
+    """
     response = start_requirement_agent(
         db=db,
         user_id=user_id,
@@ -73,13 +85,15 @@ def start_agent(
     return response
 
 
-@router.post("/projects/{project_id}/requirement-doc")
+@router.post("/{project_id}/requirement-doc")
 def save_requirement_doc(
     project_id: UUID,
     request: SaveRequirementRequest,
     db: Session = Depends(get_db)
 ):
-    
+    """
+    Save the collective requirement specification into the database and sync with documents.
+    """
     success, message = save_requirement_spec_in_db(
         db=db,
         user_id=request.user_id,
@@ -98,8 +112,11 @@ def save_requirement_doc(
 
     return {"status": "success", "message": message}
 
-@router.patch("/projects/{project_id}/requirement-complete")
+@router.patch("/{project_id}/requirement-complete")
 def mark_requirement_complete(project_id: UUID, db: Session = Depends(get_db)):
+    """
+    Mark the requirement gathering phase as completed in the workflow.
+    """
     success, message = complete_requirement_step(db, project_id)
     if not success:
         raise HTTPException(status_code=500, detail=message)

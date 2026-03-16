@@ -26,23 +26,23 @@ def save_requirement_spec_in_db(
     Main service to orchestrate saving the requirement specification into the database
     using the collaborative document services.
     """
-    if not markdown_content:
-        markdown_content = f"# Requirement Specification\n\n"
-        if problem_the_project_solves:
-            markdown_content += f"## Problem\n{problem_the_project_solves}\n\n"
-        if target_users:
-            markdown_content += f"## Users\n{target_users}\n\n"
-        if project_goal:
-            markdown_content += f"## Goal\n{project_goal}\n\n"
-        if key_system_capabilities:
-            markdown_content += f"## Core Features\n{key_system_capabilities}\n\n"
-        if expected_outcome:
-            markdown_content += f"## Expected Outcome\n{expected_outcome}\n\n"
-        if major_constraints or additional_notes:
-            markdown_content += f"## Constraints / Notes\n{major_constraints or ''}\n{additional_notes or ''}\n\n"
-
     try:
         project_title = db.query(Project.name).filter(Project.id == project_id).scalar()
+        if not markdown_content:
+            markdown_content = f"# {project_title}\n\n## Requirement Specification\n\n"
+            if problem_the_project_solves:
+                markdown_content += f"### Problem\n{problem_the_project_solves}\n\n"
+            if target_users:
+                markdown_content += f"### Users\n{target_users}\n\n"
+            if project_goal:
+                markdown_content += f"### Goal\n{project_goal}\n\n"
+            if key_system_capabilities:
+                markdown_content += f"### Core Features\n{key_system_capabilities}\n\n"
+            if expected_outcome:
+                markdown_content += f"### Expected Outcome\n{expected_outcome}\n\n"
+            if major_constraints or additional_notes:
+                markdown_content += f"### Constraints / Notes\n{major_constraints or ''}\n{additional_notes or ''}\n\n"
+
         document_title = f"{project_title} - {RequirementAgentConstants.REQ_DOC_LABEL}"
         current_user = db.query(User).filter(User.id == user_id).first()
         if not current_user:

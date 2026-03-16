@@ -6,7 +6,7 @@ from src.backend.db.database import SessionLocal
 from src.backend.model.document import Document, DocumentBlock
 from src.backend.requirement_gather.constants import RequirementAgentConstants
 
-def make_get_requirement_draft_tool(project_id: UUID):
+def get_requirement_draft_tool(project_id: UUID):
 
     @tool
     def get_current_requirement_draft():
