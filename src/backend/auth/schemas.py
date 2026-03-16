@@ -76,3 +76,12 @@ class UserDetailUpdate(BaseModel):
     skills: List[str]
     experience_years: str
     designation: str
+
+
+class OTPRequest(BaseModel):
+    email: EmailStr
+
+
+class OTPVerify(BaseModel):
+    email: EmailStr
+    otp: str

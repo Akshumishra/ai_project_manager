@@ -31,3 +31,13 @@ def login_user(request: schemas.UserLogin, db: Session = Depends(get_db)):
 @router.post("/refresh", response_model=schemas.Token)
 def refresh_token(request: schemas.TokenRefresh, db: Session = Depends(get_db)):
     return services.refresh_token(request, db)
+
+
+@router.post("/send-otp")
+def send_otp(request: schemas.OTPRequest, db: Session = Depends(get_db)):
+    return services.send_otp(request, db)
+
+
+@router.post("/verify-otp")
+def verify_otp(request: schemas.OTPVerify):
+    return services.verify_otp(request)

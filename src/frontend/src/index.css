@@ -672,6 +672,29 @@ textarea.input {
 .password-toggle:hover {
   color: var(--brand-600);
 }
+
+.hint-text {
+  font-size: 12px;
+  color: var(--gray-500);
+  margin-top: 4px;
+}
+
+.btn-link {
+  background: none;
+  border: none;
+  color: var(--brand-600);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0;
+  margin-top: 8px;
+  text-decoration: underline;
+  display: block;
+  width: fit-content;
+}
+
+.btn-link:hover {
+  color: var(--brand-700);
+}
  
 .form-group {
   margin-bottom: 16px;
