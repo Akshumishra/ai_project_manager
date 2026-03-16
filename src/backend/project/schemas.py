@@ -1,19 +1,18 @@
 from pydantic import BaseModel, ConfigDict
-from typing import Optional
 from uuid import UUID
 from datetime import datetime
 
 
 class ProjectCreateRequest(BaseModel):
     name: str
-    description: Optional[str] = None
+    description: str
 
 
 class ProjectResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: UUID
     name: str
-    description: Optional[str]
+    description: str
     created_by: UUID
     created_at: datetime
 
