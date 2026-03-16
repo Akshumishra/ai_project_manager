@@ -43,26 +43,26 @@ Generate the document using **Standard GitHub Flavored Markdown**.
 - Use bolding for emphasis on key terms.
 - Use lists and tables where appropriate to improve scannability.
 
-### Preferred Flow:
-# [Project Title]
+## Preferred Flow:
+### [Project Title]
 
-## 1. Overview
+#### 1. Overview
 A clear, 2-3 sentence explanation of the project idea and the specific problem it solves.
 
-## 2. Target Users
+#### 2. Target Users
 Identify explicitly who will use this system. Use subheadings if there are distinct user types (e.g., ### Admin Users, ### End-Users).
 
-## 3. Main Features
+#### 3. Main Features
 Group essential functionalities into logical categories using subheadings.
 *Example:*
-### Feature Category A
+##### Feature Category A
 - feature 1
 - feature 2
 
-## 4. System Logic & User Flow
+#### 4. System Logic & User Flow
 Explain how the system works from start to finish. Use numbered steps for linearity.
 
-## 5. Important Assumptions
+#### 5. Important Assumptions
 List any assumptions made about missing high-level details.
 
 ## Tools

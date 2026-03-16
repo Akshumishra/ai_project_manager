@@ -61,30 +61,27 @@ class RequirementAgent:
         return False
 
     def _extract_document_id(self, response_messages: List[Any]) -> str | None:
-        """Looks for the tool output of save_requirement_specification to find the document_id."""
-        for i, message in enumerate(response_messages):
-            tool_calls = getattr(message, "tool_calls", None) or []
+        """
+        Filters the messages to find the successful output of the save_requirement_specification tool
+        and extracts the document_id.
+        """
+        # Search for messages that have a 'name' matching our tool 
+        # (This is usually a ToolMessage containing the tool's result)
+        for msg in reversed(response_messages):
+            if getattr(msg, "name", None) != "save_requirement_specification":
+                continue
             
-            for tool_call in tool_calls:
-                if tool_call.get("name") != "save_requirement_specification":
-                    continue
+            content = getattr(msg, "content", "")
+            if not isinstance(content, str):
+                continue
+
+            try:
+                data = json.loads(content)
+                if data.get("status") == "success":
+                    return data.get("result", {}).get("document_id")
+            except (json.JSONDecodeError, AttributeError):
+                continue
                 
-                if i + 1 >= len(response_messages):
-                    continue
-                    
-                tool_msg = response_messages[i+1]
-                content = getattr(tool_msg, "content", "")
-                
-                if not isinstance(content, str):
-                    continue
-                    
-                try:
-                    data = json.loads(content)
-                    if data.get("status") == "success":
-                        return data.get("result", {}).get("document_id")
-                except (json.JSONDecodeError, AttributeError):
-                    continue
-                    
         return None
 
     def _extract_doc(self, response_messages: List[Any]) -> str:
