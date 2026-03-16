@@ -1,3 +1,4 @@
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 import src.backend.model.user as user_model
@@ -8,7 +9,7 @@ def register_user(request: schemas.UserCreate, db: Session):
     normalized_email = str(request.email).lower()
     existing_user = (
         db.query(user_model.User)
-        .filter(user_model.User.email == normalized_email)
+        .filter(func.lower(user_model.User.email) == normalized_email)
         .first()
     )
 
@@ -45,7 +46,7 @@ def register_user(request: schemas.UserCreate, db: Session):
 def login_user(request: schemas.UserLogin, db: Session):
     db_user = (
         db.query(user_model.User)
-        .filter(user_model.User.email == str(request.email).lower())
+        .filter(func.lower(user_model.User.email) == str(request.email).lower())
         .first()
     )
 
