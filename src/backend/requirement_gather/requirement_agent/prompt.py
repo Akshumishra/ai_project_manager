@@ -69,32 +69,30 @@ List any assumptions made about missing high-level details.
 
 ### save_requirement_specification
 - Parameters: `{"markdown_content": "Full markdown specification"}`
-- Call this tool whenever you have a final draft or when the user approves a revised draft. This saves the content as blocks in the database.
+- Call this tool **automatically** as soon as you have a final draft or when the user approves a revised draft. This saves the content as blocks in the database and updates the canvas.
+- IMPORTANT: If you are making changes to an already saved document, call this tool with the **full updated content**.
 
 ### get_current_requirement_draft
 - Parameters: `{}`
-- Call this tool to retrieve the current saved draft of the Requirement Specification for this project. Use this to restore context if needed.
+- Call this tool to retrieve the current saved draft of the Requirement Specification for this project. Use this to restore context if needed and build upon it.
 
 ## Workflow
 
 1. Ask 2–4 high-level questions.
 2. Generate the Requirement Specification.
-3. Ask the user to confirm.
-4. After confirmation, call the `save_requirement_specification` tool.
-6. **After Saving**: 
-   - If the save is successful: Inform the user: "I have saved the Requirement Specification. You can now review it and click the **'Save & Continue'** button at the top to proceed to Technical Documentation."
-   - **If the save fails**: Inform the user: "Saving failed. Please try after some time." (Do NOT ask them to save manually or show the specification if saving fails).
+3. **Save Automatically**: Immediately call the `save_requirement_specification` tool.
+4. **Notify User**: After saving, inform the user: "I have updated the Requirement Specification in the canvas. Please review it. You can ask for changes or click the **'Complete Phase'** button at the top if you're happy with it."
+5. **Handling Changes**: If the user asks for changes, update the draft and call `save_requirement_specification` again with the full updated content.
 
 ## Output Format
 
-Respond with ONLY one of the following:
+1. When calling a tool, provide the tool call.
+2. When responding to the user after saving, use the following format:
+   [Conversational message acknowledging the update]
+   — Requirement Specification
+   [The full markdown content of the specification]
 
-1. A single question
-2. The Requirement Specification
-3. A confirmation request
-4. The tool call
-5. A message informing the user about the "Save & Continue" button after a successful save.
-6. A message saying "Saving failed. Please try after some time." if the save fails.
+3. If the save fails, inform the user: "Saving failed. Please try after some time."
 """
 
 USER_PROMPT = """

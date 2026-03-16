@@ -39,7 +39,8 @@ def _execute_agent_run(db: Session, user_id: UUID, project_id: UUID, run_message
             return {
                 "messages": get_chat_history(db, project_id),
                 "status": "resumed",
-                "saved": response.get("saved", False)
+                "saved": response.get("saved", False),
+                "document": response.get("doc")
             }
         
         # Determine final status for redirection support
@@ -47,6 +48,10 @@ def _execute_agent_run(db: Session, user_id: UUID, project_id: UUID, run_message
         wf = get_workflow_status(db, project_id, C.WORKFLOW_NAME)
         if wf:
             response["status"] = wf.status
+        
+        # Ensure 'document' key is present for frontend consistency
+        if "doc" in response:
+            response["document"] = response.pop("doc")
 
         return response
 
@@ -70,9 +75,17 @@ def start_requirement_agent(db: Session, user_id: UUID, project_id: UUID, backgr
         return {"messages": history, "status": "resumed", "thinking": True}
 
     if history and not is_interrupted:
+        # Fetch current draft if history exists
+        from src.backend.requirement_gather.requirement_agent.tools.get_current_requirement_draft import make_get_requirement_draft_tool
+        get_draft_tool = make_get_requirement_draft_tool(project_id)
+        current_doc = get_draft_tool.invoke({})
+        if "draft found" in current_doc or "no content" in current_doc or "Error" in current_doc:
+            current_doc = ""
+
         return {
             "messages": history, 
-            "status": "resumed"
+            "status": "resumed",
+            "document": current_doc
         }
 
     project_context = build_initial_user_prompt(db, project_id, background)

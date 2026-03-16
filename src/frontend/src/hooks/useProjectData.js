@@ -79,7 +79,7 @@ export function useProjectData(projectId) {
   const handleRenameDocument = async (docId, currentTitle) => {
     const newTitle = prompt('New Document Title:', currentTitle);
     if (!newTitle || newTitle === currentTitle) return false;
-    
+
     try {
       await api.patch(`/api/documents/${docId}`, { title: newTitle });
       setDocuments(prev => prev.map(d => d.id === docId ? { ...d, title: newTitle } : d));

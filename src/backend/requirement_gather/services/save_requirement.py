@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 from uuid import UUID
 
-from src.backend.model.document import Document, DocumentBlock
+from src.backend.model.document import Document
 from src.backend.model.project import Project
 from src.backend.model.user import User
 from src.backend.utils.workflow_utils import set_workflow_status
@@ -58,15 +58,8 @@ def save_requirement_spec_in_db(
         )
 
         if existing_doc:
-            # Update existing document content by replacing blocks
-            # We use a helper from doc_services if available, or just clear and recreate blocks
-            # For simplicity with current architecture, we'll use a new method or clear manually
-            db.query(DocumentBlock).filter(DocumentBlock.doc_id == existing_doc.id).delete()
-            db.flush()
-            doc_services.utils.create_blocks_from_text(existing_doc.id, markdown_content, db)
+            doc_services.utils.sync_blocks_from_text(existing_doc.id, markdown_content, db)
             doc_id = str(existing_doc.id)
-            # Notify frontend via websocket if needed (though create_blocks_from_text might not do it)
-            # manager.broadcast_to_doc is usually called in insert/edit/delete
         else:
             doc_info = doc_services.save_document(
                 data=doc_schemas.DocumentCreate(title=document_title, project_id=project_id),
@@ -77,11 +70,6 @@ def save_requirement_spec_in_db(
             doc_id = doc_info["document_id"]
 
         db.commit()
-
-        # Automatically mark the step as completed if we saved a final doc
-        set_workflow_status(db, project_id, RequirementAgentConstants.WORKFLOW_NAME, "completed")
-        db.commit()
-
         return True, {"message": "Requirement specification saved successfully.", "document_id": doc_id}
     except Exception as e:
         db.rollback()

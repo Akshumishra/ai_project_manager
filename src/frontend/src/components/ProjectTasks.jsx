@@ -4,19 +4,19 @@ export default function ProjectTasks({ tasks, onCreateTask, onEditTask }) {
   return (
     <div className="tasks-panel">
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '24px', gap: '12px' }}>
-        <button 
-          className="btn btn-secondary" 
+        <button
+          className="btn btn-secondary"
           onClick={() => alert('Task Assigner AI Agent is coming soon!')}
           style={{ display: 'flex', alignItems: 'center' }}
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '8px' }}>
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
           </svg>
           Assign Task (AI)
         </button>
         <button className="btn btn-primary" onClick={onCreateTask}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '8px' }}>
-            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+            <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
           </svg>
           Add Task
         </button>
@@ -34,8 +34,8 @@ export default function ProjectTasks({ tasks, onCreateTask, onEditTask }) {
                   <h3>{task.title}</h3>
                 </div>
                 <div style={{ position: 'absolute', top: 0, right: 0, display: 'flex', gap: '8px', alignItems: 'center' }}>
-                  <button 
-                    className="btn-action-doc" 
+                  <button
+                    className="btn-action-doc"
                     onClick={(e) => onEditTask(e, task)}
                     title="Edit Task"
                     style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '4px' }}
@@ -65,32 +65,32 @@ export default function ProjectTasks({ tasks, onCreateTask, onEditTask }) {
                       fontSize: '10px',
                       fontWeight: '700',
                       textTransform: 'uppercase',
-                      backgroundColor: task.complexity.toLowerCase() === 'critical' ? '#fee2e2' : 
-                                      task.complexity.toLowerCase() === 'high' ? '#ffedd5' :
-                                      task.complexity.toLowerCase() === 'medium' ? '#f0f9ff' : '#f0fdf4',
-                      color: task.complexity.toLowerCase() === 'critical' ? '#991b1b' : 
-                             task.complexity.toLowerCase() === 'high' ? '#9a3412' :
-                             task.complexity.toLowerCase() === 'medium' ? '#075985' : '#166534',
+                      backgroundColor: task.complexity.toLowerCase() === 'critical' ? '#fee2e2' :
+                        task.complexity.toLowerCase() === 'high' ? '#ffedd5' :
+                          task.complexity.toLowerCase() === 'medium' ? '#f0f9ff' : '#f0fdf4',
+                      color: task.complexity.toLowerCase() === 'critical' ? '#991b1b' :
+                        task.complexity.toLowerCase() === 'high' ? '#9a3412' :
+                          task.complexity.toLowerCase() === 'medium' ? '#075985' : '#166534',
                     }}>
                       {task.complexity}
                     </span>
                   )}
                 </div>
                 {task.assignee_name && (
-                  <div className="task-assignee" style={{ 
+                  <div className="task-assignee" style={{
                     marginTop: '12px',
                     paddingTop: '12px',
                     borderTop: '1px solid var(--gray-100)',
-                    display: 'flex', 
+                    display: 'flex',
                     alignItems: 'center',
                     fontSize: '12px',
                     color: 'var(--gray-600)'
                   }}>
-                    <div style={{ 
-                      width: '24px', 
-                      height: '24px', 
-                      borderRadius: '50%', 
-                      background: 'var(--brand-600)', 
+                    <div style={{
+                      width: '24px',
+                      height: '24px',
+                      borderRadius: '50%',
+                      background: 'var(--brand-600)',
                       color: 'white',
                       display: 'flex',
                       alignItems: 'center',

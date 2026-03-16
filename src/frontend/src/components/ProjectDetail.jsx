@@ -62,12 +62,12 @@ export default function ProjectDetail({ projectId, onSelectDocument, onBack }) {
   return (
     <div className="project-detail-container" style={{ padding: '40px', background: 'var(--gray-50)', minHeight: '100vh', display: 'flex', justifyContent: 'center' }}>
       <div className="document-container" style={{ width: '100%', maxWidth: '1000px', background: 'white', padding: '40px', borderRadius: '24px', boxShadow: 'var(--shadow-md)' }}>
-        
-        <ProjectHeader 
-          user={user} 
-          onBack={onBack} 
-          onAddMember={() => setIsInviteModalOpen(true)} 
-          onViewMembers={() => setIsMembersModalOpen(true)} 
+
+        <ProjectHeader
+          user={user}
+          onBack={onBack}
+          onAddMember={() => setIsInviteModalOpen(true)}
+          onViewMembers={() => setIsMembersModalOpen(true)}
         />
 
         <div className="document-inner-scroller" style={{ padding: '0 40px 40px 40px' }}>
@@ -87,7 +87,7 @@ export default function ProjectDetail({ projectId, onSelectDocument, onBack }) {
           </div>
 
           {activeTab === 'documents' && (
-            <ProjectDocuments 
+            <ProjectDocuments
               documents={documents}
               onSelectDocument={onSelectDocument}
               onCreateDocument={onHandleCreateDocument}
@@ -97,7 +97,7 @@ export default function ProjectDetail({ projectId, onSelectDocument, onBack }) {
           )}
 
           {activeTab === 'tasks' && (
-            <ProjectTasks 
+            <ProjectTasks
               tasks={tasks}
               onCreateTask={handleCreateTask}
               onEditTask={handleEditTask}
@@ -105,10 +105,10 @@ export default function ProjectDetail({ projectId, onSelectDocument, onBack }) {
           )}
         </div>
 
-        <InviteModal 
-          projectId={projectId} 
-          isOpen={isInviteModalOpen} 
-          onClose={() => setIsInviteModalOpen(false)} 
+        <InviteModal
+          projectId={projectId}
+          isOpen={isInviteModalOpen}
+          onClose={() => setIsInviteModalOpen(false)}
         />
 
         <ProjectMembersModal

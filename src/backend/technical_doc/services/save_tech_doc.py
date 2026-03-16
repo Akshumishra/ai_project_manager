@@ -34,16 +34,20 @@ def save_technical_spec_in_db(
             Document.project_id == project_id,
             Document.title == document_title
         ).all()
-        for d in existing_docs:
-            db.delete(d)
-        db.flush()
 
-        doc_services.save_document(
-            data=doc_schemas.DocumentCreate(title=document_title, project_id=project_id),
-            markdown_content=markdown_content,
-            db=db,
-            current_user=current_user
-        )
+        existing_doc = existing_docs[0] if existing_docs else None
+        for d in existing_docs[1:]:
+            db.delete(d)
+
+        if existing_doc:
+            doc_services.utils.sync_blocks_from_text(existing_doc.id, markdown_content, db)
+        else:
+            doc_services.save_document(
+                data=doc_schemas.DocumentCreate(title=document_title, project_id=project_id),
+                markdown_content=markdown_content,
+                db=db,
+                current_user=current_user
+            )
 
         set_workflow_status(db, project_id, TechDocAgentConstants.WORKFLOW_NAME, "completed")
         db.commit()

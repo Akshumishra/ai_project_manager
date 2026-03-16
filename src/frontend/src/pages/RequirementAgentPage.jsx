@@ -11,6 +11,36 @@ import { getActiveProject, setActiveProject, getUserBackground } from "../utils/
 import { useAuth } from "../context/AuthContext";
 
 function ChatMessage({ role, content }) {
+  const docMarker = "— Requirement Specification";
+
+  if (role === "assistant" && content.includes(docMarker)) {
+    const parts = content.split(docMarker);
+    const conversationalPart = parts[0].trim();
+
+    return (
+      <div className={`message ai`}>
+        <div className="bubble">
+          {conversationalPart && <div dangerouslySetInnerHTML={{ __html: marked.parse(conversationalPart) }} />}
+          <div className="spec-notice" style={{
+            marginTop: conversationalPart ? '12px' : '0',
+            padding: '12px',
+            borderRadius: '12px',
+            border: '1px solid var(--brand-200)',
+            background: 'var(--brand-50)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px'
+          }}>
+            <span style={{ fontSize: '20px' }}>📄</span>
+            <p style={{ margin: 0, fontSize: '14px', color: 'var(--brand-700)', fontWeight: '500' }}>
+              Requirement Specification has been updated in the canvas.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (content === "...") {
     return (
       <div className="message ai">
@@ -20,6 +50,7 @@ function ChatMessage({ role, content }) {
       </div>
     );
   }
+
   return (
     <div className={`message ${role === "assistant" ? "ai" : "user"}`}>
       <div className="bubble">
@@ -43,7 +74,8 @@ export default function RequirementAgentPage() {
   const [chatStatus, setChatStatus] = useState("Initializing agent...");
   const [inputValue, setInputValue] = useState("");
   const [isSending, setIsSending] = useState(false);
-  const [canContinue, setCanContinue] = useState(false);
+  const [documentMarkdown, setDocumentMarkdown] = useState("");
+  const [isCompleting, setIsCompleting] = useState(false);
 
   const chatBoxRef = useRef(null);
   const pollingIntervalRef = useRef(null);
@@ -63,10 +95,10 @@ export default function RequirementAgentPage() {
         if (!currentTitle) {
           currentTitle = data.project_title || data.name || "My Project";
           setProjectTitle(currentTitle);
-          setActiveProject({ 
-            project_id: activeProjectId, 
-            project_title: currentTitle, 
-            project_description: data.project_description || data.description 
+          setActiveProject({
+            project_id: activeProjectId,
+            project_title: currentTitle,
+            project_description: data.project_description || data.description
           });
         }
 
@@ -80,9 +112,9 @@ export default function RequirementAgentPage() {
 
         const initialMessages = res.messages && res.messages.length > 0 ? res.messages : [{ role: "assistant", content: res.content }];
         setMessages(initialMessages);
-        
-        if (res.saved) {
-           setCanContinue(true);
+
+        if (res.document) {
+          setDocumentMarkdown(res.document);
         }
 
         // Handle Thinking persistence
@@ -110,18 +142,18 @@ export default function RequirementAgentPage() {
   // 2. Polling logic to handle "thinking" state persistence
   const startPolling = () => {
     if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
-    
+
     pollingIntervalRef.current = setInterval(async () => {
       try {
         const background = getUserBackground(user.id);
         const res = await startRequirementAgentRequest(activeProjectId, user.id, background);
-        
+
         if (!res.thinking) {
           clearInterval(pollingIntervalRef.current);
           pollingIntervalRef.current = null;
           setIsSending(false);
           setChatStatus("Ready to chat");
-          
+
           if (res.messages) {
             setMessages(res.messages);
           }
@@ -132,8 +164,8 @@ export default function RequirementAgentPage() {
             }, 2000);
             return;
           }
-          if (res.saved) {
-            setCanContinue(true);
+          if (res.document) {
+            setDocumentMarkdown(res.document);
           }
         }
       } catch (err) {
@@ -155,23 +187,22 @@ export default function RequirementAgentPage() {
     setIsSending(true);
     setInputValue("");
     const newMessages = [...messages, { role: "user", content: text }];
-    setMessages(newMessages);
+    setMessages([...newMessages, { role: "assistant", content: "..." }]);
 
     try {
       setChatStatus("Assistant is thinking...");
       const res = await sendRequirementAgentMessage(activeProjectId, text, user.id);
-      
-      const finalMessages = [...newMessages, { role: "assistant", content: res.content }];
-      setMessages(finalMessages);
+
+      setMessages([...newMessages, { role: "assistant", content: res.content }]);
 
       if (res.status === "completed") {
         setChatStatus("Requirement gathering complete! Redirecting...");
         setTimeout(() => {
           navigate(`/tech-doc?project_id=${encodeURIComponent(activeProjectId)}`);
         }, 2000);
-      } else if (res.saved) {
-        setChatStatus("Requirement draft saved.");
-        setCanContinue(true);
+      } else if (res.document) {
+        setDocumentMarkdown(res.document);
+        setChatStatus("Requirement specification updated.");
       } else {
         setChatStatus("Ready to chat");
       }
@@ -184,18 +215,18 @@ export default function RequirementAgentPage() {
     }
   };
 
-  const handleContinue = async () => {
-    if (isSending) return;
-    setIsSending(true);
+  const handleCompletePhase = async () => {
+    if (isCompleting) return;
+    setIsCompleting(true);
     setChatStatus("Finalizing requirement phase...");
     try {
-       await completeRequirementStepRequest(activeProjectId);
-       navigate(`/tech-doc?project_id=${encodeURIComponent(activeProjectId)}`);
+      await completeRequirementStepRequest(activeProjectId);
+      navigate(`/tech-doc?project_id=${encodeURIComponent(activeProjectId)}`);
     } catch (err) {
-       console.error("Failed to complete step:", err);
-       setChatStatus("Error finalizing phase.");
+      console.error("Failed to complete step:", err);
+      setChatStatus("Error finalizing phase.");
     } finally {
-       setIsSending(false);
+      setIsCompleting(false);
     }
   };
 
@@ -203,8 +234,8 @@ export default function RequirementAgentPage() {
     <div className="agent-workspace">
       <header className="workspace-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <button 
-            className="btn-close" 
+          <button
+            className="btn-close"
             onClick={() => navigate('/')}
             style={{ fontSize: '24px', background: 'var(--gray-100)', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           >
@@ -223,18 +254,15 @@ export default function RequirementAgentPage() {
         </div>
       </header>
 
-      <div className="workspace-body" style={{ justifyContent: 'center' }}>
-        <section className="chat-panel" style={{ maxWidth: '800px', margin: '0 auto', borderRight: 'none' }}>
+      <div className="workspace-body">
+        <section className="chat-panel">
           <div className="messages" ref={chatBoxRef}>
             {messages.map((m, i) => <ChatMessage key={i} role={m.role} content={m.content} />)}
-            {isSending && !messages.find(m => m.role === 'assistant' && m.content === '...') && (
-              <ChatMessage role="assistant" content="..." />
-            )}
           </div>
           <div className="input-area">
-            <input 
-              type="text" 
-              placeholder="Ask a question..." 
+            <input
+              type="text"
+              placeholder="Ask a question or suggest changes..."
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && sendMessage()}
@@ -243,7 +271,34 @@ export default function RequirementAgentPage() {
             <button onClick={sendMessage} disabled={isSending || !inputValue.trim()}>Send</button>
           </div>
         </section>
+
+        <section className="canvas-panel">
+          <div className="canvas-header">
+            <h2>Requirement Specification</h2>
+            <div className="h-stack gap-2">
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={handleCompletePhase}
+                disabled={isCompleting || !documentMarkdown}
+              >
+                {isCompleting ? "Completing..." : "Complete Phase"}
+              </button>
+            </div>
+          </div>
+          <div className="canvas-content">
+            <div className="canvas-container">
+              <div className="inner-canvas-scroller">
+                {documentMarkdown ? (
+                  <div dangerouslySetInnerHTML={{ __html: marked.parse(documentMarkdown) }} />
+                ) : (
+                  <p className="placeholder">The requirement specification will appear here once generated.</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </section>
       </div>
     </div>
   );
 }
+
