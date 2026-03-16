@@ -224,7 +224,7 @@ def save_final_tech_doc(db: Session, user_id: UUID, project_id: UUID, document_m
     """Explicitly saves the technical document and updates workflow status to completed."""
     from src.backend.technical_doc.services.save_tech_doc import save_technical_spec_in_db
     
-    success, message = save_technical_spec_in_db(
+    result = save_technical_spec_in_db(
         db=db,
         user_id=user_id,
         project_id=project_id,
@@ -232,7 +232,7 @@ def save_final_tech_doc(db: Session, user_id: UUID, project_id: UUID, document_m
         background_tasks=background_tasks
     )
     
-    if success:
-        return {"status": "success", "message": message}
+    if result.get("success"):
+        return {"status": "success", "message": result.get("message")}
     else:
-        raise HTTPException(status_code=500, detail=message)
+        raise HTTPException(status_code=500, detail=result.get("message"))

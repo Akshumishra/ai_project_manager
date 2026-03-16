@@ -49,7 +49,8 @@ def save_document(
     data: schemas.DocumentCreate,
     markdown_content: str,
     db: Session,
-    current_user: User
+    current_user: User,
+    auto_commit: bool = True,
 ):
     project = db.query(Project).filter(Project.id == data.project_id).first()
     if not project:
@@ -76,7 +77,8 @@ def save_document(
     db.flush()
 
     utils.create_blocks_from_text(document.id, markdown_content, db)
-    db.commit()
+    if auto_commit:
+        db.commit()
     return {"document_id": str(document.id)}
 
 

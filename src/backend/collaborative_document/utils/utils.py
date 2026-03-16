@@ -62,7 +62,7 @@ def verify_document_access(document_id: UUID, user_id: UUID, db: Session):
 
 def parse_markdown_blocks(text: str) -> list[dict]:
     """
-    Parses markdown text into editor blocks without writing to the database.
+    Parse markdown into logical editor blocks without writing to the database.
     """
     lines = text.split("\n")
     current_block_content = []
@@ -97,7 +97,7 @@ def parse_markdown_blocks(text: str) -> list[dict]:
 
 def create_blocks_from_text(doc_id: UUID, text: str, db: Session):
     """
-    Parses markdown text and creates fresh blocks for a given document.
+    Parse markdown text and create fresh blocks for a document.
     """
     from src.backend.model.document import DocumentBlock
 
@@ -115,7 +115,7 @@ def create_blocks_from_text(doc_id: UUID, text: str, db: Session):
 
 def sync_blocks_from_text(doc_id: UUID, text: str, db: Session):
     """
-    Updates only the changed blocks for a document while preserving unchanged ones.
+    Update only changed blocks for a document while preserving unchanged ones.
     """
     from src.backend.model.document import DocumentBlock
 
@@ -140,13 +140,12 @@ def sync_blocks_from_text(doc_id: UUID, text: str, db: Session):
 
         if tag == "replace":
             shared = min(len(existing_slice), len(desired_slice))
+
             for offset in range(shared):
                 block = existing_slice[offset]
                 desired = desired_slice[offset]
-                if block.content != desired["content"]:
-                    block.content = desired["content"]
-                if block.type != desired["type"]:
-                    block.type = desired["type"]
+                block.content = desired["content"]
+                block.type = desired["type"]
 
             for block in existing_slice[shared:]:
                 db.delete(block)
@@ -202,12 +201,13 @@ def _insert_blocks_between(doc_id: UUID, blocks: list[dict], prev_block, next_bl
 
     for block in blocks:
         position_key = generate_position(prev_position, next_position)
-        new_block = DocumentBlock(
-            id=str(uuid.uuid4()),
-            doc_id=doc_id,
-            content=block["content"],
-            position_key=position_key,
-            type=block["type"],
+        db.add(
+            DocumentBlock(
+                id=str(uuid.uuid4()),
+                doc_id=doc_id,
+                content=block["content"],
+                position_key=position_key,
+                type=block["type"],
+            )
         )
-        db.add(new_block)
         prev_position = position_key

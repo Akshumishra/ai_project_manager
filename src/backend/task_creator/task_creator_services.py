@@ -1,8 +1,10 @@
+from datetime import datetime, timezone
 import json
 import logging
 from typing import List, Optional
 from uuid import UUID
 from sqlalchemy.orm import Session
+from src.backend.db.database import SessionLocal
 from langchain_openai import ChatOpenAI
 
 from src.backend.model.task import Task, TaskCategory, TaskPriority, TaskStatus, TaskComplexity
@@ -15,10 +17,11 @@ from src.backend.task_creator.task_creator_agent.prompt import (
 
 logger = logging.getLogger(__name__)
 
-def generate_and_save_tasks(db: Session, project_id: UUID):
+def generate_and_save_tasks(project_id: UUID):
     """
-    Background service to analyze documentation and generate initial tasks.
+    Background service to analyze documentation and generate initial tasks (Internal Session).
     """
+    db = SessionLocal()
     try:
         logger.info(f"Starting task generation for project: {project_id}")
         

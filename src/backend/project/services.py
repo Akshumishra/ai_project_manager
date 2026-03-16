@@ -1,3 +1,4 @@
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, BackgroundTasks
 from uuid import UUID
@@ -10,17 +11,21 @@ from typing import List
 
 
 def get_projects(db: Session, current_user: User):
-    member_project_ids = (
-        db.query(ProjectMember.project_id)
-        .filter(ProjectMember.user_id == current_user.id)
+    projects = (
+        db.query(Project)
+        .outerjoin(ProjectMember)
+        .filter(
+            (Project.created_by == current_user.id)
+            | (ProjectMember.user_id == current_user.id),
+            Project.deleted_at.is_(None)
+        )
         .all()
     )
-    member_project_ids = [r[0] for r in member_project_ids]
-    return db.query(Project).filter(Project.id.in_(member_project_ids)).all()
+    return projects
 
 
 def get_project(project_id: UUID, db: Session, current_user: User):
-    project = db.query(Project).filter(Project.id == project_id).first()
+    project = db.query(Project).filter(Project.id == project_id, Project.deleted_at.is_(None)).first()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
@@ -67,7 +72,7 @@ def create_project(data: schemas.ProjectCreate, db: Session, current_user: User)
 
 
 def _ensure_project_access(project_id: UUID, db: Session, current_user: User) -> Project:
-    project = db.query(Project).filter(Project.id == project_id).first()
+    project = db.query(Project).filter(Project.id == project_id, Project.deleted_at.is_(None)).first()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
@@ -143,7 +148,7 @@ def add_project_member(
     db: Session,
     current_user: User,
 ):
-    project = db.query(Project).filter(Project.id == project_id).first()
+    project = db.query(Project).filter(Project.id == project_id, Project.deleted_at.is_(None)).first()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
@@ -234,3 +239,18 @@ def update_project_task(
         task.assignee_name = None
         
     return task
+
+
+def delete_project(project_id: UUID, db: Session, current_user: User):
+    project = db.query(Project).filter(Project.id == project_id, Project.deleted_at.is_(None)).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    if project.created_by != current_user.id:
+        raise HTTPException(
+            status_code=403, detail="Only the project owner can delete the project"
+        )
+
+    project.deleted_at = func.now()
+    db.commit()
+    return {"message": "Project deleted successfully"}

@@ -22,7 +22,13 @@ def is_status_stale(status: ProjectWorkflowStatus, seconds: int = 60) -> bool:
         
     return datetime.now(timezone.utc) - updated_at > timedelta(seconds=seconds)
 
-def set_workflow_status(db: Session, project_id: UUID, workflow_name: str, status_str: str):
+def set_workflow_status(
+    db: Session,
+    project_id: UUID,
+    workflow_name: str,
+    status_str: str,
+    auto_commit: bool = True,
+):
     """Update or create workflow status."""
     wf_status = get_workflow_status(db, project_id, workflow_name)
     if not wf_status:
@@ -35,7 +41,10 @@ def set_workflow_status(db: Session, project_id: UUID, workflow_name: str, statu
     else:
         wf_status.status = status_str
     
-    db.commit()
+    if auto_commit:
+        db.commit()
+    else:
+        db.flush()
     return wf_status
 
 def check_completion_and_redirect(db: Session, project_id: UUID, workflow_name: str, redirect_path: str) -> Optional[Dict[str, Any]]:

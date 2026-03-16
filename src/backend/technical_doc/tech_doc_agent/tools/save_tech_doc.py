@@ -18,17 +18,17 @@ def make_save_tech_doc_tool(user_id: UUID, project_id: UUID):
         try:
             from src.backend.technical_doc.services.save_tech_doc import save_technical_spec_in_db
             
-            success, message = save_technical_spec_in_db(
+            result = save_technical_spec_in_db(
                 db=db,
                 user_id=user_id,
                 project_id=project_id,
                 markdown_content=document_markdown
             )
 
-            if success:
-                return f"Success! {message}"
+            if result.get("success"):
+                return f"Success! {result.get('message')}"
             else:
-                return f"Error: {message}"
+                return f"Error: {result.get('message')}"
         except Exception as exc:
             return f"Error saving document: {str(exc)}"
         finally:
