@@ -582,6 +582,7 @@ textarea.input {
   margin-bottom: 12px;
   background: var(--brand-gradient);
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
@@ -641,7 +642,54 @@ textarea.input {
   font-weight: 700;
   margin-left: 4px;
 }
-
+ 
+.password-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+ 
+.password-input-wrapper input {
+  padding-right: 48px;
+  margin-bottom: 0;
+}
+ 
+.password-toggle {
+  position: absolute;
+  right: 12px;
+  background: none;
+  border: none;
+  color: var(--gray-400);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  border-radius: 8px;
+  transition: color 0.2s;
+}
+ 
+.password-toggle:hover {
+  color: var(--brand-600);
+}
+ 
+.form-group {
+  margin-bottom: 16px;
+}
+ 
+.form-group label {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gray-700);
+  margin-bottom: 6px;
+}
+ 
+.required-star {
+  color: var(--danger);
+  margin-left: 2px;
+}
+ 
 .error-banner {
   background: #fef2f2;
   color: #dc2626;
@@ -782,6 +830,25 @@ textarea.input {
 .btn-delete-doc:hover {
   background: #fee2e2;
   color: var(--danger);
+}
+
+.btn-delete-project {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--dur-fast);
+  color: var(--gray-400);
+}
+
+.btn-delete-project:hover {
+  background: #fee2e2;
+  color: var(--danger);
+  transform: scale(1.1);
 }
 
 .dashboard-loading {

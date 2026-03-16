@@ -45,6 +45,43 @@ def create_document(data: schemas.DocumentCreate, db: Session, current_user: Use
     return {"document_id": str(document.id), "initial_block_id": str(block.id)}
 
 
+def save_document(
+    data: schemas.DocumentCreate,
+    markdown_content: str,
+    db: Session,
+    current_user: User,
+    auto_commit: bool = True,
+):
+    project = db.query(Project).filter(Project.id == data.project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    is_member = (
+        db.query(ProjectMember)
+        .filter(
+            ProjectMember.project_id == data.project_id,
+            ProjectMember.user_id == current_user.id,
+        )
+        .first()
+    )
+
+    if project.created_by != current_user.id and not is_member:
+        raise HTTPException(
+            status_code=403, detail="No access to create documents in this project"
+        )
+
+    document = Document(
+        title=data.title, project_id=data.project_id, created_by=current_user.id
+    )
+    db.add(document)
+    db.flush()
+
+    helper_function.create_blocks_from_text(document.id, markdown_content, db)
+    if auto_commit:
+        db.commit()
+    return {"document_id": str(document.id)}
+
+
 def get_document(document_id: UUID, db: Session, current_user: User):
     helper_function.verify_document_access(document_id, current_user.id, db)
     redis_key = f"doc:{document_id}"
@@ -103,7 +140,7 @@ async def insert_block(
     # Redis-buffered Insert
     try:
         redis_client.set(f"pending_insert:{new_id}", json.dumps({"doc_id": str(document_id), **block_data}), ex=3600)
-        redis_client.sadd("pending_inserts", new_id)
+        redis_client.sadd("pending_inserts", str(new_id))
         _update_doc_cache(document_id, block_data)
     except (redis.ConnectionError, redis.TimeoutError):
         _persist_block_to_db(new_id, document_id, new_key, data, db)

@@ -112,3 +112,12 @@ def update_project_task(
     current_user: User = Depends(get_current_user),
 ):
     return services.update_project_task(project_id, task_id, data, db, current_user)
+
+
+@router.delete("/{project_id}")
+def delete_project(
+    project_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return services.delete_project(project_id, db, current_user)

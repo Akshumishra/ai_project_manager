@@ -57,7 +57,7 @@ export default function CreateProjectModal({ isOpen, onClose, onSuccess }) {
           {error && <div className="modal-alert error">{error}</div>}
 
           <div className="form-group">
-            <label htmlFor="project-name">Project Name</label>
+            <label htmlFor="project-name">Project Name <span className="required-star">*</span></label>
             <input
               id="project-name"
               type="text"

@@ -62,7 +62,7 @@ export default function CreateProjectPage() {
           {error && <div className="error-banner">{error}</div>}
 
           <div className="v-stack gap-2">
-            <label className="text-sm font-bold" style={{ marginBottom: '4px', display: 'block' }}>Project Name</label>
+            <label className="text-sm font-bold" style={{ marginBottom: '4px', display: 'block' }}>Project Name <span className="required-star">*</span></label>
             <input
               type="text"
               className="input"
@@ -75,7 +75,7 @@ export default function CreateProjectPage() {
           </div>
 
           <div className="v-stack gap-2">
-            <label className="text-sm font-bold" style={{ marginBottom: '4px', display: 'block' }}>Description</label>
+            <label className="text-sm font-bold" style={{ marginBottom: '4px', display: 'block' }}>Description <span className="required-star">*</span></label>
             <textarea
               className="input"
               style={{ minHeight: '100px' }}

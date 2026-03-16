@@ -8,7 +8,7 @@ from src.backend.model.project import Project
 from src.backend.model.user import User
 from src.backend.utils.workflow_utils import set_workflow_status
 from src.backend.technical_doc.constants import TechDocAgentConstants
-from src.backend.collaborative_document import document_service as doc_services, schemas as doc_schemas
+from src.backend.collaborative_document import document_service, utils as doc_utils, schemas as doc_schemas
 
 logger = logging.getLogger(__name__)
 
@@ -53,10 +53,10 @@ def save_technical_spec_in_db(
         if existing_doc:
             logger.info(f"Updating existing tech doc: {existing_doc.id}")
             existing_doc.title = document_title
-            doc_services.utils.sync_blocks_from_text(existing_doc.id, markdown_content, db)
+            doc_utils.sync_blocks_from_text(existing_doc.id, markdown_content, db)
         else:
             logger.info("Creating new tech doc")
-            doc_services.save_document(
+            document_service.save_document(
                 data=doc_schemas.DocumentCreate(title=document_title, project_id=project_id),
                 markdown_content=markdown_content,
                 db=db,

@@ -96,7 +96,7 @@ export default function AddTaskModal({ isOpen, onClose, projectId, onSuccess, me
           {error && <div className="modal-alert error">{error}</div>}
 
           <div className="form-group">
-            <label htmlFor="task-title">Task Title</label>
+            <label htmlFor="task-title">Task Title <span className="required-star">*</span></label>
             <input
               id="task-title"
               type="text"
