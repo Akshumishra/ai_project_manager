@@ -17,7 +17,7 @@ def get_projects(db: Session, current_user: User):
     return db.query(Project).filter(Project.id.in_(member_project_ids)).all()
 
 
-def create_project(data: schemas.ProjectCreate, db: Session, current_user: User):
+def create_project(data: schemas.ProjectCreateRequest, db: Session, current_user: User):
     new_project = Project(
         name=data.name, description=data.description, created_by=current_user.id
     )
@@ -30,8 +30,8 @@ def create_project(data: schemas.ProjectCreate, db: Session, current_user: User)
     return new_project
 
 
-def get_project_documents(project_id: UUID, db: Session, current_user: User):
-    project = db.query(Project).filter(Project.id == project_id).first()
+def _ensure_project_access(project_id: UUID, db: Session, current_user: User) -> Project:
+    project = db.query(Project).filter(Project.id == project_id, Project.deleted_at.is_(None)).first()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
@@ -47,6 +47,12 @@ def get_project_documents(project_id: UUID, db: Session, current_user: User):
     if project.created_by != current_user.id and not is_member:
         raise HTTPException(status_code=403, detail="Access denied to this project")
 
+    return project
+
+
+def get_project_documents(project_id: UUID, db: Session, current_user: User):
+    _ensure_project_access(project_id, db, current_user)
+
     documents = db.query(Document).filter(Document.project_id == project_id).all()
     return [
         {"id": str(d.id), "title": d.title, "created_at": d.created_at}
@@ -54,23 +60,20 @@ def get_project_documents(project_id: UUID, db: Session, current_user: User):
     ]
 
 
-def add_project_member(
-    project_id: UUID,
-    data: schemas.AddMemberRequest,
-    background_tasks: BackgroundTasks,
-    db: Session,
-    current_user: User,
-):
+def _verify_project_ownership(project_id: UUID, db: Session, user_id: UUID) -> Project:
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    if project.created_by != current_user.id:
+    if project.created_by != user_id:
         raise HTTPException(
             status_code=403, detail="Only the project owner can add members"
         )
+    return project
 
-    target_email = data.email.lower().strip()
+
+def _get_or_create_user_by_email(email: str, db: Session) -> User:
+    target_email = email.lower().strip()
     target_user = db.query(User).filter(User.email == target_email).first()
 
     if not target_user:
@@ -81,19 +84,34 @@ def add_project_member(
         )
         db.add(target_user)
         db.flush()
-    else:
-        existing_member = (
-            db.query(ProjectMember)
-            .filter(
-                ProjectMember.project_id == project_id,
-                ProjectMember.user_id == target_user.id,
-            )
-            .first()
+    return target_user
+
+
+def _check_if_member_exists(project_id: UUID, user_id: UUID, creator_id: UUID, db: Session):
+    existing_member = (
+        db.query(ProjectMember)
+        .filter(
+            ProjectMember.project_id == project_id,
+            ProjectMember.user_id == user_id,
         )
-        if existing_member or target_user.id == project.created_by:
-            raise HTTPException(
-                status_code=400, detail="User is already a member of this project"
-            )
+        .first()
+    )
+    if existing_member or user_id == creator_id:
+        raise HTTPException(
+            status_code=400, detail="User is already a member of this project"
+        )
+
+
+def add_project_member(
+    project_id: UUID,
+    data: schemas.AddMemberRequest,
+    background_tasks: BackgroundTasks,
+    db: Session,
+    current_user: User,
+):
+    project = _verify_project_ownership(project_id, db, current_user.id)
+    target_user = _get_or_create_user_by_email(data.email, db)
+    _check_if_member_exists(project_id, target_user.id, project.created_by, db)
 
     new_member = ProjectMember(project_id=project_id, user_id=target_user.id)
     db.add(new_member)
@@ -101,9 +119,9 @@ def add_project_member(
 
     background_tasks.add_task(
         utils.send_invitation_email,
-        to_email=target_email,
+        to_email=target_user.email,
         project_name=project.name,
         inviter_name=current_user.name,
     )
 
-    return {"message": f"User {target_email} added to project."}
+    return {"message": f"User {target_user.email} added to project."}

@@ -10,34 +10,67 @@ from src.backend.model.user import User
 router = APIRouter(prefix="/api/projects", tags=["Projects"])
 
 
-@router.get("/", response_model=List[schemas.ProjectRead])
+@router.get(
+    "/",
+    response_model=List[schemas.ProjectResponse],
+    status_code=status.HTTP_200_OK
+)
 def get_projects(
     db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
-    return services.get_projects(db, current_user)
+    try:
+        return services.get_projects(db, current_user)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch projects: {str(e)}"
+        )
 
 
 @router.post(
-    "/", response_model=schemas.ProjectRead, status_code=status.HTTP_201_CREATED
+    "/",
+    response_model=schemas.ProjectResponse,
+    status_code=status.HTTP_201_CREATED
 )
 def create_project(
-    data: schemas.ProjectCreate,
+    data: schemas.ProjectCreateRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return services.create_project(data, db, current_user)
+    try:
+        return services.create_project(data, db, current_user)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create project: {str(e)}"
+        )
 
 
-@router.get("/{project_id}/documents")
+@router.get(
+    "/{project_id}/documents",
+    status_code=status.HTTP_200_OK
+)
 def get_project_documents(
     project_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return services.get_project_documents(project_id, db, current_user)
+    try:
+        return services.get_project_documents(project_id, db, current_user)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch project documents: {str(e)}"
+        )
 
 
-@router.post("/{project_id}/members")
+@router.post(
+    "/{project_id}/members",
+    response_model=schemas.MessageResponse,
+    status_code=status.HTTP_201_CREATED
+)
 def add_project_member(
     project_id: UUID,
     data: schemas.AddMemberRequest,
@@ -45,6 +78,14 @@ def add_project_member(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return services.add_project_member(
-        project_id, data, background_tasks, db, current_user
-    )
+    try:
+        return services.add_project_member(
+            project_id, data, background_tasks, db, current_user
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to add project member: {str(e)}"
+        )

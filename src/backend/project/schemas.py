@@ -4,12 +4,12 @@ from uuid import UUID
 from datetime import datetime
 
 
-class ProjectCreate(BaseModel):
+class ProjectCreateRequest(BaseModel):
     name: str
     description: Optional[str] = None
 
 
-class ProjectRead(BaseModel):
+class ProjectResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: UUID
     name: str
@@ -20,3 +20,7 @@ class ProjectRead(BaseModel):
 
 class AddMemberRequest(BaseModel):
     email: str
+
+
+class MessageResponse(BaseModel):
+    message: str

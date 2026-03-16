@@ -4,6 +4,8 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from src.backend.config import Config
 
+from . import constants
+
 logger = logging.getLogger(__name__)
 
 
@@ -12,31 +14,17 @@ async def send_invitation_email(to_email: str, project_name: str, inviter_name: 
     Main entry point for sending invitation emails.
     Tries SMTP (primary) then Resend (fallback).
     """
-    subject = f"Invitation to collaborate on {project_name}"
-    html_content = _get_invitation_html(to_email, project_name, inviter_name)
+    subject = constants.INVITATION_EMAIL_SUBJECT.format(project_name=project_name)
+    html_content = constants.INVITATION_EMAIL_HTML_TEMPLATE.format(
+        inviter_name=inviter_name,
+        project_name=project_name,
+        frontend_url=Config.FRONTEND_URL,
+        to_email=to_email
+    )
 
     result = _send_via_smtp(to_email, subject, html_content)
     return result
 
-
-def _get_invitation_html(to_email: str, project_name: str, inviter_name: str) -> str:
-    return f"""
-    <div style="font-family: sans-serif; line-height: 1.5; color: #333;">
-        <h2>Hello!</h2>
-        <p><strong>{inviter_name}</strong> has invited you to collaborate on the project <strong>"{project_name}"</strong> in AI Project Manager.</p>
-        <p>
-            <a href="{Config.FRONTEND_URL}/register?email={to_email}" 
-               style="display: inline-block; padding: 10px 20px; background-color: #007bff; color: #fff; text-decoration: none; border-radius: 5px;">
-               Get Started
-            </a>
-        </p>
-        <p>If the button doesn't work, copy and paste this link: <br>
-           {Config.FRONTEND_URL}/register?email={to_email}</p>
-        <p>Please register using this email (<strong>{to_email}</strong>) to start collaborating!</p>
-        <hr>
-        <p style="font-size: 0.8em; color: #777;">Best,<br>The AI Project Manager Team</p>
-    </div>
-    """
 
 def _send_via_smtp(to_email: str, subject: str, html_content: str):
     try:
