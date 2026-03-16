@@ -1,5 +1,4 @@
 import json
-import uuid
 from sqlalchemy.orm import Session
 
 from src.backend.db.redis import redis_client
