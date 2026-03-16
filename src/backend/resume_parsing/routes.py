@@ -19,21 +19,23 @@ async def parse_resume(
     Step 1: Extract data from resume and return JSON for review.
     Does NOT save to database yet.
     """
-    filename = file.filename.lower()
-    content = await file.read()
-
-    if filename.endswith(".pdf"):
-        text = await asyncio.to_thread(services.parse_pdf, content)
-    elif filename.endswith(".docx"):
-        text = await asyncio.to_thread(services.parse_docx, content)
-    elif filename.endswith(".txt"):
-        text = content.decode("utf-8")
-    else:
-        raise HTTPException(status_code=400, detail="Unsupported file type")
-
     try:
+        filename = file.filename.lower()
+        content = await file.read()
+
+        if filename.endswith(".pdf"):
+            text = await asyncio.to_thread(services.parse_pdf, content)
+        elif filename.endswith(".docx"):
+            text = await asyncio.to_thread(services.parse_docx, content)
+        elif filename.endswith(".txt"):
+            text = content.decode("utf-8")
+        else:
+            raise HTTPException(status_code=400, detail="Unsupported file type")
+
         result = await services.extract_resume_data(text)
         return JSONResponse(status_code=status.HTTP_200_OK, content=result.model_dump())
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -50,12 +52,12 @@ def update_profile(
     """
     Step 2: Save reviewed/edited data to the database.
     """
-    user_detail = (
-        db.query(UserDetail).filter(UserDetail.user_id == current_user.id).first()
-    )
-    skills_str = ", ".join(data.skills) if data.skills else ""
-
     try:
+        user_detail = (
+            db.query(UserDetail).filter(UserDetail.user_id == current_user.id).first()
+        )
+        skills_str = ", ".join(data.skills) if data.skills else ""
+
         if not user_detail:
             user_detail = UserDetail(
                 user_id=current_user.id,
@@ -70,6 +72,7 @@ def update_profile(
             user_detail.designation = data.designation
 
         db.commit()
+
         return JSONResponse(
             status_code=status.HTTP_200_OK,
             content={"message": "Profile updated successfully"}
