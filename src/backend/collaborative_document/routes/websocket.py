@@ -8,8 +8,8 @@ from src.backend.db.database import SessionLocal
 from src.backend.model.document import Document, DocumentBlock
 from src.backend.db.redis import redis_client
 from src.backend.config import Config
-from src.backend.collaborative_document.utils.websocket import ConnectionManager
-from src.backend.collaborative_document.utils import utils
+from src.backend.collaborative_document.services.websocket import ConnectionManager
+from src.backend.collaborative_document.utils import helper_function
 
 manager = ConnectionManager()
 
@@ -43,7 +43,7 @@ async def websocket_endpoint(
         doc_uuid = UUID(str(document_id))
         user_uuid = UUID(str(user_id))
         with SessionLocal() as db:
-            utils.verify_document_access(doc_uuid, user_uuid, db)
+            helper_function.verify_document_access(doc_uuid, user_uuid, db)
     except Exception as e:
         await websocket.accept()
         await websocket.close(code=1008, reason=f"Access denied: {str(e)}")

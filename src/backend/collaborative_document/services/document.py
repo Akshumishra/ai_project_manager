@@ -5,8 +5,8 @@ from uuid import UUID
 import uuid
 import json, time, redis
 
-from .utils import utils
-from . import schemas
+from src.backend.collaborative_document.utils import helper_function
+from src.backend.collaborative_document import schemas
 from src.backend.collaborative_document.routes.websocket import manager
 from src.backend.db.redis import redis_client
 from src.backend.model.document import Document, DocumentBlock
@@ -46,7 +46,7 @@ def create_document(data: schemas.DocumentCreate, db: Session, current_user: Use
 
 
 def get_document(document_id: UUID, db: Session, current_user: User):
-    utils.verify_document_access(document_id, current_user.id, db)
+    helper_function.verify_document_access(document_id, current_user.id, db)
     redis_key = f"doc:{document_id}"
     cached = redis_client.get(redis_key)
     if cached:
@@ -87,7 +87,7 @@ def get_document(document_id: UUID, db: Session, current_user: User):
 async def insert_block(
     document_id: UUID, data: schemas.BlockCreate, db: Session, current_user: User
 ):
-    utils.verify_document_access(document_id, current_user.id, db)
+    helper_function.verify_document_access(document_id, current_user.id, db)
     _verify_document_exists(document_id, db)
 
     new_id = uuid.uuid4()
@@ -118,7 +118,7 @@ async def edit_block(block_id: str, data: schemas.BlockUpdate, db: Session, curr
     if not block:
         raise HTTPException(404, "Block not found")
 
-    utils.verify_document_access(block.doc_id, current_user.id, db)
+    helper_function.verify_document_access(block.doc_id, current_user.id, db)
 
     try:
         redis_client.set(f"block_update:{block_id}", json.dumps({"content": data.content, "type": data.type}))
@@ -135,7 +135,7 @@ async def edit_block(block_id: str, data: schemas.BlockUpdate, db: Session, curr
 
 async def delete_block(block_id: str, db: Session, current_user: User):
     doc_id = _find_doc_id_for_block(block_id, db)
-    utils.verify_document_access(doc_id, current_user.id, db)
+    helper_function.verify_document_access(doc_id, current_user.id, db)
 
     # 1. Handle Pending Insert
     is_pending = False
@@ -161,7 +161,7 @@ async def delete_block(block_id: str, db: Session, current_user: User):
 
 
 def update_document(document_id: UUID, data: schemas.DocumentUpdate, db: Session, current_user: User):
-    utils.verify_document_access(document_id, current_user.id, db)
+    helper_function.verify_document_access(document_id, current_user.id, db)
     document = db.query(Document).filter(Document.id == document_id).first()
     if not document:
         raise HTTPException(404, "Document not found")
@@ -174,7 +174,7 @@ def update_document(document_id: UUID, data: schemas.DocumentUpdate, db: Session
 
 
 def delete_document(document_id: UUID, db: Session, current_user: User):
-    utils.verify_document_access(document_id, current_user.id, db)
+    helper_function.verify_document_access(document_id, current_user.id, db)
     document = db.query(Document).filter(Document.id == document_id).first()
     if not document:
         raise HTTPException(404, "Document not found")
@@ -195,7 +195,7 @@ def _verify_document_exists(doc_id: UUID, db: Session):
 def _calculate_position(doc_id: UUID, prev_id: str | None, next_id: str | None, db: Session) -> str:
     prev_key = _get_block_position(prev_id, db) if prev_id else None
     next_key = _get_block_position(next_id, db) if next_id else None
-    return utils.generate_position(prev_key, next_key)
+    return helper_function.generate_position(prev_key, next_key)
 
 
 def _get_block_position(block_id: str, db: Session) -> str:
