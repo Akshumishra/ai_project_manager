@@ -8,16 +8,27 @@ The engine is created **lazily** on first use (not at module import time).
 This lets any module safely import ``Base``, ``get_db``, or ``SessionLocal``
 without immediately requiring DATABASE_URL to be set — which is critical for
 the meeting_bot subprocess and for test environments that patch the URL.
+
+Migrations:
+    SQLAlchemy 2.0+ ``DeclarativeBase`` replaces the legacy
+    ``declarative_base()`` function, which is deprecated.
 """
 
 from __future__ import annotations
 
-import os
+import logging
 
 from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, declarative_base, sessionmaker
+from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
-Base = declarative_base()
+logger = logging.getLogger(__name__)
+
+
+class Base(DeclarativeBase):
+    """Declarative base class for all ORM models (SQLAlchemy 2.0+ style)."""
+
+    pass
+
 
 # ── Lazy engine/session factory ───────────────────────────────────────────────
 # Nothing is created here at import time.  _engine and _SessionLocal are
@@ -29,13 +40,11 @@ _SessionLocal: sessionmaker | None = None
 
 def _get_database_url() -> str:
     """
-    Resolve DATABASE_URL from environment.
-
-    Checks the environment directly (not via src.backend.config.Config) so
-    this module remains importable in any subprocess regardless of whether
-    the wider backend config is available.
+    Resolve DATABASE_URL from centralized configuration framework.
     """
-    url = os.environ.get("DATABASE_URL")
+    from src.backend.config import get_app_config
+
+    url = get_app_config().database_url
     if not url:
         raise RuntimeError(
             "DATABASE_URL environment variable is not set. "
@@ -48,10 +57,17 @@ def _get_session_local() -> sessionmaker:
     """Return the module-level sessionmaker, creating the engine on first call."""
     global _engine, _SessionLocal  # noqa: PLW0603
     if _SessionLocal is None:
-        _engine = create_engine(_get_database_url(), pool_pre_ping=True)
+        _engine = create_engine(
+            _get_database_url(),
+            pool_pre_ping=True,
+            pool_size=5,
+            max_overflow=10,
+            pool_recycle=1800,
+        )
         _SessionLocal = sessionmaker(
             bind=_engine, autocommit=False, autoflush=False
         )
+        logger.info("Database engine initialized (pool_size=5, max_overflow=10).")
     return _SessionLocal
 
 
