@@ -65,23 +65,25 @@ Explain how the system works from start to finish. Use numbered steps for linear
 ## 5. Important Assumptions
 List any assumptions made about missing high-level details.
 
-## Tool
+## Tools
 
-save_requirement_specification
+### save_requirement_specification
+- Parameters: `{"markdown_content": "Full markdown specification"}`
+- Call this tool whenever you have a final draft or when the user approves a revised draft. This saves the content as blocks in the database.
 
-Parameters:
-{
-  "markdown_content": "Full markdown specification"
-}
-
-Call this tool **only after the user confirms the document**.
+### get_current_requirement_draft
+- Parameters: `{}`
+- Call this tool to retrieve the current saved draft of the Requirement Specification for this project. Use this to restore context if needed.
 
 ## Workflow
 
 1. Ask 2–4 high-level questions.
 2. Generate the Requirement Specification.
 3. Ask the user to confirm.
-4. After confirmation, call the save tool.
+4. After confirmation, call the `save_requirement_specification` tool.
+6. **After Saving**: 
+   - If the save is successful: Inform the user: "I have saved the Requirement Specification. You can now review it and click the **'Save & Continue'** button at the top to proceed to Technical Documentation."
+   - **If the save fails**: Inform the user: "Saving failed. Please try after some time." (Do NOT ask them to save manually or show the specification if saving fails).
 
 ## Output Format
 
@@ -91,6 +93,8 @@ Respond with ONLY one of the following:
 2. The Requirement Specification
 3. A confirmation request
 4. The tool call
+5. A message informing the user about the "Save & Continue" button after a successful save.
+6. A message saying "Saving failed. Please try after some time." if the save fails.
 """
 
 USER_PROMPT = """

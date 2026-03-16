@@ -29,7 +29,7 @@ def make_save_requirement_spec_tool(user_id: UUID, project_id: UUID):
             if success:
                 return {
                     "status": "success",
-                    "message": message
+                    "result": message # message is a dict now
                 }
             else:
                 return {

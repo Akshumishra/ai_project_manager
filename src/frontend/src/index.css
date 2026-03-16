@@ -1297,3 +1297,118 @@ textarea.input {
   display: flex;
   gap: 12px;
 }
+
+/* ── Requirement Agent Canvas (Split Screen) ────────────────── */
+.agent-workspace-canvas {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--surface-app);
+}
+
+.agent-workspace-canvas .workspace-header {
+  height: 72px;
+  flex-shrink: 0;
+  padding: 0 24px;
+  background: white;
+  border-bottom: 1px solid var(--gray-200);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.agent-workspace-canvas .workspace-container {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.agent-workspace-canvas .chat-panel {
+  flex: 0 0 400px; /* Fixed width for chat */
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--gray-200);
+  background: white;
+}
+
+.agent-workspace-canvas .messages {
+  flex: 1;
+  padding: 24px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.agent-workspace-canvas .input-area {
+  padding: 20px;
+  border-top: 1px solid var(--gray-200);
+  background: white;
+  display: flex;
+  gap: 12px;
+}
+
+.agent-workspace-canvas .canvas-panel {
+  flex: 1;
+  background: var(--gray-50);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+.agent-workspace-canvas .canvas-panel .editor-wrapper {
+  padding: 40px;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.agent-workspace-canvas .canvas-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--gray-400);
+  gap: 16px;
+}
+
+.agent-workspace-canvas .project-info .eyebrow {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--gray-400);
+  letter-spacing: 0.1em;
+  font-weight: 700;
+  margin-bottom: 2px;
+  display: block;
+}
+
+.agent-workspace-canvas .project-info h1 {
+  font-size: 18px;
+  margin: 0;
+  color: var(--gray-900);
+}
+
+.agent-workspace-canvas .btn-close {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--gray-100);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.2s;
+  font-size: 20px;
+}
+
+.agent-workspace-canvas .btn-close:hover {
+  background: var(--gray-200);
+}
+
+.agent-workspace-canvas .agent-status {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}

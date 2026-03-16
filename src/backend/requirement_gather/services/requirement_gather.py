@@ -42,6 +42,12 @@ def _execute_agent_run(db: Session, user_id: UUID, project_id: UUID, run_message
                 "saved": response.get("saved", False)
             }
         
+        # Determine final status for redirection support
+        from src.backend.utils.workflow_utils import get_workflow_status
+        wf = get_workflow_status(db, project_id, C.WORKFLOW_NAME)
+        if wf:
+            response["status"] = wf.status
+
         return response
 
     except Exception as e:

@@ -27,7 +27,8 @@ Ask yourself: "Does this change improve, simplify, or better align with the proj
 
 ### When the user CONFIRMS they are satisfied and wants to save:
 - Call `save_technical_document` with the final Markdown.
-- Confirm briefly that the document has been saved.
+- **If successful**: Confirm briefly that the document has been saved.
+- **If saving fails**: Inform the user: "Saving failed. Please try after some time." (Do NOT offer to paste the document manually).
 
 ## TOOL USAGE RULES
 

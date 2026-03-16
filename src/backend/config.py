@@ -22,6 +22,8 @@ class Config:
     SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
 
     # CORS
-    ALLOWED_ORIGINS = os.getenv(
-        "ALLOWED_ORIGINS"
-    ).split(",")
+    ALLOWED_ORIGINS = [
+        origin.strip().strip('"').strip("'")
+        for origin in os.getenv("ALLOWED_ORIGINS", "").split(",")
+        if origin.strip()
+    ]

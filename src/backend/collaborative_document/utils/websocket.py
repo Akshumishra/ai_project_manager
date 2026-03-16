@@ -11,12 +11,12 @@ class ConnectionManager:
         await websocket.accept()
         if document_id not in self.active_connections:
             self.active_connections[document_id] = {}
-        self.active_connections[document_id][websocket] = user_id
-        role = (
-            "editor"
-            if len(self.active_connections[document_id]) <= self.MAX_EDITORS
-            else "viewer"
-        )
+        
+        # Count existing editors
+        current_editors = sum(1 for role in self.active_connections[document_id].values() if role == "editor")
+        
+        role = "editor" if current_editors < self.MAX_EDITORS else "viewer"
+        self.active_connections[document_id][websocket] = role
         return role
 
     def disconnect(self, websocket: WebSocket, document_id: str):

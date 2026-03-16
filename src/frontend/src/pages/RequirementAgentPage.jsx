@@ -5,12 +5,21 @@ import {
   startRequirementAgentRequest,
   sendRequirementAgentMessage,
   getProjectRequest,
-  saveRequirementDocRequest,
+  completeRequirementStepRequest,
 } from "../api";
 import { getActiveProject, setActiveProject, getUserBackground } from "../utils/storage";
 import { useAuth } from "../context/AuthContext";
 
 function ChatMessage({ role, content }) {
+  if (content === "...") {
+    return (
+      <div className="message ai">
+        <div className="bubble">
+          <div className="spinner-sm"></div>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className={`message ${role === "assistant" ? "ai" : "user"}`}>
       <div className="bubble">
@@ -24,6 +33,7 @@ export default function RequirementAgentPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const initRef = useRef(false);
 
   const storedProject = getActiveProject();
   const activeProjectId = searchParams.get("project_id") || storedProject.project_id;
@@ -32,31 +42,34 @@ export default function RequirementAgentPage() {
   const [messages, setMessages] = useState([]);
   const [chatStatus, setChatStatus] = useState("Initializing agent...");
   const [inputValue, setInputValue] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+  const [canContinue, setCanContinue] = useState(false);
 
   const chatBoxRef = useRef(null);
+  const pollingIntervalRef = useRef(null);
 
+  // 1. Initialization logic - Fixed to run once using initRef
   useEffect(() => {
-    if (!activeProjectId) {
-      navigate("/create-project");
-      return;
-    }
-
-    if (!user?.id) return;
+    if (!activeProjectId || !user?.id || initRef.current) return;
+    initRef.current = true;
 
     const init = async () => {
-      setLoading(true);
+      setChatStatus("Checking project status...");
       try {
-        if (!projectTitle) {
-          const data = await getProjectRequest(activeProjectId);
-          setProjectTitle(data.name || "My Project");
+        let currentTitle = projectTitle;
+
+        // Always get latest project info
+        const data = await getProjectRequest(activeProjectId);
+        if (!currentTitle) {
+          currentTitle = data.project_title || data.name || "My Project";
+          setProjectTitle(currentTitle);
           setActiveProject({ 
             project_id: activeProjectId, 
-            project_title: data.name, 
-            project_description: data.description 
+            project_title: currentTitle, 
+            project_description: data.project_description || data.description 
           });
         }
-        
+
         const background = getUserBackground(user.id);
         const res = await startRequirementAgentRequest(activeProjectId, user.id, background);
 
@@ -68,48 +81,121 @@ export default function RequirementAgentPage() {
         const initialMessages = res.messages && res.messages.length > 0 ? res.messages : [{ role: "assistant", content: res.content }];
         setMessages(initialMessages);
         
-        setChatStatus("Ready to chat");
+        if (res.saved) {
+           setCanContinue(true);
+        }
+
+        // Handle Thinking persistence
+        if (res.thinking) {
+          setChatStatus("Assistant is thinking...");
+          setIsSending(true);
+          startPolling();
+        } else {
+          setChatStatus("Ready to chat");
+        }
+
       } catch (err) {
         console.error("Agent init failed:", err);
         setChatStatus("Failed to start agent.");
-      } finally {
-        setLoading(false);
       }
     };
 
     init();
-  }, [activeProjectId, navigate, projectTitle, user]);
+
+    return () => {
+      if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
+    };
+  }, [activeProjectId, user?.id]);
+
+  // 2. Polling logic to handle "thinking" state persistence
+  const startPolling = () => {
+    if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
+    
+    pollingIntervalRef.current = setInterval(async () => {
+      try {
+        const background = getUserBackground(user.id);
+        const res = await startRequirementAgentRequest(activeProjectId, user.id, background);
+        
+        if (!res.thinking) {
+          clearInterval(pollingIntervalRef.current);
+          pollingIntervalRef.current = null;
+          setIsSending(false);
+          setChatStatus("Ready to chat");
+          
+          if (res.messages) {
+            setMessages(res.messages);
+          }
+          if (res.status === "completed") {
+            setChatStatus("Requirement gathering complete! Redirecting...");
+            setTimeout(() => {
+              navigate(`/tech-doc?project_id=${encodeURIComponent(activeProjectId)}`);
+            }, 2000);
+            return;
+          }
+          if (res.saved) {
+            setCanContinue(true);
+          }
+        }
+      } catch (err) {
+        console.error("Polling failed:", err);
+      }
+    }, 3000);
+  };
 
   useEffect(() => {
     if (chatBoxRef.current) {
       chatBoxRef.current.scrollTop = chatBoxRef.current.scrollHeight;
     }
-  }, [messages]);
+  }, [messages, isSending]);
 
   const sendMessage = async () => {
     const text = inputValue.trim();
-    if (!text || loading || !user?.id) return;
+    if (!text || isSending || !user?.id) return;
 
-    setLoading(true);
+    setIsSending(true);
     setInputValue("");
     const newMessages = [...messages, { role: "user", content: text }];
-    setMessages([...newMessages, { role: "assistant", content: "..." }]);
+    setMessages(newMessages);
 
     try {
+      setChatStatus("Assistant is thinking...");
       const res = await sendRequirementAgentMessage(activeProjectId, text, user.id);
       
       const finalMessages = [...newMessages, { role: "assistant", content: res.content }];
       setMessages(finalMessages);
 
-      if (res.saved) {
-        setChatStatus("Finalizing specification...");
-        setTimeout(() => navigate(`/tech-doc?project_id=${encodeURIComponent(activeProjectId)}`), 2000);
+      if (res.status === "completed") {
+        setChatStatus("Requirement gathering complete! Redirecting...");
+        setTimeout(() => {
+          navigate(`/tech-doc?project_id=${encodeURIComponent(activeProjectId)}`);
+        }, 2000);
+      } else if (res.saved) {
+        setChatStatus("Requirement draft saved.");
+        setCanContinue(true);
+      } else {
+        setChatStatus("Ready to chat");
       }
     } catch (err) {
       console.error("Message failed:", err);
       setMessages([...newMessages, { role: "assistant", content: "Error: Could not send message." }]);
+      setChatStatus("Error occurred.");
     } finally {
-      setLoading(false);
+      setIsSending(false);
+    }
+  };
+
+  const handleContinue = async () => {
+    if (isSending) return;
+    setIsSending(true);
+    setChatStatus("Finalizing requirement phase...");
+    try {
+       await completeRequirementStepRequest(activeProjectId);
+       navigate(`/tech-doc?project_id=${encodeURIComponent(activeProjectId)}`);
+    } catch (err) {
+       console.error("Failed to complete step:", err);
+       setChatStatus("Error finalizing phase.");
+    } finally {
+       setIsSending(false);
     }
   };
 
@@ -129,9 +215,9 @@ export default function RequirementAgentPage() {
             <h1>{projectTitle}</h1>
           </div>
         </div>
-        <div className="agent-status" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+        <div className="agent-status">
           <div className="h-stack gap-2">
-            <span className={`status-dot ${loading ? "busy" : "idle"}`}></span>
+            <span className={`status-dot ${isSending ? "busy" : "idle"}`}></span>
             <span style={{ fontSize: '14px', color: 'var(--gray-600)' }}>{chatStatus}</span>
           </div>
         </div>
@@ -141,24 +227,20 @@ export default function RequirementAgentPage() {
         <section className="chat-panel" style={{ maxWidth: '800px', margin: '0 auto', borderRight: 'none' }}>
           <div className="messages" ref={chatBoxRef}>
             {messages.map((m, i) => <ChatMessage key={i} role={m.role} content={m.content} />)}
-            {loading && (
-              <div className="message ai">
-                <div className="bubble">
-                  <div className="spinner-sm"></div>
-                </div>
-              </div>
+            {isSending && !messages.find(m => m.role === 'assistant' && m.content === '...') && (
+              <ChatMessage role="assistant" content="..." />
             )}
           </div>
           <div className="input-area">
             <input 
               type="text" 
-              placeholder="Ask a question or provide more details..." 
+              placeholder="Ask a question..." 
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && sendMessage()}
-              disabled={loading}
+              disabled={isSending}
             />
-            <button onClick={sendMessage} disabled={loading || !inputValue.trim()}>Send</button>
+            <button onClick={sendMessage} disabled={isSending || !inputValue.trim()}>Send</button>
           </div>
         </section>
       </div>

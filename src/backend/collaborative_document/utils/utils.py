@@ -15,7 +15,7 @@ def generate_position(prev_pos, next_pos):
         try:
             return float(val)
         except ValueError:
-            return 0.0
+            raise HTTPException(status_code=400, detail=f"Invalid position value: {val}")
 
     p = to_float(prev_pos)
     n = to_float(next_pos)
@@ -56,23 +56,57 @@ def verify_document_access(document_id: UUID, user_id: UUID, db: Session):
         )
 
     return document
-
-
-def create_blocks_from_text(doc_id: UUID, text: str, db: Session, initial_pos: int = 1000, increment: int = 1000):
-
+def create_blocks_from_text(doc_id: UUID, text: str, db: Session):
+    """
+    Parses markdown text into blocks and saves them to the database for a given document.
+    """
     from src.backend.model.document import DocumentBlock
     
-    lines = [line.strip() for line in text.split("\n") if line.strip()]
+    # Simple parser: split by double newlines or headers
+    import re
+    # We split by headers or double newlines to create blocks
+    # This is a basic implementation to get things working
+    lines = text.split('\n')
+    current_block_content = []
+    blocks = []
     
-    pos = initial_pos
     for line in lines:
-        block = DocumentBlock(
-            doc_id=doc_id,
-            content=line,
-            type="markdown",
-            position_key=str(pos)
-        )
-        db.add(block)
-        pos += increment
+        if line.startswith('#') or (not line.strip() and current_block_content):
+            if current_block_content:
+                blocks.append("\n".join(current_block_content).strip())
+                current_block_content = []
+            if line.strip():
+                blocks.append(line.strip())
+        else:
+            if line.strip() or current_block_content:
+                current_block_content.append(line)
+                
+    if current_block_content:
+        blocks.append("\n".join(current_block_content).strip())
+        
+    # Remove empty blocks
+    blocks = [b for b in blocks if b]
     
-    db.flush()
+    if not blocks:
+        blocks = ["# New Document"]
+        
+    # Create blocks with sequential keys
+    for i, content in enumerate(blocks):
+        block_type = "text"
+        if content.startswith('# '): block_type = "h1"
+        elif content.startswith('## '): block_type = "h2"
+        elif content.startswith('### '): block_type = "h3"
+        elif content.startswith('- ') or content.startswith('* '): block_type = "bullet_list"
+        
+        # Strip header markers from content for some types if desired, 
+        # but the editor expects raw markdown for now? 
+        # Actually the Editor renders marked(content), so keeping markdown is fine.
+        
+        new_block = DocumentBlock(
+            id=str(uuid.uuid4()) if 'uuid' in globals() else str(__import__('uuid').uuid4()),
+            doc_id=doc_id,
+            content=content,
+            position_key=str((i + 1) * 1000),
+            type=block_type
+        )
+        db.add(new_block)

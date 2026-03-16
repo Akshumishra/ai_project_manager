@@ -71,6 +71,11 @@ export const saveRequirementDocRequest = async (projectId, payload) => {
   return data;
 };
 
+export const completeRequirementStepRequest = async (projectId) => {
+  const { data } = await api.patch(`/api/agent/projects/${projectId}/requirement-complete`);
+  return data;
+};
+
 export const startTechDocAgentRequest = async (projectId, userId) => {
   const { data } = await api.get(`/api/agent/projects/${projectId}/tech-doc-agent?user_id=${encodeURIComponent(userId)}`);
   return data;

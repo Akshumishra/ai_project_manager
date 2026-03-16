@@ -96,3 +96,11 @@ def save_requirement_doc(
         raise HTTPException(status_code=500, detail=message)
 
     return {"status": "success", "message": message}
+
+@router.patch("/projects/{project_id}/requirement-complete")
+def mark_requirement_complete(project_id: UUID, db: Session = Depends(get_db)):
+    from src.backend.requirement_gather.services.save_requirement import complete_requirement_step
+    success, message = complete_requirement_step(db, project_id)
+    if not success:
+        raise HTTPException(status_code=500, detail=message)
+    return {"status": "success", "message": message}
