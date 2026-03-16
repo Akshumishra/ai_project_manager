@@ -1,14 +1,16 @@
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 from src.backend.db.database import get_db
-from . import schemas, services
+from . import schemas, services, utils
 import src.backend.model.user as user_model
 
 router = APIRouter(prefix="/api/users", tags=["Users"])
 
 
 @router.get("/", response_model=list[schemas.UserRead])
-def get_all_users(db: Session = Depends(get_db)):
+def get_all_users(
+    db: Session = Depends(get_db), user: user_model.User = Depends(utils.get_current_user)
+):
     return db.query(user_model.User).all()
 
 
