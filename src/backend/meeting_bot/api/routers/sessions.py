@@ -116,8 +116,8 @@ async def schedule_meeting_calendar(
                 {
                     "project_member_id": uuid.UUID(p["project_member_id"]),
                     "invite_reason": p.get("reason", ""),
-                    "invite_source": "AI_SUGGESTED",
-                    "role_in_meeting": p.get("role_in_meeting", "ATTENDEE"),
+                    "invite_source": "ai_suggested",
+                    "role_in_meeting": str(p.get("role_in_meeting", "attendee")).lower(),
                 }
                 for p in inferred
             ]
