@@ -8,7 +8,8 @@ from src.backend.db.database import SessionLocal
 from src.backend.model.document import Document, DocumentBlock
 from src.backend.db.redis import redis_client
 from src.backend.config import Config
-from src.backend.collaborative_document.utils.websocket import ConnectionManager
+from src.backend.collaborative_document.services.websocket import ConnectionManager
+from src.backend.collaborative_document.utils import helper_function
 
 manager = ConnectionManager()
 
@@ -28,7 +29,7 @@ async def websocket_endpoint(
         payload = jwt.decode(
             token, Config.ACCESS_SECRET_KEY, algorithms=[Config.ALGORITHM]
         )
-        user_id = payload.get("user_id")
+        user_id = payload.get("sub") or payload.get("user_id")
         if not user_id:
             await websocket.accept()
             await websocket.close(code=1008, reason="Invalid token content")
@@ -38,10 +39,19 @@ async def websocket_endpoint(
         await websocket.close(code=1008, reason="Invalid token")
         return
 
+    try:
+        doc_uuid = UUID(str(document_id))
+        user_uuid = UUID(str(user_id))
+        with SessionLocal() as db:
+            helper_function.verify_document_access(doc_uuid, user_uuid, db)
+    except Exception as e:
+        await websocket.accept()
+        await websocket.close(code=1008, reason=f"Access denied: {str(e)}")
+        return
+
     role = await manager.connect(websocket, document_id, user_id)
 
     try:
-        doc_uuid = UUID(str(document_id))
         cached = redis_client.get(f"doc:{doc_uuid}")
         if cached:
             init_data = json.loads(cached)
@@ -51,7 +61,7 @@ async def websocket_endpoint(
                 if document:
                     blocks = (
                         db.query(DocumentBlock)
-                        .filter(DocumentBlock.doc_id == document_id)
+                        .filter(DocumentBlock.doc_id == doc_uuid)
                         .order_by(cast(DocumentBlock.position_key, Float))
                         .all()
                     )
@@ -69,7 +79,7 @@ async def websocket_endpoint(
                         ],
                     }
                     redis_client.set(
-                        f"doc:{document_id}", json.dumps(init_data), ex=3000
+                        f"doc:{doc_uuid}", json.dumps(init_data), ex=3000
                     )
                 else:
                     init_data = {"error": "Document not found."}
@@ -99,12 +109,27 @@ async def websocket_endpoint(
                 edit_timestamp = time.time()
 
                 try:
+                    # Validate block belongs to document
+                    with SessionLocal() as db:
+                        block = db.query(DocumentBlock).filter(
+                            DocumentBlock.id == block_id,
+                            DocumentBlock.doc_id == doc_uuid
+                        ).first()
+                        
+                        # Check pending inserts if not in DB
+                        if not block:
+                            pending = redis_client.get(f"pending_insert:{block_id}")
+                            if not pending or json.loads(pending).get("doc_id") != str(doc_uuid):
+                                await websocket.send_json({"type": "error", "message": "Unauthorized block edit"})
+                                continue
+
                     redis_client.set(
                         f"block_update:{block_id}",
                         json.dumps({"content": content, "type": block_type}),
                     )
                     redis_client.zadd("dirty_blocks", {str(block_id): edit_timestamp})
-                    cached_doc = redis_client.get(f"doc:{document_id}")
+                    
+                    cached_doc = redis_client.get(f"doc:{doc_uuid}")
                     if cached_doc:
                         doc_data = json.loads(cached_doc)
                         for b in doc_data["blocks"]:
@@ -112,7 +137,7 @@ async def websocket_endpoint(
                                 b["content"] = content
                                 b["type"] = block_type
                                 break
-                        redis_client.set(f"doc:{document_id}", json.dumps(doc_data))
+                        redis_client.set(f"doc:{doc_uuid}", json.dumps(doc_data))
                 except Exception as e:
                     print(f"Redis write error on websocket edit: {e}")
 
@@ -124,8 +149,10 @@ async def websocket_endpoint(
                     "timestamp": edit_timestamp,
                 }
                 await manager.broadcast_to_doc(
-                    document_id, broadcast_msg, exclude=websocket
+                    str(doc_uuid), broadcast_msg, exclude=websocket
                 )
 
     except WebSocketDisconnect:
+        pass
+    finally:
         manager.disconnect(websocket, document_id)

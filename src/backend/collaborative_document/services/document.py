@@ -5,8 +5,8 @@ from uuid import UUID
 import uuid
 import json, time, redis
 
-from .utils import utils
-from . import schemas
+from src.backend.collaborative_document.utils import helper_function
+from src.backend.collaborative_document import schemas
 from src.backend.collaborative_document.routes.websocket import manager
 from src.backend.db.redis import redis_client
 from src.backend.model.document import Document, DocumentBlock
@@ -46,7 +46,7 @@ def create_document(data: schemas.DocumentCreate, db: Session, current_user: Use
 
 
 def get_document(document_id: UUID, db: Session, current_user: User):
-    utils.verify_document_access(document_id, current_user.id, db)
+    helper_function.verify_document_access(document_id, current_user.id, db)
     redis_key = f"doc:{document_id}"
     cached = redis_client.get(redis_key)
     if cached:
@@ -87,14 +87,14 @@ def get_document(document_id: UUID, db: Session, current_user: User):
 async def insert_block(
     document_id: UUID, data: schemas.BlockCreate, db: Session, current_user: User
 ):
-    utils.verify_document_access(document_id, current_user.id, db)
+    helper_function.verify_document_access(document_id, current_user.id, db)
     _verify_document_exists(document_id, db)
 
-    new_id = str(uuid.uuid4())
+    new_id = uuid.uuid4()
     new_key = data.position_key or _calculate_position(document_id, data.prev_block_id, data.next_block_id, db)
 
     block_data = {
-        "block_id": new_id,
+        "block_id": str(new_id),
         "position_key": new_key,
         "content": data.content,
         "type": data.type,
@@ -102,7 +102,7 @@ async def insert_block(
 
     # Redis-buffered Insert
     try:
-        redis_client.set(f"pending_insert:{new_id}", json.dumps({"doc_id": str(document_id), **block_data}))
+        redis_client.set(f"pending_insert:{new_id}", json.dumps({"doc_id": str(document_id), **block_data}), ex=3600)
         redis_client.sadd("pending_inserts", new_id)
         _update_doc_cache(document_id, block_data)
     except (redis.ConnectionError, redis.TimeoutError):
@@ -118,7 +118,7 @@ async def edit_block(block_id: str, data: schemas.BlockUpdate, db: Session, curr
     if not block:
         raise HTTPException(404, "Block not found")
 
-    utils.verify_document_access(block.doc_id, current_user.id, db)
+    helper_function.verify_document_access(block.doc_id, current_user.id, db)
 
     try:
         redis_client.set(f"block_update:{block_id}", json.dumps({"content": data.content, "type": data.type}))
@@ -135,10 +135,16 @@ async def edit_block(block_id: str, data: schemas.BlockUpdate, db: Session, curr
 
 async def delete_block(block_id: str, db: Session, current_user: User):
     doc_id = _find_doc_id_for_block(block_id, db)
-    utils.verify_document_access(doc_id, current_user.id, db)
+    helper_function.verify_document_access(doc_id, current_user.id, db)
 
     # 1. Handle Pending Insert
-    if redis_client.exists(f"pending_insert:{block_id}"):
+    is_pending = False
+    try:
+        is_pending = redis_client.exists(f"pending_insert:{block_id}")
+    except (redis.ConnectionError, redis.TimeoutError):
+        pass # Fallback to trying delete in DB
+        
+    if is_pending:
         redis_client.srem("pending_inserts", block_id)
         redis_client.delete(f"pending_insert:{block_id}")
     else:
@@ -155,7 +161,7 @@ async def delete_block(block_id: str, db: Session, current_user: User):
 
 
 def update_document(document_id: UUID, data: schemas.DocumentUpdate, db: Session, current_user: User):
-    utils.verify_document_access(document_id, current_user.id, db)
+    helper_function.verify_document_access(document_id, current_user.id, db)
     document = db.query(Document).filter(Document.id == document_id).first()
     if not document:
         raise HTTPException(404, "Document not found")
@@ -168,7 +174,7 @@ def update_document(document_id: UUID, data: schemas.DocumentUpdate, db: Session
 
 
 def delete_document(document_id: UUID, db: Session, current_user: User):
-    utils.verify_document_access(document_id, current_user.id, db)
+    helper_function.verify_document_access(document_id, current_user.id, db)
     document = db.query(Document).filter(Document.id == document_id).first()
     if not document:
         raise HTTPException(404, "Document not found")
@@ -189,7 +195,7 @@ def _verify_document_exists(doc_id: UUID, db: Session):
 def _calculate_position(doc_id: UUID, prev_id: str | None, next_id: str | None, db: Session) -> str:
     prev_key = _get_block_position(prev_id, db) if prev_id else None
     next_key = _get_block_position(next_id, db) if next_id else None
-    return utils.generate_position(prev_key, next_key)
+    return helper_function.generate_position(prev_key, next_key)
 
 
 def _get_block_position(block_id: str, db: Session) -> str:
@@ -204,8 +210,9 @@ def _get_block_position(block_id: str, db: Session) -> str:
     raise HTTPException(400, f"Block {block_id} not found")
 
 
-def _persist_block_to_db(block_id: str, doc_id: UUID, key: str, data: schemas.BlockCreate, db: Session):
-    block = DocumentBlock(id=block_id, doc_id=doc_id, position_key=key, content=data.content, type=data.type)
+def _persist_block_to_db(block_id: UUID | str, doc_id: UUID, key: str, data: schemas.BlockCreate, db: Session):
+    b_uuid = UUID(str(block_id)) if isinstance(block_id, str) else block_id
+    block = DocumentBlock(id=b_uuid, doc_id=doc_id, position_key=key, content=data.content, type=data.type)
     db.add(block)
     db.commit()
 
@@ -228,8 +235,13 @@ def _update_doc_cache(doc_id: UUID, block_update: dict):
     if not found:
         doc_data["blocks"].append(block_update)
     
-    doc_data["blocks"].sort(key=lambda x: x["position_key"])
-    redis_client.set(redis_key, json.dumps(doc_data))
+    doc_data["blocks"].sort(key=lambda x: float(x["position_key"]))
+    
+    ttl = redis_client.ttl(redis_key)
+    if ttl and ttl > 0:
+        redis_client.setex(redis_key, ttl, json.dumps(doc_data))
+    else:
+        redis_client.set(redis_key, json.dumps(doc_data), ex=3000)
 
 
 def _remove_from_doc_cache(doc_id: UUID, block_id: str):
@@ -240,7 +252,12 @@ def _remove_from_doc_cache(doc_id: UUID, block_id: str):
     
     doc_data = json.loads(cached)
     doc_data["blocks"] = [b for b in doc_data["blocks"] if b["block_id"] != block_id]
-    redis_client.set(redis_key, json.dumps(doc_data))
+    
+    ttl = redis_client.ttl(redis_key)
+    if ttl and ttl > 0:
+        redis_client.setex(redis_key, ttl, json.dumps(doc_data))
+    else:
+        redis_client.set(redis_key, json.dumps(doc_data), ex=3000)
 
 
 def _find_doc_id_for_block(block_id: str, db: Session) -> UUID:
@@ -265,7 +282,12 @@ def _sync_title_to_cache(doc_id: UUID, title: str):
     try:
         doc_data = json.loads(cached)
         doc_data["title"] = title
-        redis_client.set(redis_key, json.dumps(doc_data), ex=3000)
+        
+        ttl = redis_client.ttl(redis_key)
+        if ttl and ttl > 0:
+            redis_client.setex(redis_key, ttl, json.dumps(doc_data))
+        else:
+            redis_client.set(redis_key, json.dumps(doc_data), ex=3000)
     except Exception:
         redis_client.delete(redis_key)
 
