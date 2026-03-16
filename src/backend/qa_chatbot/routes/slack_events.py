@@ -1,7 +1,11 @@
 import os
-import traceback
+import hmac
+import hashlib
+import time
 import requests
-from fastapi import APIRouter, Request
+import httpx
+import traceback
+from fastapi import APIRouter, Request, HTTPException
 from langchain_core.messages import HumanMessage, AIMessage
 from src.backend.config import Config
 from src.backend.constants import SlackConstants
@@ -22,14 +26,21 @@ logger.info(f"SLACK_BOT_TOKEN set={bool(Config.SLACK_BOT_TOKEN)}")
 
 processed_ts: set = set()
 
-def get_thread_history(channel_id: str, thread_ts: str) -> list:
+async def get_thread_history(channel_id: str, thread_ts: str) -> list:
     url = SlackConstants.CONVERSATIONS_REPLIES_URL
     headers = {"Authorization": f"Bearer {Config.SLACK_BOT_TOKEN}"}
     params  = {"channel": channel_id, "ts": thread_ts}
 
     try:
-        resp = requests.get(url, headers=headers, params=params, timeout=SlackConstants.API_TIMEOUT)
-        data = resp.json()
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                url, 
+                headers=headers, 
+                params=params, 
+                timeout=SlackConstants.API_TIMEOUT
+            )
+            resp.raise_for_status()
+            data = resp.json()
     except Exception as exc:
         logger.error(f"HTTP error fetching thread history: {exc}", exc_info=True)
         return []
@@ -62,9 +73,46 @@ def get_thread_history(channel_id: str, thread_ts: str) -> list:
 
 @router.post("/slack/events")
 async def slack_events(request: Request):
-    body = await request.json()
+    # 1. Verify Slack Signature
+    timestamp = request.headers.get("X-Slack-Request-Timestamp")
+    signature = request.headers.get("X-Slack-Signature")
+    
+    if not timestamp or not signature:
+        logger.error("Missing Slack verification headers")
+        raise HTTPException(status_code=401, detail="Authentication failed")
 
-    logger.debug("Received incoming request to /slack/events")
+    # Prevent replay attacks: reject if older than 5 minutes
+    if abs(time.time() - int(timestamp)) > 60 * 5:
+        logger.error("Slack request timestamp expired")
+        raise HTTPException(status_code=401, detail="Authentication failed")
+
+    body_bytes = await request.body()
+    signing_secret = Config.SLACK_SIGNING_SECRET
+    
+    if not signing_secret:
+        # Fallback for development if secret not set yet
+        logger.warning("SLACK_SIGNING_SECRET not set, bypassing verification")
+    else:
+        sig_basestring = f"v0:{timestamp}:".encode() + body_bytes
+        my_signature = "v0=" + hmac.new(
+            signing_secret.encode(),
+            sig_basestring,
+            hashlib.sha256
+        ).hexdigest()
+
+        if not hmac.compare_digest(my_signature, signature):
+            logger.error("Slack signature mismatch")
+            raise HTTPException(status_code=401, detail="Authentication failed")
+
+    # 2. Process Request
+    try:
+        import json
+        body = json.loads(body_bytes.decode())
+    except Exception as e:
+        logger.error(f"Failed to parse request body: {e}")
+        raise HTTPException(status_code=400, detail="Invalid JSON body")
+
+    logger.debug("Received incoming verified request to /slack/events")
     logger.debug(f"Request type: {body.get('type')}")
 
     if body.get("type") == "url_verification":
@@ -107,7 +155,7 @@ async def slack_events(request: Request):
         return {"status": "ignored"}
 
     question = user_message.replace(mention_str, "").strip()
-    logger.info(f"Received question: '{question}' from user {slack_user_id} in channel {channel_id}")
+    logger.debug(f"Received question: '{question}' from user {slack_user_id} in channel {channel_id}")
 
     # DEBUG: Write to a file since terminal output is hard to capture
     with open("/tmp/slack_debug.log", "a") as f:
@@ -117,7 +165,7 @@ async def slack_events(request: Request):
     project_id = get_project_id_from_channel(channel_id)
     if not project_id:
         logger.error(f"No project mapped to channel {channel_id}")
-        send_message(
+        await send_message(
             channel_id,
             "Sorry, I couldn't find a project linked to this channel.",
             thread_ts=thread_ts,
@@ -129,7 +177,7 @@ async def slack_events(request: Request):
     project_member_id = get_project_member_id(project_id, slack_user_id)
     if not project_member_id:
         logger.warning(f"User {slack_user_id} is not a member of project {project_id}")
-        send_message(
+        await send_message(
             channel_id,
             "Sorry, you don't appear to be a member of the project linked to this channel.",
             thread_ts=thread_ts,
@@ -138,23 +186,23 @@ async def slack_events(request: Request):
 
     logger.debug(f"Project member ID resolved: {project_member_id}")
 
-    history = get_thread_history(channel_id, thread_ts)
+    history = await get_thread_history(channel_id, thread_ts)
     history.append(HumanMessage(content=question))
-    logger.info(f"Total history messages including new question: {len(history)}")
+    logger.debug(f"Total history messages including new question: {len(history)}")
 
     try:
         logger.debug("Initializing ProjectAwareAgent...")
         agent  = ProjectAwareAgent(project_id, slack_user_id, project_member_id)
         logger.info("Running agent reasoning...")
         answer = agent.run(history)
-        logger.info(f"Agent response: {answer}")
+        logger.debug(f"Agent response: {answer}")
         logger.info("Agent response generated successfully")
-        send_message(channel_id, answer, thread_ts=thread_ts)
+        await send_message(channel_id, answer, thread_ts=thread_ts)
         return {"status": "ok", "message_sent": True}
 
     except Exception as exc:
         logger.error(f"Agent processing error: {exc}", exc_info=True)
-        send_message(
+        await send_message(
             channel_id,
             "Sorry, I ran into an error while processing your request.",
             thread_ts=thread_ts,

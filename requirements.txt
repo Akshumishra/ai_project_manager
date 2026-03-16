@@ -10,3 +10,4 @@ langchain-community
 requests
 alembic
 pydantic
+httpx

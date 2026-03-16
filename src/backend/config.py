@@ -8,3 +8,4 @@ class Config:
     SLACK_BOT_TOKEN = os.getenv("SLACK_BOT_TOKEN")
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
     BOT_USER_ID = os.getenv("BOT_USER_ID")
+    SLACK_SIGNING_SECRET = os.getenv("SLACK_SIGNING_SECRET")
