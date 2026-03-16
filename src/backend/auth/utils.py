@@ -9,7 +9,7 @@ from src.backend.db.database import get_db
 from src.backend.model.user import User
 from uuid import UUID
 
-bearer_scheme = HTTPBearer()
+bearer_scheme = HTTPBearer(auto_error=False)
 
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -86,6 +86,9 @@ def get_current_user(
         detail="Could not validate token",
         headers={"WWW-Authenticate": "Bearer"},
     )
+
+    if not token:
+        raise credentials_exception
 
     try:
         jwt_token = token.credentials
