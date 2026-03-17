@@ -1,3 +1,7 @@
+"""
+This script enables Row Level Security (RLS) on database tables to ensure strict data isolation between projects.
+It implements policies that filter rows based on a session-level 'app.project_id' variable.
+"""
 import sys
 import os
 

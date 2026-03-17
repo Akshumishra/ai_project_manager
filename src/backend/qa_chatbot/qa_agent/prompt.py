@@ -269,4 +269,4 @@ WHERE t.project_id  = :project_id
 - Bullets: lines starting with `-`
 - Keep under 4000 characters.
 - Do NOT expose raw UUIDs, SQL, or internal DB details in your reply.
-""".strip()
+"""

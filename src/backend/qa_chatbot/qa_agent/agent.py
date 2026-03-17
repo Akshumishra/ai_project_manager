@@ -1,12 +1,12 @@
 from typing import List
 
 from langchain_openai import ChatOpenAI
-from src.backend.config import Config
+from src.backend.config import settings
 from src.backend.qa_chatbot.constants import QAAgentConstants
 from langchain_core.messages import SystemMessage, BaseMessage
 from langchain.agents import create_agent
 from src.backend.qa_chatbot.qa_agent.prompt import SYSTEM_PROMPT
-from src.backend.qa_chatbot.qa_agent.tools.run_sql_query import make_run_sql_query_tool
+from src.backend.qa_chatbot.qa_agent.tools.run_sql_query import create_sql_query_tool
 from src.backend.logger import get_logger
 
 logger = get_logger("project_agent")
@@ -32,12 +32,12 @@ class ProjectAwareAgent:
         return ChatOpenAI(
             model=QAAgentConstants.MODEL,
             temperature=QAAgentConstants.TEMPERATURE,
-            api_key=Config.OPENAI_API_KEY,
+            api_key=settings.OPENAI_API_KEY,
         )
 
     def _create_tools(self) -> list:
         return [
-            make_run_sql_query_tool(
+            create_sql_query_tool(
                 project_id=self.project_id,
                 slack_user_id=self.slack_user_id,
                 project_member_id=self.project_member_id,
