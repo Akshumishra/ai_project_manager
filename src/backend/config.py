@@ -24,4 +24,4 @@ class Settings(BaseSettings):
     )
 
 settings = Settings()
-Config = settings
+
