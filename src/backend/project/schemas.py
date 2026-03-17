@@ -23,3 +23,9 @@ class AddMemberRequest(BaseModel):
 
 class MessageResponse(BaseModel):
     message: str
+
+
+class ProjectDocumentResponse(BaseModel):
+    id: UUID
+    title: str
+    created_at: datetime

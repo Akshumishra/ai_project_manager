@@ -48,6 +48,7 @@ def create_project(
 
 @router.get(
     "/{project_id}/documents",
+    response_model=List[schemas.ProjectDocumentResponse],
     status_code=status.HTTP_200_OK
 )
 def get_project_documents(
