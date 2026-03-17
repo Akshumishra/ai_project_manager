@@ -40,12 +40,18 @@ export default function ResumeUpload({ onComplete }) {
       
       setParsedData({
         skills: res.data.skills || [],
-        experience_years: res.data.experience_years || '',
+        yoe: String(res.data.yoe ?? ''),
         designation: res.data.designation || '',
       });
     } catch (err) {
       console.error('Parsing failed:', err);
-      setError(err.response?.data?.detail || 'Failed to parse resume. Please try again.');
+      let errMsg = 'Failed to parse resume. Please try again.';
+      if (err.response?.data?.detail) {
+        errMsg = Array.isArray(err.response.data.detail) 
+          ? err.response.data.detail.map(e => e.msg).join(', ') 
+          : err.response.data.detail;
+      }
+      setError(errMsg);
     } finally {
       setUploading(false);
     }
@@ -66,7 +72,13 @@ export default function ResumeUpload({ onComplete }) {
       if (onComplete) onComplete();
     } catch (err) {
       console.error('Update failed:', err);
-      setError(err.response?.data?.detail || 'Failed to update profile. Please try again.');
+      let errMsg = 'Failed to update profile. Please try again.';
+      if (err.response?.data?.detail) {
+        errMsg = Array.isArray(err.response.data.detail) 
+          ? err.response.data.detail.map(e => e.msg).join(', ') 
+          : err.response.data.detail;
+      }
+      setError(errMsg);
     } finally {
       setSaving(false);
     }
@@ -107,8 +119,8 @@ export default function ResumeUpload({ onComplete }) {
               <input 
                 type="text" 
                 className="input"
-                value={parsedData.experience_years} 
-                onChange={(e) => updateParsedField('experience_years', e.target.value)}
+                value={parsedData.yoe} 
+                onChange={(e) => updateParsedField('yoe', e.target.value)}
                 required 
               />
             </div>

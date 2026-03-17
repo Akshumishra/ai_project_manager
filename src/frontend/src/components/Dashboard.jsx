@@ -70,22 +70,28 @@ export default function Dashboard({ onSelectProject }) {
               </svg>
             </div>
             <div className="doc-card-info">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <h3>{project.name}</h3>
-                {user?.id === project.created_by && (
-                  <button 
-                    className="btn-delete-project"
-                    onClick={(e) => handleDeleteProject(e, project.id, project.name)}
-                    title="Delete Project"
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <polyline points="3 6 5 6 21 6"></polyline>
-                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                    </svg>
-                  </button>
-                )}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                <h3 style={{ margin: 0 }}>{project.name}</h3>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span className={`task-status status-${(project.status || 'active').toLowerCase()}`} style={{ fontSize: '10px', padding: '2px 8px' }}>
+                    {(project.status || 'active').replace('_', ' ')}
+                  </span>
+                  {user?.id === project.created_by && (
+                    <button 
+                      className="btn-delete-project"
+                      onClick={(e) => handleDeleteProject(e, project.id, project.name)}
+                      title="Delete Project"
+                      style={{ padding: '4px' }}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <polyline points="3 6 5 6 21 6"></polyline>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                      </svg>
+                    </button>
+                  )}
+                </div>
               </div>
-              <p>{project.description || 'No description'}</p>
+              <p style={{ margin: 0 }}>{project.description || 'No description'}</p>
             </div>
           </div>
         ))}

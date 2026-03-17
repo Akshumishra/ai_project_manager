@@ -1,8 +1,9 @@
+from sqlalchemy import cast, Float
 from difflib import SequenceMatcher
 from uuid import UUID
 import uuid
 from sqlalchemy.orm import Session
-from fastapi import HTTPException
+from fastapi import HTTPException, status
 
 from src.backend.model.document import Document
 from src.backend.model.project import Project, ProjectMember
@@ -17,7 +18,10 @@ def generate_position(prev_pos, next_pos):
         try:
             return float(val)
         except ValueError:
-            raise HTTPException(status_code=400, detail=f"Invalid position value: {val}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, 
+                detail=f"Invalid position value: {val}"
+            )
 
     p = to_float(prev_pos)
     n = to_float(next_pos)
@@ -37,11 +41,17 @@ def generate_position(prev_pos, next_pos):
 def verify_document_access(document_id: UUID, user_id: UUID, db: Session):
     document = db.query(Document).filter(Document.id == document_id).first()
     if not document:
-        raise HTTPException(status_code=404, detail="Document not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Document not found"
+        )
 
     project = db.query(Project).filter(Project.id == document.project_id).first()
     if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Project not found"
+        )
 
     is_member = (
         db.query(ProjectMember)
@@ -54,7 +64,8 @@ def verify_document_access(document_id: UUID, user_id: UUID, db: Session):
 
     if project.created_by != user_id and not is_member:
         raise HTTPException(
-            status_code=403, detail="No access to this document/project"
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="No access to this document/project"
         )
 
     return document
@@ -123,7 +134,7 @@ def sync_blocks_from_text(doc_id: UUID, text: str, db: Session):
     existing_blocks = (
         db.query(DocumentBlock)
         .filter(DocumentBlock.doc_id == doc_id)
-        .order_by(DocumentBlock.position_key)
+        .order_by(cast(DocumentBlock.position_key, Float))
         .all()
     )
 
@@ -171,6 +182,9 @@ def sync_blocks_from_text(doc_id: UUID, text: str, db: Session):
                 next_block=_safe_next_block(existing_blocks, i1),
                 db=db,
             )
+    
+    # Critical: Flush deletions before committing to avoid unique constraint collisions on position_key
+    db.flush()
 
 
 def _detect_block_type(content: str) -> str:

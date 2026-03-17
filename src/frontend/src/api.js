@@ -71,8 +71,10 @@ export const saveRequirementDocRequest = async (projectId, payload) => {
   return data;
 };
 
-export const completeRequirementStepRequest = async (projectId) => {
-  const { data } = await api.patch(`/api/agent/projects/${projectId}/requirement-complete`);
+export const completeRequirementStepRequest = async (projectId, userId = null) => {
+  let url = `/api/agent/projects/${projectId}/requirement-complete`;
+  if (userId) url += `?user_id=${encodeURIComponent(userId)}`;
+  const { data } = await api.patch(url);
   return data;
 };
 
@@ -95,6 +97,21 @@ export const saveTechDocRequest = async (projectId, documentMarkdown, userId) =>
     user_id: userId,
     document_markdown: documentMarkdown,
   });
+  return data;
+};
+
+export const generateTasksRequest = async (projectId) => {
+  const { data } = await api.post(`/api/task-creator/projects/${projectId}/generate`);
+  return data;
+};
+
+export const getTaskGenerationStatusRequest = async (projectId) => {
+  const { data } = await api.get(`/api/task-creator/projects/${projectId}/task-generation-status`);
+  return data;
+};
+
+export const updateProjectStatusRequest = async (projectId, status) => {
+  const { data } = await api.patch(`/api/projects/${projectId}/status`, { status });
   return data;
 };
 

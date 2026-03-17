@@ -5,6 +5,10 @@ from .task import Task
 from .document import Document, DocumentBlock
 from .requirement_chat import RequirementChat
 from .tech_doc_chat import TechDocChat
+from .task_log import TaskLog
+from .standup import Standup
+from .standup_update import StandupUpdate
+from .standup_action_log import StandupActionLog
 
 __all__ = [
     "User",
@@ -18,4 +22,8 @@ __all__ = [
     "RequirementChat",
     "TechDocChat",
     "ProjectWorkflowStatus",
+    "TaskLog",
+    "Standup",
+    "StandupUpdate",
+    "StandupActionLog",
 ]

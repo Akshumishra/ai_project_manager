@@ -38,7 +38,7 @@ class ProjectResponse(BaseModel):
 
 
 class RequirementAgentResponse(BaseModel):
-    content: str
+    content: str | None = ""
     document: str | None = ""
     saved: bool | None = False
     document_id: UUID | None = None

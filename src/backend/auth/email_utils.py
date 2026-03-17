@@ -1,27 +1,32 @@
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from src.backend.config import Config
+from src.backend.config import settings
 
-def send_email(to_email: str, subject: str, body: str):
+import logging
+from . import constants
+
+logger = logging.getLogger(__name__)
+
+def send_email(to_email: str, subject: str, html_body: str):
     msg = MIMEMultipart()
-    msg['From'] = Config.EMAILS_FROM
+    msg['From'] = settings.EMAILS_FROM
     msg['To'] = to_email
     msg['Subject'] = subject
 
-    msg.attach(MIMEText(body, 'plain'))
+    msg.attach(MIMEText(html_body, 'html'))
 
     try:
-        with smtplib.SMTP(Config.SMTP_SERVER, Config.SMTP_PORT) as server:
+        with smtplib.SMTP(settings.SMTP_SERVER, settings.SMTP_PORT) as server:
             server.starttls()
-            server.login(Config.SMTP_USERNAME, Config.SMTP_PASSWORD)
+            server.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
             server.send_message(msg)
         return True
     except Exception as e:
-        print(f"Failed to send email: {e}")
+        logger.error(f"Failed to send email to {to_email}: {e}")
         return False
 
-def send_otp_email(to_email: str, otp: str):
-    subject = "Your Verification Code"
-    body = f"Your verification code is: {otp}\n\nThis code will expire in 10 minutes."
-    return send_email(to_email, subject, body)
+def send_otp_email(to_email: str, otp_code: str):
+    subject = constants.OTP_EMAIL_SUBJECT
+    html_content = constants.OTP_EMAIL_HTML_TEMPLATE.format(otp_code=otp_code)
+    return send_email(to_email, subject, html_content)

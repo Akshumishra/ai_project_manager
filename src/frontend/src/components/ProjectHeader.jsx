@@ -1,6 +1,20 @@
-import React from 'react';
+import React, { useState } from 'react';
 
-export default function ProjectHeader({ user, onBack, onAddMember, onViewMembers }) {
+export default function ProjectHeader({ user, project, onBack, onUpdateStatus, onAddMember, onViewMembers }) {
+  const [isUpdating, setIsUpdating] = useState(false);
+  const isCreator = user && project && user.id === project.created_by;
+
+  const handleStatusChange = async (e) => {
+    const newStatus = e.target.value;
+    if (newStatus === project.status) return;
+
+    setIsUpdating(true);
+    const success = await onUpdateStatus(newStatus);
+    if (!success) {
+      alert('Failed to update project status');
+    }
+    setIsUpdating(false);
+  };
   return (
     <header className="dashboard-header" style={{ marginBottom: '32px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -11,7 +25,51 @@ export default function ProjectHeader({ user, onBack, onAddMember, onViewMembers
         </button>
         <div>
           <h1>Project Dashboard</h1>
-          <p className="welcome-text">Manage your workspace for <strong>{user?.name || user?.email}</strong></p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <p className="welcome-text" style={{ margin: 0 }}>Manage your workspace for <strong>{user?.name || user?.email}</strong></p>
+            {project && (
+              <div className="project-status-wrapper" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {isCreator ? (
+                  <select
+                    className="status-select"
+                    value={project.status}
+                    onChange={handleStatusChange}
+                    disabled={isUpdating}
+                    style={{
+                      padding: '2px 8px',
+                      borderRadius: '6px',
+                      border: '1px solid var(--gray-200)',
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      textTransform: 'uppercase',
+                      cursor: 'pointer',
+                      backgroundColor: project.status === 'active' ? '#f0fdf4' : project.status === 'completed' ? '#f0f9ff' : '#fff7ed',
+                      color: project.status === 'active' ? '#166534' : project.status === 'completed' ? '#075985' : '#9a3412',
+                    }}
+                  >
+                    <option value="active">Active</option>
+                    <option value="completed">Completed</option>
+                    <option value="hold">Hold</option>
+                  </select>
+                ) : (
+                  <span
+                    className="status-badge"
+                    style={{
+                      padding: '2px 10px',
+                      borderRadius: '12px',
+                      fontSize: '11px',
+                      fontWeight: '700',
+                      textTransform: 'uppercase',
+                      backgroundColor: project.status === 'active' ? '#f0fdf4' : project.status === 'completed' ? '#f0f9ff' : '#fff7ed',
+                      color: project.status === 'active' ? '#166534' : project.status === 'completed' ? '#075985' : '#9a3412',
+                    }}
+                  >
+                    {project.status}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
       <div style={{ display: 'flex', gap: '10px' }}>

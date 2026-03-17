@@ -10,11 +10,15 @@ import {
 import { getActiveProject, setActiveProject, getUserBackground } from "../utils/storage";
 import { useAuth } from "../context/AuthContext";
 
-function ChatMessage({ role, content }) {
-  const docMarker = "— Requirement Specification";
+const EXTRACT_MARKER_REGEX = /^[—-]{1,5}\s*Requirement Specification\s*$/mi;
+const EXTRACT_MARKER_TEXT = "— Requirement Specification";
 
-  if (role === "assistant" && content.includes(docMarker)) {
-    const parts = content.split(docMarker);
+function ChatMessage({ role, content }) {
+  // Use multiline flag properly to match start of line
+  const hasMarker = content.match(/^[—-]{1,5}\s*Requirement Specification\s*$/mi);
+
+  if (role === "assistant" && hasMarker) {
+    const parts = content.split(EXTRACT_MARKER_REGEX);
     const conversationalPart = parts[0].trim();
 
     return (
@@ -44,8 +48,44 @@ function ChatMessage({ role, content }) {
   if (content === "...") {
     return (
       <div className="message ai">
+        <div className="bubble" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 20px' }}>
+          <div className="thinking-dots">
+            <span></span><span></span><span></span>
+          </div>
+          <span style={{ fontSize: '14px', color: 'var(--gray-500)', fontStyle: 'italic', fontWeight: '500' }}>Thinking...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Heading fallback: only hide message if it looks like a complete spec document
+  // (must start with # heading AND have at least 2 ## section headings)
+  const markdownHeadingIndex = content.indexOf("# ");
+  const sectionCount = (content.match(/^##\s/gm) || []).length;
+  const looksLikeFullDoc = markdownHeadingIndex !== -1 && sectionCount >= 2 && (content.length - markdownHeadingIndex > 300);
+
+  if (role === "assistant" && !hasMarker && looksLikeFullDoc) {
+    const conversationalPart = content.slice(0, markdownHeadingIndex).trim();
+
+    return (
+      <div className={`message ai`}>
         <div className="bubble">
-          <div className="spinner-sm"></div>
+          {conversationalPart && <div dangerouslySetInnerHTML={{ __html: marked.parse(conversationalPart) }} />}
+          <div className="spec-notice" style={{
+            marginTop: conversationalPart ? '12px' : '0',
+            padding: '12px',
+            borderRadius: '12px',
+            border: '1px solid var(--brand-200)',
+            background: 'var(--brand-50)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px'
+          }}>
+            <span style={{ fontSize: '20px' }}>📄</span>
+            <p style={{ margin: 0, fontSize: '14px', color: 'var(--brand-700)', fontWeight: '500' }}>
+              Requirement Specification has been updated in the canvas.
+            </p>
+          </div>
         </div>
       </div>
     );
@@ -78,6 +118,7 @@ export default function RequirementAgentPage() {
   const [isCompleting, setIsCompleting] = useState(false);
 
   const chatBoxRef = useRef(null);
+  const inputRef = useRef(null);
   const pollingIntervalRef = useRef(null);
 
   // 1. Initialization logic - Fixed to run once using initRef
@@ -111,19 +152,40 @@ export default function RequirementAgentPage() {
         }
 
         const initialMessages = res.messages && res.messages.length > 0 ? res.messages : [{ role: "assistant", content: res.content }];
-        setMessages(initialMessages);
-
-        if (res.document) {
-          setDocumentMarkdown(res.document);
-        }
-
-        // Handle Thinking persistence
+        
+        // Handle Thinking persistence in history
         if (res.thinking) {
           setChatStatus("Assistant is thinking...");
           setIsSending(true);
+          
+          // Add "..." message if not already present at the end
+          if (initialMessages.length === 0 || initialMessages[initialMessages.length - 1].content !== "...") {
+            setMessages([...initialMessages, { role: "assistant", content: "..." }]);
+          } else {
+            setMessages(initialMessages);
+          }
           startPolling();
         } else {
+          setMessages(initialMessages);
           setChatStatus("Ready to chat");
+        }
+
+        if (res.document) {
+          setDocumentMarkdown(res.document);
+        } else {
+          const lastMsg = initialMessages[initialMessages.length - 1];
+          const content = lastMsg?.content || "";
+          if (lastMsg?.role === "assistant" && content.match(EXTRACT_MARKER_REGEX)) {
+            const extracted = content.split(EXTRACT_MARKER_REGEX).slice(1).join("").trim();
+            if (extracted) {
+              setDocumentMarkdown(extracted);
+            } else if (content.includes("# ")) {
+              const fallbackParts = content.split("# ");
+              if (fallbackParts.length > 1) {
+                setDocumentMarkdown("# " + fallbackParts[1].trim());
+              }
+            }
+          }
         }
 
       } catch (err) {
@@ -155,7 +217,12 @@ export default function RequirementAgentPage() {
           setChatStatus("Ready to chat");
 
           if (res.messages) {
-            setMessages(res.messages);
+            // Keep the "..." if still thinking, otherwise replace with full history
+            if (res.thinking && (res.messages.length === 0 || res.messages[res.messages.length - 1].content !== "...")) {
+                setMessages([...res.messages, { role: "assistant", content: "..." }]);
+            } else {
+                setMessages(res.messages);
+            }
           }
           if (res.status === "completed") {
             setChatStatus("Requirement gathering complete! Redirecting...");
@@ -166,6 +233,23 @@ export default function RequirementAgentPage() {
           }
           if (res.document) {
             setDocumentMarkdown(res.document);
+          } else if (res.messages && res.messages.length > 0) {
+            const lastMsg = res.messages[res.messages.length - 1];
+            // Resilient extraction
+            const content = lastMsg?.content || "";
+            if (lastMsg?.role === "assistant" && content.match(EXTRACT_MARKER_REGEX)) {
+              const extracted = content.split(EXTRACT_MARKER_REGEX).slice(1).join("").trim();
+              if (extracted) {
+                 setDocumentMarkdown(extracted);
+              } else {
+                // Heading fallback: only if it looks like a full spec (2+ ## sections)
+                const headingIdx = content.indexOf("# ");
+                const sectionCount = (content.match(/^##\s/gm) || []).length;
+                if (headingIdx !== -1 && sectionCount >= 2 && content.length - headingIdx > 300) {
+                  setDocumentMarkdown("# " + content.split("# ").slice(1).join("# ").trim());
+                }
+              }
+            }
           }
         }
       } catch (err) {
@@ -204,7 +288,27 @@ export default function RequirementAgentPage() {
         setDocumentMarkdown(res.document);
         setChatStatus("Requirement specification updated.");
       } else {
-        setChatStatus("Ready to chat");
+        const markerRegex = /^[—-]{1,5}\s*Requirement Specification\s*$/mi;
+        const hasMarker = res.content && res.content.match(markerRegex);
+        const extracted = hasMarker
+          ? res.content.split(markerRegex).slice(1).join("").trim()
+          : null;
+        if (extracted) {
+          setDocumentMarkdown(extracted);
+          setChatStatus("Requirement specification updated.");
+        } else if (res.content) {
+          // Heading fallback: only if it looks like a full spec (2+ ## sections)
+          const headingIdx = res.content.indexOf("# ");
+          const sectionCount = (res.content.match(/^##\s/gm) || []).length;
+          if (headingIdx !== -1 && sectionCount >= 2 && res.content.length - headingIdx > 300) {
+            setDocumentMarkdown("# " + res.content.split("# ").slice(1).join("# ").trim());
+            setChatStatus("Requirement specification updated.");
+          } else {
+            setChatStatus("Ready to chat");
+          }
+        } else {
+          setChatStatus("Ready to chat");
+        }
       }
     } catch (err) {
       console.error("Message failed:", err);
@@ -212,6 +316,24 @@ export default function RequirementAgentPage() {
       setChatStatus("Error occurred.");
     } finally {
       setIsSending(false);
+      if (inputRef.current) {
+        inputRef.current.style.height = 'auto';
+      }
+    }
+  };
+
+  const handleInputChange = (e) => {
+    setInputValue(e.target.value);
+    // Auto-expand height
+    const textarea = e.target;
+    textarea.style.height = 'auto';
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`;
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
     }
   };
 
@@ -220,7 +342,7 @@ export default function RequirementAgentPage() {
     setIsCompleting(true);
     setChatStatus("Finalizing requirement phase...");
     try {
-      await completeRequirementStepRequest(activeProjectId);
+      await completeRequirementStepRequest(activeProjectId, user.id);
       navigate(`/tech-doc?project_id=${encodeURIComponent(activeProjectId)}`);
     } catch (err) {
       console.error("Failed to complete step:", err);
@@ -259,16 +381,47 @@ export default function RequirementAgentPage() {
           <div className="messages" ref={chatBoxRef}>
             {messages.map((m, i) => <ChatMessage key={i} role={m.role} content={m.content} />)}
           </div>
-          <div className="input-area">
-            <input
-              type="text"
+          <div className="input-area" style={{ display: 'flex', alignItems: 'flex-end', gap: '12px', padding: '16px' }}>
+            <textarea
+              ref={inputRef}
+              rows="1"
               placeholder="Ask a question or suggest changes..."
               value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && sendMessage()}
+              onChange={handleInputChange}
+              onKeyDown={handleKeyDown}
               disabled={isSending}
+              style={{
+                flex: 1,
+                resize: 'none',
+                minHeight: '44px',
+                maxHeight: '200px',
+                padding: '12px 16px',
+                borderRadius: '12px',
+                border: '1px solid var(--gray-200)',
+                background: isSending ? 'var(--gray-50)' : 'white',
+                fontFamily: 'inherit',
+                fontSize: '15px',
+                lineHeight: '1.5',
+                overflowY: 'auto',
+                transition: 'border-color 0.2s',
+              }}
             />
-            <button onClick={sendMessage} disabled={isSending || !inputValue.trim()}>Send</button>
+            <button 
+              onClick={sendMessage} 
+              disabled={!inputValue.trim()}
+              className={isSending ? "busy" : ""}
+              style={{
+                height: '44px',
+                padding: '0 24px',
+                background: isSending ? 'var(--brand-300)' : 'var(--brand-600)',
+                color: 'white',
+                opacity: 1,
+                cursor: isSending ? 'wait' : (inputValue.trim() ? 'pointer' : 'not-allowed'),
+                transition: 'all 0.2s ease'
+              }}
+            >
+              Send
+            </button>
           </div>
         </section>
 

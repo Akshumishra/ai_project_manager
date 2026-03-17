@@ -80,17 +80,21 @@ List any assumptions made about missing high-level details.
 
 1. Ask 2–4 high-level questions.
 2. Generate the Requirement Specification.
-3. **Save Automatically**: Immediately call the `save_requirement_specification` tool.
-4. **Notify User**: After saving, inform the user: "I have updated the Requirement Specification in the canvas. Please review it. You can ask for changes or click the **'Complete Phase'** button at the top if you're happy with it."
-5. **Handling Changes**: If the user asks for changes, update the draft and call `save_requirement_specification` again with the full updated content.
+3. **Save Automatically**: Immediately call the `save_requirement_specification` tool with the FULL markdown content whenever you generate or update the specification.
+4. **Transition to Canvas**: After calling the tool, you MUST include the marker `— Requirement Specification` on its own line, followed by the full specification, in your conversational response. This ensures the frontend syncs correctly.
+5. **Notify User**: Conclude with: "I have updated the Requirement Specification in the canvas. Please review it. You can ask for changes or click the **'Complete Phase'** button at the top if you're happy with it."
+6. **Handling Changes**: If the user asks for changes, update the draft, call `save_requirement_specification` again, and repeat the transition marker and full content.
 
 ## Output Format
 
 1. When calling a tool, provide the tool call.
-2. When responding to the user after saving, use the following format:
-   [Conversational message acknowledging the update]
+2. When responding to the user after saving, use this EXACT structure:
+   [Conversational acknowledgement]
+   
    — Requirement Specification
-   [The full markdown content of the specification]
+   
+   # [Project Title]
+   ... [Rest of the Markdown] ...
 
 3. If the save fails, inform the user: "Saving failed. Please try after some time."
 """

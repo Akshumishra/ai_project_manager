@@ -4,17 +4,22 @@ from uuid import UUID
 from datetime import datetime
 
 
-class ProjectCreate(BaseModel):
+class ProjectCreateRequest(BaseModel):
     name: str
     description: Optional[str] = None
     background: Optional[str] = "technical"
 
 
-class ProjectRead(BaseModel):
+class ProjectStatusUpdate(BaseModel):
+    status: str
+
+
+class ProjectResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: UUID
     name: str
     description: Optional[str]
+    status: str
     created_by: UUID
     created_at: datetime
 
@@ -60,11 +65,28 @@ class TaskRead(TaskBase):
     id: UUID
     project_id: UUID
     status: str
+    label: Optional[int] = None
     assignee_name: Optional[str] = None
+
+class TaskLogRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
+    log: str
+    created_at: datetime
+
+
+class StandupRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
+    message_ts: str
+    prompt: Optional[str]
+    summary: Optional[str]
+    created_at: datetime
 
 
 class MemberRead(BaseModel):
     id: UUID
+    user_id: UUID
     name: str
     email: str
     status: str

@@ -42,7 +42,12 @@ export const AuthProvider = ({ children }) => {
     const refreshToken = localStorage.getItem('refresh_token');
     if (refreshToken) {
       try {
-        const { data } = await api.post('/api/users/refresh', { refresh_token: refreshToken });
+        // Add a 5s timeout to prevent hanging forever on a bad network/backend
+        const refreshPromise = api.post('/api/users/refresh', { refresh_token: refreshToken });
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Auth timeout')), 5000));
+        
+        const { data } = await Promise.race([refreshPromise, timeoutPromise]);
+        
         setAccessToken(data.access_token);
         localStorage.setItem('refresh_token', data.refresh_token);
         setIsAuthenticated(true);
@@ -51,7 +56,8 @@ export const AuthProvider = ({ children }) => {
           name: data.name, 
           is_profile_complete: data.is_profile_complete 
         }); 
-      } catch {
+      } catch (err) {
+        console.error('Check auth failed:', err);
         logout();
       }
     }

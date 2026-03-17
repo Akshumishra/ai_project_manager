@@ -3,6 +3,7 @@ import docx
 import tempfile
 from langchain_openai import ChatOpenAI
 
+from src.backend.config import settings
 from . import schemas, prompts, constants
 
 
@@ -10,15 +11,12 @@ async def extract_resume_data(resume_text: str) -> schemas.ResumeExtraction:
 
     llm = ChatOpenAI(
         model=constants.MODEL_NAME,
-        temperature=constants.TEMPERATURE
+        temperature=constants.TEMPERATURE,
+        api_key=settings.OPENAI_API_KEY
     ).with_structured_output(schemas.ResumeExtraction)
 
-    prompt = f"""
-    {prompts.PROMPT_TEMPLATE}
-
-    Resume:
-    {resume_text}
-    """
+    # Simplified prompt to avoid duplication with PROMPT_TEMPLATE
+    prompt = f"{prompts.PROMPT_TEMPLATE}\n\nResume Content:\n{resume_text}"
 
     response = await llm.ainvoke(prompt)
 

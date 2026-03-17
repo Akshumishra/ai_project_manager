@@ -9,12 +9,21 @@ class Background(str, enum.Enum):
     TECHNICAL = "technical"
     NON_TECHNICAL = "non_technical"
 
+class ProjectStatus(enum.Enum):
+    ACTIVE = "active"
+    COMPLETED = "completed"
+    HOLD = "hold"
+
 class Project(BaseModel):
     __tablename__ = "projects"
 
     name = Column(String, nullable=False)
     description = Column(Text, nullable=True)
-    status = Column(String, nullable=True)
+    status = Column(
+        Enum(ProjectStatus, name="projectstatus", values_callable=lambda x: [e.value for e in x]), 
+        default=ProjectStatus.ACTIVE,
+        nullable=False
+    )
     created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
 
     creator = relationship("User", back_populates="projects", foreign_keys=[created_by])
@@ -27,6 +36,9 @@ class Project(BaseModel):
     tasks = relationship("Task", back_populates="project", cascade="all, delete-orphan")
     documents = relationship(
         "Document", back_populates="project", cascade="all, delete-orphan"
+    )
+    standups = relationship(
+        "Standup", back_populates="project", cascade="all, delete-orphan"
     )
 
 
@@ -48,7 +60,7 @@ class ProjectMember(BaseModel):
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     slack_id = Column(String, nullable=True)
     background = Column(
-        Enum(Background, name="background_enum"),
+        Enum(Background, name="background_enum", values_callable=lambda x: [e.value for e in x]),
         nullable=True,
     )
 

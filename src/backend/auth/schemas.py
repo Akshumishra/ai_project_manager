@@ -74,7 +74,7 @@ class UserRegistrationResponse(BaseModel):
 
 class UserDetailUpdate(BaseModel):
     skills: List[str]
-    experience_years: str
+    yoe: str
     designation: str
 
 
@@ -85,3 +85,7 @@ class OTPRequest(BaseModel):
 class OTPVerify(BaseModel):
     email: EmailStr
     otp: str
+
+
+class MessageResponse(BaseModel):
+    message: str

@@ -7,7 +7,7 @@ from sqlalchemy import cast, Float
 from src.backend.db.database import SessionLocal
 from src.backend.model.document import Document, DocumentBlock
 from src.backend.db.redis import redis_client
-from src.backend.config import Config
+from src.backend.config import settings
 from src.backend.collaborative_document.services.websocket import ConnectionManager
 from src.backend.collaborative_document.utils import helper_function
 
@@ -27,7 +27,7 @@ async def websocket_endpoint(
 
     try:
         payload = jwt.decode(
-            token, Config.ACCESS_SECRET_KEY, algorithms=[Config.ALGORITHM]
+            token, settings.ACCESS_SECRET_KEY, algorithms=[settings.ALGORITHM]
         )
         user_id = payload.get("sub") or payload.get("user_id")
         if not user_id:
@@ -83,7 +83,7 @@ async def websocket_endpoint(
                     )
                 else:
                     init_data = {"error": "Document not found."}
-
+ 
         await websocket.send_json({"type": "init", "role": role, "data": init_data})
 
         while True:

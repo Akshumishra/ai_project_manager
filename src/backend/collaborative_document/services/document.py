@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from fastapi import HTTPException
+from fastapi import HTTPException, status
 from sqlalchemy import cast, Float
 from uuid import UUID
 import uuid
@@ -17,7 +17,10 @@ from src.backend.model.user import User
 def create_document(data: schemas.DocumentCreate, db: Session, current_user: User):
     project = db.query(Project).filter(Project.id == data.project_id).first()
     if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Project not found"
+        )
 
     is_member = (
         db.query(ProjectMember)
@@ -30,7 +33,7 @@ def create_document(data: schemas.DocumentCreate, db: Session, current_user: Use
 
     if project.created_by != current_user.id and not is_member:
         raise HTTPException(
-            status_code=403, detail="No access to create documents in this project"
+            status_code=status.HTTP_403_FORBIDDEN, detail="No access to create documents in this project"
         )
 
     document = Document(
@@ -54,7 +57,10 @@ def save_document(
 ):
     project = db.query(Project).filter(Project.id == data.project_id).first()
     if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Project not found"
+        )
 
     is_member = (
         db.query(ProjectMember)
@@ -67,7 +73,8 @@ def save_document(
 
     if project.created_by != current_user.id and not is_member:
         raise HTTPException(
-            status_code=403, detail="No access to create documents in this project"
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="No access to create documents in this project"
         )
 
     document = Document(
@@ -93,7 +100,10 @@ def get_document(document_id: UUID, db: Session, current_user: User):
 
     document = db.query(Document).filter(Document.id == document_id).first()
     if not document:
-        raise HTTPException(status_code=404, detail="Document not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Document not found"
+        )
 
     blocks = (
         db.query(DocumentBlock)
@@ -147,13 +157,16 @@ async def insert_block(
 
     await _broadcast_update(document_id, "insert", {"block": block_data, "client_id": data.client_id})
     
-    return {"block_id": new_id, "position_key": new_key, "client_id": data.client_id}
+    return {"block_id": str(new_id), "position_key": new_key, "client_id": data.client_id}
 
 
 async def edit_block(block_id: str, data: schemas.BlockUpdate, db: Session, current_user: User):
     block = db.query(DocumentBlock).filter(DocumentBlock.id == block_id).first()
     if not block:
-        raise HTTPException(404, "Block not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Block not found"
+        )
 
     helper_function.verify_document_access(block.doc_id, current_user.id, db)
 
@@ -201,7 +214,10 @@ def update_document(document_id: UUID, data: schemas.DocumentUpdate, db: Session
     helper_function.verify_document_access(document_id, current_user.id, db)
     document = db.query(Document).filter(Document.id == document_id).first()
     if not document:
-        raise HTTPException(404, "Document not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Document not found"
+        )
 
     document.title = data.title
     db.commit()
@@ -214,7 +230,10 @@ def delete_document(document_id: UUID, db: Session, current_user: User):
     helper_function.verify_document_access(document_id, current_user.id, db)
     document = db.query(Document).filter(Document.id == document_id).first()
     if not document:
-        raise HTTPException(404, "Document not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Document not found"
+        )
 
     db.delete(document)
     db.commit()
@@ -226,7 +245,10 @@ def delete_document(document_id: UUID, db: Session, current_user: User):
 
 def _verify_document_exists(doc_id: UUID, db: Session):
     if not db.query(Document).filter(Document.id == doc_id).first():
-        raise HTTPException(404, "Document not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Document not found"
+        )
 
 
 def _calculate_position(doc_id: UUID, prev_id: str | None, next_id: str | None, db: Session) -> str:
@@ -244,7 +266,10 @@ def _get_block_position(block_id: str, db: Session) -> str:
     if cached:
         return json.loads(cached).get("position_key")
     
-    raise HTTPException(400, f"Block {block_id} not found")
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST, 
+        detail=f"Block {block_id} not found"
+    )
 
 
 def _persist_block_to_db(block_id: UUID | str, doc_id: UUID, key: str, data: schemas.BlockCreate, db: Session):
@@ -306,7 +331,10 @@ def _find_doc_id_for_block(block_id: str, db: Session) -> UUID:
     # Fallback to DB
     block = db.query(DocumentBlock).filter(DocumentBlock.id == block_id).first()
     if not block:
-        raise HTTPException(404, "Block not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Block not found"
+        )
     return block.doc_id
 
 

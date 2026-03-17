@@ -1,5 +1,6 @@
 import logging
 from typing import List, Dict, Any
+from sqlalchemy import func
 from uuid import UUID
 from langchain.tools import tool
 from sqlalchemy.orm import Session
@@ -22,6 +23,10 @@ def make_save_tasks_tool(user_id: UUID, project_id: UUID):
         """
         db = SessionLocal()
         try:
+            # Get current max label for this project
+            max_label = db.query(func.max(Task.label)).filter(Task.project_id == project_id).scalar()
+            base_label = (max_label or 0)
+            
             created_count = 0
             for i, item in enumerate(tasks):
                 # Map category
@@ -54,7 +59,7 @@ def make_save_tasks_tool(user_id: UUID, project_id: UUID):
 
                 new_task = Task(
                     title=item.get("title", "Untitled Task"),
-                    label=item.get("label", i + 1),
+                    label=base_label + created_count + 1,
                     description=item.get("description", ""),
                     project_id=project_id,
                     category=category,

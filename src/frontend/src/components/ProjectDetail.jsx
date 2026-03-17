@@ -1,28 +1,34 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useSearchParams } from 'react-router-dom';
 import InviteModal from './InviteModal';
 import ProjectMembersModal from './ProjectMembersModal';
 import AddTaskModal from './AddTaskModal';
 import ProjectHeader from './ProjectHeader';
 import ProjectDocuments from './ProjectDocuments';
 import ProjectTasks from './ProjectTasks';
+import ProjectStandups from './ProjectStandups';
 import { useProjectData } from '../hooks/useProjectData';
 
 export default function ProjectDetail({ projectId, onSelectDocument, onBack }) {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState('documents');
+  const [searchParams] = useSearchParams();
+  const initialTab = searchParams.get('tab') || 'documents';
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [isMembersModalOpen, setIsMembersModalOpen] = useState(false);
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
 
   const {
-    documents, tasks, members, loading,
+    project, documents, tasks, members, loading,
     setTasks,
+    onTaskSaved,
     handleCreateDocument,
     handleDeleteDocument,
     handleRenameDocument,
-    onTaskSaved
+    updateProjectStatus,
+    refreshTasks,
   } = useProjectData(projectId);
 
   const onHandleCreateDocument = async () => {
@@ -30,26 +36,11 @@ export default function ProjectDetail({ projectId, onSelectDocument, onBack }) {
     if (docId) onSelectDocument(docId);
   };
 
-  const handleEditTask = (e, task) => {
-    e.stopPropagation();
-    setEditingTask(task);
-    setIsTaskModalOpen(true);
-  };
-
   const handleCreateTask = () => {
     setEditingTask(null);
     setIsTaskModalOpen(true);
   };
 
-  const handleTaskSaved = (savedTask) => {
-    setTasks(prev => {
-      const exists = prev.find(t => t.id === savedTask.id);
-      if (exists) {
-        return prev.map(t => t.id === savedTask.id ? savedTask : t);
-      }
-      return [savedTask, ...prev];
-    });
-  };
 
   if (loading) {
     return (
@@ -65,7 +56,9 @@ export default function ProjectDetail({ projectId, onSelectDocument, onBack }) {
 
         <ProjectHeader
           user={user}
+          project={project}
           onBack={onBack}
+          onUpdateStatus={updateProjectStatus}
           onAddMember={() => setIsInviteModalOpen(true)}
           onViewMembers={() => setIsMembersModalOpen(true)}
         />
@@ -84,6 +77,12 @@ export default function ProjectDetail({ projectId, onSelectDocument, onBack }) {
             >
               Tasks
             </button>
+            <button
+              className={`tab ${activeTab === 'standups' ? 'active' : ''}`}
+              onClick={() => setActiveTab('standups')}
+            >
+              Standups
+            </button>
           </div>
 
           {activeTab === 'documents' && (
@@ -100,8 +99,12 @@ export default function ProjectDetail({ projectId, onSelectDocument, onBack }) {
             <ProjectTasks
               tasks={tasks}
               onCreateTask={handleCreateTask}
-              onEditTask={handleEditTask}
+              refreshTasks={refreshTasks}
             />
+          )}
+
+          {activeTab === 'standups' && (
+            <ProjectStandups projectId={projectId} />
           )}
         </div>
 
@@ -121,7 +124,7 @@ export default function ProjectDetail({ projectId, onSelectDocument, onBack }) {
           isOpen={isTaskModalOpen}
           onClose={() => setIsTaskModalOpen(false)}
           projectId={projectId}
-          onSuccess={handleTaskSaved}
+          onSuccess={onTaskSaved}
           members={members}
           task={editingTask}
         />

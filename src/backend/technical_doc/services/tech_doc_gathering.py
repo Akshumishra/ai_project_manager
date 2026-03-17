@@ -1,6 +1,6 @@
 from typing import Optional, List, Dict, Any
 from uuid import UUID
-from fastapi import HTTPException, BackgroundTasks
+from fastapi import HTTPException, BackgroundTasks, status
 from sqlalchemy.orm import Session
 
 from src.backend.model.document import Document, DocumentBlock
@@ -151,7 +151,10 @@ def _execute_tech_doc_agent_turn(
 
     except Exception as e:
         set_workflow_status(db, project_id, C.WORKFLOW_NAME, "in_progress")
-        raise HTTPException(status_code=500, detail=f"Agent failed: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            detail=f"An unexpected error occurred: {str(e)}"
+        )
 
 def run_tech_doc_agent(
     db: Session,
@@ -235,4 +238,7 @@ def save_final_tech_doc(db: Session, user_id: UUID, project_id: UUID, document_m
     if result.get("success"):
         return {"status": "success", "message": result.get("message")}
     else:
-        raise HTTPException(status_code=500, detail=result.get("message"))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            detail=result.get("message")
+        )

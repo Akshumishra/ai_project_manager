@@ -186,7 +186,12 @@ def run_tech_doc_agent(
     if is_start:
         is_interrupted = history and history[-1]["role"] == "user"
         if is_interrupted and handle_thinking_lock(db, project_id, AgentConstants.WORKFLOW_NAME):
-            return {"messages": history, "status": "resumed", "thinking": True}
+            return {
+                "messages": history, 
+                "status": "resumed", 
+                "thinking": True,
+                "document": fetch_technical_specification_text(db, project_id)
+            }
         
         if history and not is_interrupted:
             return {

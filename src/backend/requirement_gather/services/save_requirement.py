@@ -1,10 +1,12 @@
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 from uuid import UUID
+import re
 
 from src.backend.model.document import Document
 from src.backend.model.project import Project
 from src.backend.model.user import User
+from src.backend.model.requirement_chat import RequirementChat
 from src.backend.utils.workflow_utils import set_workflow_status
 from src.backend.requirement_gather.constants import RequirementAgentConstants
 from src.backend.requirement_gather.utils.doc_utils import sync_blocks_from_text, save_document
@@ -100,13 +102,71 @@ def save_requirement_spec_document(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
             detail=f"Failed to save requirement: {str(e)}"
         )
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            detail=f"Failed to save requirement: {str(e)}"
+        )
 
 
-def complete_requirement_step(db: Session, project_id: UUID):
+def extract_latest_spec_from_history(db: Session, project_id: UUID) -> str | None:
+    """
+    Finds the latest assistant message in history that contains a valid specification.
+    """
+    history = (
+        db.query(RequirementChat)
+        .filter(RequirementChat.project_id == project_id, RequirementChat.role == "assistant")
+        .order_by(RequirementChat.created_at.desc())
+        .all()
+    )
+
+    marker_regex = r"^[—-]{1,5}\s*Requirement Specification\s*$(.*)"
+    
+    for msg in history:
+        content = msg.content or ""
+        # 1. Look for marker
+        match = re.search(marker_regex, content, re.DOTALL | re.IGNORECASE | re.MULTILINE)
+        if match:
+            return match.group(1).strip()
+        
+        # 2. Look for heading fallback
+        if "# " in content:
+            parts = content.split("# ", 1)
+            if len(parts) > 1:
+                potential = "# " + parts[1].strip()
+                if len(potential) > 200:
+                    return potential
+                    
+    return None
+
+
+def complete_requirement_step(db: Session, project_id: UUID, user_id: UUID | None = None):
     """
     Updates the workflow status to completed for the requirement step.
+    Also ensures the latest draft is saved if not already present.
     """
     try:
+        # Check if document already exists
+        doc_exists = (
+            db.query(Document)
+            .filter(
+                Document.project_id == project_id,
+                Document.title.like(f"%{RequirementAgentConstants.REQ_DOC_LABEL}%")
+            )
+            .first()
+        )
+
+        if not doc_exists and user_id:
+            latest_spec = extract_latest_spec_from_history(db, project_id)
+            if latest_spec:
+                save_requirement_spec_document(
+                    db=db,
+                    user_id=user_id,
+                    project_id=project_id,
+                    markdown_content=latest_spec
+                )
+
         set_workflow_status(db, project_id, RequirementAgentConstants.WORKFLOW_NAME, "completed")
         db.commit()
         return {"status": "success", "message": "Requirement step marked as completed."}

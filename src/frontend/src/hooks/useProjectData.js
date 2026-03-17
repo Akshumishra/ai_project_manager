@@ -2,10 +2,20 @@ import { useState, useCallback, useEffect } from 'react';
 import api, { getProjectTasksRequest } from '../api';
 
 export function useProjectData(projectId) {
+  const [project, setProject] = useState(null);
   const [documents, setDocuments] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  const fetchProject = useCallback(async () => {
+    try {
+      const res = await api.get(`/api/projects/${projectId}`);
+      setProject(res.data);
+    } catch (err) {
+      console.error('Failed to fetch project:', err);
+    }
+  }, [projectId]);
 
   const fetchDocuments = useCallback(async () => {
     try {
@@ -38,12 +48,12 @@ export function useProjectData(projectId) {
     const load = async () => {
       setLoading(true);
       if (projectId) {
-        await Promise.all([fetchDocuments(), fetchTasks(), fetchMembers()]);
+        await Promise.all([fetchProject(), fetchDocuments(), fetchTasks(), fetchMembers()]);
       }
       setLoading(false);
     };
     load();
-  }, [projectId, fetchDocuments, fetchTasks, fetchMembers]);
+  }, [projectId, fetchProject, fetchDocuments, fetchTasks, fetchMembers]);
 
   const handleCreateDocument = async () => {
     const title = prompt('Document Title:', 'Untitled Document');
@@ -91,12 +101,32 @@ export function useProjectData(projectId) {
     }
   };
 
+  const onTaskSaved = (savedTask) => {
+    setTasks(prev => {
+      const exists = prev.find(t => t.id === savedTask.id);
+      if (exists) return prev.map(t => t.id === savedTask.id ? savedTask : t);
+      return [savedTask, ...prev];
+    });
+  };
+
   return {
+    project,
     documents, tasks, members, loading,
     setTasks,
+    onTaskSaved,
     handleCreateDocument,
     handleDeleteDocument,
     handleRenameDocument,
+    updateProjectStatus: async (newStatus) => {
+      try {
+        const updated = await api.patch(`/api/projects/${projectId}/status`, { status: newStatus });
+        setProject(updated.data);
+        return true;
+      } catch (err) {
+        console.error('Failed to update project status:', err);
+        return false;
+      }
+    },
     refreshTasks: fetchTasks,
     refreshMembers: fetchMembers
   };

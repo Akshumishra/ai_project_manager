@@ -80,7 +80,7 @@ def sync_blocks_from_text(doc_id: UUID, text: str, db: Session):
             for idx in range(j1, j2):
                 new_data = new_parsed[idx]
                 new_blk = DocumentBlock(
-                    id=str(uuid.uuid4()),
+                    id=uuid.uuid4(),
                     doc_id=doc_id,
                     content=new_data["content"],
                     type=new_data["type"]
@@ -96,7 +96,7 @@ def sync_blocks_from_text(doc_id: UUID, text: str, db: Session):
             for idx in range(j1, j2):
                 new_data = new_parsed[idx]
                 new_blk = DocumentBlock(
-                    id=str(uuid.uuid4()),
+                    id=uuid.uuid4(),
                     doc_id=doc_id,
                     content=new_data["content"],
                     type=new_data["type"]

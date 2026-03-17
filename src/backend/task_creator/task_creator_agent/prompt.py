@@ -48,13 +48,12 @@ Choose from the following domains:
 Tasks must not combine multiple domains.
 If a feature requires work from multiple domains, split it into separate tasks.
 
+Return your results by calling the `save_tasks` tool. 
+
 Important requirements:
 - Generate between 15 and 40 tasks depending on project complexity.
 - Tasks must be logically ordered from foundational tasks to advanced tasks.
-
-Output format:
-Return ONLY a valid JSON array of objects.
-Do NOT include explanations or text outside JSON.
+- You MUST call `save_tasks` tool with the list of tasks.
 """
 
 user_prompt = """

@@ -1,4 +1,5 @@
 import { memo, useCallback, useEffect, useRef } from 'react'
+import api from '../api'
 import { API } from '../config'
 import { getCursorOffset, caretAtStart, getRawText, isFullySelected, moveCursorTo } from '../utils/editorUtils'
 import { detectBlockType, renderMarkdown, generatePosition } from '../utils/blockUtils'
@@ -267,7 +268,13 @@ function EditorBlock({
 
   const handlePaste = useCallback(async (e) => {
     const text = e.clipboardData.getData('text/plain')
-    if (text.startsWith('|')) return
+    
+    // If it's a table, paste it directly into the current block to keep it together
+    if (text.trim().startsWith('|')) {
+      e.preventDefault();
+      document.execCommand('insertText', false, text);
+      return;
+    }
 
     e.preventDefault()
     const lines = text.split(/\r?\n/)
@@ -318,15 +325,16 @@ function EditorBlock({
     if (data) prevId = data.block_id
 
     // 4. Force a refresh to sync all new blocks and move cursor
-    const res = await fetch(`${API}/api/documents/${docId}`)
-    if (res.ok) {
-      const freshData = await res.json()
+    try {
+      const { data: freshData } = await api.get(`/api/documents/${docId}`)
       setDocumentData(freshData)
       lastSnapshotRef.current = JSON.stringify(freshData)
       setTimeout(() => {
         const lastEl = document.querySelector(`[data-id="${prevId}"]`)
         if (lastEl) moveCursorTo(lastEl, 'end')
       }, 50)
+    } catch (err) {
+      console.error('Failed to refresh document after paste:', err)
     }
   }, [block.block_id, docId, documentData, lastSnapshotRef, onAddAfter, onUpdate, setDocumentData])
 

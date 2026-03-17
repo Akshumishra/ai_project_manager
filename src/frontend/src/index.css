@@ -9,6 +9,9 @@
   --brand-600: #6366f1;
   --brand-700: #4f46e5;
   --brand-500: #818cf8;
+  --brand-400: #94a3b8;
+  --brand-300: #c7d2fe;
+  --brand-200: #e0e7ff;
   --brand-100: #eef2ff;
   --brand-gradient: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
 
@@ -307,7 +310,7 @@ h1, h2, h3, h4, .brand-name {
 
 .input:focus {
   outline: none;
-  border-color: var(--brand-blue);
+  border-color: var(--brand-600);
   box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
   background: #fff;
 }
@@ -398,6 +401,37 @@ textarea.input {
   font-weight: 600;
   color: var(--gray-600);
 }
+
+/* ── Thinking Indicator ────────────────────────────────── */
+.thinking-dots {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 14px;
+}
+
+.thinking-dots span {
+  width: 6px;
+  height: 6px;
+  background-color: var(--brand-500);
+  border-radius: 50%;
+  display: inline-block;
+  animation: thinking-bounce 1.4s infinite ease-in-out both;
+}
+
+.thinking-dots span:nth-child(1) { animation-delay: -0.32s; }
+.thinking-dots span:nth-child(2) { animation-delay: -0.16s; }
+
+@keyframes thinking-bounce {
+  0%, 80%, 100% { transform: scale(0); opacity: 0.3; }
+  40% { transform: scale(1.0); opacity: 1; }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 
 /* ── Editor Wrapper ────────────────────────────────────────── */
 .editor-wrapper {

@@ -26,6 +26,10 @@ def save_technical_spec_in_db(
     using the collaborative document block-based system.
     """
     try:
+        # Cast to UUID to ensure data type consistency in SQLAlchemy
+        user_id = UUID(str(user_id))
+        project_id = UUID(str(project_id))
+        
         logger.info(f"Saving tech doc for project: {project_id}, user: {user_id}")
         project_title = db.query(Project.name).filter(
             Project.id == project_id, 

@@ -3,6 +3,7 @@ from langchain_openai import ChatOpenAI
 from typing import Any, Dict, List
 from uuid import UUID
 import json
+import re
 
 from src.backend.requirement_gather.requirement_agent.prompt import SYSTEM_PROMPT
 from src.backend.config import settings
@@ -104,9 +105,30 @@ class RequirementAgent:
             if not isinstance(content, str):
                 content = str(content)
 
+            document = self._extract_doc(response_messages)
+            
+            # Stage 2 Fallback: Transition marker (regex)
+            if not document:
+                # Matches "— Requirement Specification" or "--- Requirement Specification"
+                marker_pattern = r"^[—-]{1,5}\s*Requirement Specification\s*$(.*)"
+                marker_match = re.search(marker_pattern, content, re.DOTALL | re.IGNORECASE | re.MULTILINE)
+                if marker_match:
+                    document = marker_match.group(1).strip()
+            
+            # Stage 3 Fallback: Default to heading detection if substantial markdown exists
+            if not document:
+                # If content contains a level 1 heading, extract from there to the end
+                if "# " in content:
+                    parts = content.split("# ", 1)
+                    if len(parts) > 1:
+                        # Only fallback if the suspected document is significant (e.g., > 100 chars)
+                        potential_doc = "# " + parts[1].strip()
+                        if len(potential_doc) > 100:
+                            document = potential_doc
+
             return {
                 "content": content,
-                "doc": self._extract_doc(response_messages),
+                "document": document,
                 "saved": self._was_save_tool_called(response_messages),
                 "document_id": self._extract_document_id(response_messages)
             }

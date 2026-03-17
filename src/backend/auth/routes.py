@@ -33,11 +33,17 @@ def refresh_token(request: schemas.TokenRefresh, db: Session = Depends(get_db)):
     return services.refresh_token(request, db)
 
 
-@router.post("/send-otp")
+@router.post("/send-otp", response_model=schemas.MessageResponse)
 def send_otp(request: schemas.OTPRequest, db: Session = Depends(get_db)):
     return services.send_otp(request, db)
 
 
-@router.post("/verify-otp")
+@router.post("/resend-otp", response_model=schemas.MessageResponse)
+def resend_otp(request: schemas.OTPRequest, db: Session = Depends(get_db)):
+    """Explicit endpoint for resending OTP, reuses send_otp logic with rate limiting."""
+    return services.send_otp(request, db)
+
+
+@router.post("/verify-otp", response_model=schemas.MessageResponse)
 def verify_otp(request: schemas.OTPVerify):
     return services.verify_otp(request)

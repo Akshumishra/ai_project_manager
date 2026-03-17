@@ -1,17 +1,14 @@
 PROMPT_TEMPLATE = """
 You are an expert resume parser.
 
-Extract the following fields from the resume:
+Extract the following fields from the resume text provided below:
 
-1. skills
-2. experience_years
-3. designation
+1. skills: List of strings
+2. yoe: Number (Total years of experience)
+3. designation: Most recent job title
 
 Rules:
 - Return ONLY valid JSON
 - Do not include explanations
-- If information is missing return empty values
-
-Resume:
-{resume}
+- If information is missing return null or empty list
 """

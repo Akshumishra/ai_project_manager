@@ -10,8 +10,12 @@ from src.backend.collaborative_document.utils.scheduler import start_scheduler
 from src.backend.collaborative_document.utils.block_sync_worker import (
     flush_dirty_blocks,
 )
-from src.backend.requirement_gather.project_routes import router as project_routes
-from src.backend.config import Config
+from src.backend.requirement_gather import project_routes as requirement_routes
+from src.backend.project import routes as project_routes
+from src.backend.technical_doc import tech_doc_routes
+from src.backend.resume_parsing import routes as resume_routes
+from src.backend.task_creator import task_creator_routes
+from src.backend.config import settings
 
 import src.backend.model
 
@@ -20,20 +24,22 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=Config.ALLOWED_ORIGINS,
+    allow_origins=settings.ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["*"],
 )
 
-app.include_router(project_routes)
+# Application Routes
+app.include_router(auth_routes.router)
+app.include_router(resume_routes.router)
+app.include_router(project_routes.router)
 app.include_router(doc_routes.router)
 app.include_router(block_routes.router)
 app.include_router(ws_routes.router)
-app.include_router(auth_routes.router)
-app.include_router(project_routes.router)
-app.include_router(resume_routes.router)
+
+# Agent & Tool Routes
 app.include_router(requirement_routes.router, prefix="/api/agent")
 app.include_router(tech_doc_routes.router, prefix="/api/agent")
 app.include_router(task_creator_routes.router)

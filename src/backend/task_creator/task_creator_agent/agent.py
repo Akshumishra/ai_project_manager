@@ -48,17 +48,18 @@ class TaskCreatorAgent:
             "messages": messages
         })
 
-        response_messages = response["messages"]
-        last_message = response_messages[-1]
-        
-        content = getattr(last_message, "content", "")
-        if not isinstance(content, str):
-            content = str(content)
-        
-        # Check if the tool was called
-        tasks_saved = any(
-            getattr(msg, "name", None) == "save_tasks" for msg in response_messages
-        )
+        response_messages = response.get("messages", [])
+        if not response_messages and "output" in response:
+            content = str(response["output"])
+            tasks_saved = False
+        else:
+            last_message = response_messages[-1] if response_messages else None
+            content = getattr(last_message, "content", "") if last_message else str(response.get("output", ""))
+            
+            # Check if the tool was called
+            tasks_saved = any(
+                getattr(msg, "name", None) == "save_tasks" for msg in response_messages
+            )
 
         return {
             "content": content,
