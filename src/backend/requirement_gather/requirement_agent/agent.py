@@ -21,15 +21,10 @@ class RequirementAgent:
         self.agent = self._create_agent()
 
     def _create_llm(self):
-        model_name = RequirementAgentConstants.MODEL
-        kwargs = {
-            "model": model_name,
-            "api_key": settings.OPENAI_API_KEY
-        }
-        if not (model_name.startswith("o1") or model_name.startswith("o3")):
-            kwargs["temperature"] = RequirementAgentConstants.TEMPERATURE
-            
-        return ChatOpenAI(**kwargs)
+        return ChatOpenAI(
+            model=RequirementAgentConstants.MODEL,
+            api_key=settings.OPENAI_API_KEY
+        )
 
     def _create_tools(self):
         return [
