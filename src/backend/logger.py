@@ -1,12 +1,11 @@
 import logging
-import os
 import sys
+from src.backend.config import settings
 
 def get_logger(name: str):
     logger = logging.getLogger(name)
     
-    log_level_str = os.getenv("LOG_LEVEL", "INFO").upper()
-    log_level = getattr(logging, log_level_str, logging.INFO)
+    log_level = getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO)
     logger.setLevel(log_level)
 
     if logger.hasHandlers():
@@ -16,7 +15,7 @@ def get_logger(name: str):
     handler.setLevel(log_level)
 
     formatter = logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        settings.LOG_FORMAT,
         datefmt='%Y-%m-%d %H:%M:%S'
     )
 

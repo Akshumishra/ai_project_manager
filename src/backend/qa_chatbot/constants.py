@@ -17,7 +17,7 @@ class QAAgentConstants:
         "workspace_id", "channel_id",
         "doc_id", "title", "content", "position_key", "type",
         "complexity", "deadline", "project_member_id", "role",
-        "label", "category", "priority", "story_points", "estimated_hours",
+        "label", "category", "priority",
         "total_tasks", "assigned_to", "count", "num_tasks"
     }
 

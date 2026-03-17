@@ -41,12 +41,19 @@ class Task(BaseModel):
     project_id = Column(
         UUID(as_uuid=True),
         ForeignKey("projects.id"),
+        nullable=False,
+        index=True
+    )
+
+    title = Column(
+        String,
         nullable=False
     )
 
-    title = Column(String, nullable=False)
-    label = Column(Integer, nullable=False)
-    description = Column(Text, nullable=True)
+    label = Column(
+        Integer,
+        nullable=False
+    )
 
     category = Column(
         Enum(TaskCategory, name="task_category_enum"),
@@ -65,23 +72,30 @@ class Task(BaseModel):
         default=TaskComplexity.MEDIUM
     )
 
-    story_points = Column(Integer, nullable=True)
-
-    estimated_hours = Column(Integer, nullable=True)
-
-    deadline = Column(DateTime(timezone=True), nullable=True)
-
     status = Column(
         Enum(TaskStatus, name="task_status_enum"),
         nullable=False,
         default=TaskStatus.TODO
     )
 
-    project_member_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("project_members.id"),
+    deadline = Column(
+        DateTime,
         nullable=True
     )
 
-    project = relationship("Project", back_populates="tasks")
-    assignee = relationship("ProjectMember", back_populates="tasks")
+    project_member_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("project_members.id"),
+        nullable=True,
+        index=True
+    )
+
+    project = relationship(
+        "Project",
+        back_populates="tasks"
+    )
+
+    assignee = relationship(
+        "ProjectMember",
+        back_populates="tasks"
+    )

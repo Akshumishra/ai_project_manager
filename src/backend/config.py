@@ -12,6 +12,7 @@ class Settings(BaseSettings):
 
     # Database
     DATABASE_URL: str = Field(default=os.getenv("DATABASE_URL", ""))
+    STANDUP_DATABASE_URL: Optional[str] = Field(default=os.getenv("STANDUP_DATABASE_URL"))
 
     # Slack
     SLACK_BOT_TOKEN: str = Field(default=os.getenv("SLACK_BOT_TOKEN", ""))
@@ -24,5 +25,9 @@ class Settings(BaseSettings):
 
     # App Metadata
     APP_TITLE: str = Field(default="AI Project Manager Chatbot API")
+
+    # Logging
+    LOG_LEVEL: str = Field(default=os.getenv("LOG_LEVEL", "INFO"))
+    LOG_FORMAT: str = Field(default='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
 settings = Settings()

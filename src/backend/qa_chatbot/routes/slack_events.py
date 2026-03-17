@@ -19,7 +19,7 @@ from src.backend.logger import get_logger
 from langchain_core.messages import HumanMessage, AIMessage
 
 logger = get_logger("slack_events")
-router = APIRouter(prefix="/slack", tags=["Slack Events"])
+router = APIRouter(prefix="/api/slack", tags=["Slack Events"])
 
 class SlackEvent(BaseModel):
     type: str
