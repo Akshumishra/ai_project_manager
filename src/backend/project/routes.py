@@ -90,3 +90,24 @@ def add_project_member(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to add project member: {str(e)}"
         )
+
+
+@router.delete(
+    "/{project_id}",
+    response_model=schemas.MessageResponse,
+    status_code=status.HTTP_200_OK
+)
+def delete_project(
+    project_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        return services.delete_project(project_id, db, current_user)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete project: {str(e)}"
+        )
