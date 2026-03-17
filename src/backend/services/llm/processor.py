@@ -5,7 +5,7 @@ import logging
 
 from langchain_openai import ChatOpenAI
 
-from src.backend.config import Config
+from src.backend.config import settings
 from src.backend.services.llm.prompts import TRANSCRIPT_PROMPT
 from src.backend.services.llm.schemas import MeetingAnalysis
 from src.backend.services.meeting.analysis import add_action_items, save_summary
@@ -19,7 +19,7 @@ def process_meeting_transcript(bot_session_id: str, transcript_text: str) -> boo
 
     Returns True on success, False if skipped or failed.
     """
-    api_key = Config.OPENAI_API_KEY
+    api_key = settings.OPENAI_API_KEY
     if not api_key:
         logger.warning(
             "AI processor skipped for session %s: OPENAI_API_KEY is not set.",

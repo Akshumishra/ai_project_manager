@@ -11,7 +11,7 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 
-from src.backend.config import Config
+from src.backend.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +24,7 @@ SCOPES = [
 
 def _get_credential_paths() -> tuple[Path, Path]:
     """Return resolved (token_path, credentials_path) from centralized config."""
-    return Config.GOOGLE_TOKEN_PATH, Config.GOOGLE_CREDENTIALS_PATH
+    return settings.GOOGLE_TOKEN_PATH, settings.GOOGLE_CREDENTIALS_PATH
 
 
 def _write_token_securely(token_path: Path, creds: Credentials) -> None:

@@ -26,9 +26,9 @@ def _get_database_url() -> str:
     """
     Resolve DATABASE_URL from centralized configuration framework.
     """
-    from src.backend.config import Config
+    from src.backend.config import settings
 
-    url = Config.DATABASE_URL
+    url = settings.DATABASE_URL
     if not url:
         raise RuntimeError(
             "DATABASE_URL environment variable is not set. "
