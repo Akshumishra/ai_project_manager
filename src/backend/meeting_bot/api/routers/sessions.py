@@ -11,9 +11,8 @@ from meeting_bot.api.schemas import (
     ScheduleCalendarMeetingRequest,
     ScheduleCalendarMeetingResponse,
 )
-from src.backend.services.llm.processor import infer_meeting_participants
 from src.backend.services.calendar_service import create_calendar_meet
-from src.backend.services.meeting import add_participants, create_meeting
+from src.backend.services.meeting import create_meeting
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Sessions"])
@@ -76,18 +75,7 @@ async def schedule_meeting_calendar(
             detail="Google Calendar created the event but failed to generate a video link.",
         )
 
-    # ── 3. Infer participants via AI LLM agent ─────────────────────────────
-    inferred: list[dict] = []
-    try:
-        inferred = await asyncio.to_thread(
-            infer_meeting_participants,
-            str(request.project_id),
-            request.agenda,
-        )
-    except Exception:
-        logger.exception("AI Participant inference failed — continuing without suggestions")
-
-    # ── 4. Persist Meeting to DB ───────────────────────────────────────────
+    # ── 3. Persist Meeting to DB ───────────────────────────────────────────
     bot_session_id = f"ffl-{uuid.uuid4().hex[:8]}"
 
     try:
@@ -109,27 +97,8 @@ async def schedule_meeting_calendar(
             detail="Failed to persist scheduled meeting. Please contact support.",
         )
 
-    # ── 5. Save participants into DB ───────────────────────────────────────
-    if inferred:
-        try:
-            participants_data = [
-                {
-                    "project_member_id": uuid.UUID(p["project_member_id"]),
-                    "invite_reason": p.get("reason", ""),
-                    "invite_source": "ai_suggested",
-                    "role_in_meeting": str(p.get("role_in_meeting", "attendee")).lower(),
-                }
-                for p in inferred
-            ]
-            await asyncio.to_thread(
-                add_participants, bot_session_id, participants_data
-            )
-        except Exception:
-            logger.exception("Database Participant persistence failed")
-
     return {
         "meeting_id": meeting_id,
         "meet_url": meet_url,
         "message": "Google Calendar meeting created and saved in database successfully.",
-        "inferred_participants": inferred,
     }

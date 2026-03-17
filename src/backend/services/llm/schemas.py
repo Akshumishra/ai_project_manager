@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from uuid import UUID
-
 from pydantic import BaseModel, Field
 
 
@@ -64,26 +62,3 @@ class MeetingAnalysis(BaseModel):
     )
 
 
-# ── Scheduling & Participant Inference Schemas ───────────────────────────────
-
-
-class RecommendedParticipant(BaseModel):
-    """A single recommended meeting participant."""
-
-    project_member_id: UUID = Field(
-        description="The exact UUID of the project member recommended for the meeting.",
-    )
-    reason: str = Field(
-        description="One-sentence explanation of why this person must attend.",
-    )
-    role_in_meeting: str = Field(
-        description="Suggested role: 'PRESENTER', 'ATTENDEE', or 'MODERATOR'.",
-    )
-
-
-class ParticipantInference(BaseModel):
-    """Container for the recommended meeting participants."""
-
-    recommended_participants: list[RecommendedParticipant] = Field(
-        description="List of selected members critical to the meeting agenda.",
-    )
