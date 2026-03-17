@@ -8,6 +8,7 @@ from src.backend.model.project import (
     Project,
     ProjectSlackDetail,
     ProjectMember,
+    ProjectWorkflowStatus,
 )
 from src.backend.model.task import Task
 from src.backend.model.requirement_chat import RequirementChat

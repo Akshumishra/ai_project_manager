@@ -216,3 +216,7 @@ client_secret*.json
 *.pem
 *.key
 server_log.txt
+.vscode/
+.DS_Store
+node_modules/
+package-lock.json
