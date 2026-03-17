@@ -11,7 +11,7 @@ from src.backend.collaborative_document.utils.block_sync_worker import (
     flush_dirty_blocks,
 )
 from src.backend.requirement_gather.project_routes import router as project_routes
-from src.backend.config import Config
+from src.backend.config import settings
 
 import src.backend.model
 
@@ -20,7 +20,7 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=Config.ALLOWED_ORIGINS,
+    allow_origins=settings.ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
