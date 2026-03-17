@@ -29,3 +29,9 @@ class ProjectDocumentResponse(BaseModel):
     id: UUID
     title: str
     created_at: datetime
+
+
+class ProjectUpdateRequest(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    status: str | None = None
