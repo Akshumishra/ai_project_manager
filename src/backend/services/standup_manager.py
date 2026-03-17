@@ -967,6 +967,33 @@ class StandupManager:
         except Exception as e:
             logger.error(f"FAILURE: Could not parse '{deadline_str}' even with fuzzy logic: {e}")
             return None
+    def finalize_all_active_standups(self):
+        """
+        Finds all standups created in the last 24 hours that are not yet finalized and finalizes them.
+        """
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+        
+        # Find recent unfinalized standups
+        standups = self.db.query(Standup).filter(
+            Standup.created_at >= cutoff,
+            Standup.summary.is_(None),
+            Standup.deleted_at.is_(None)
+        ).all()
+        
+        logger.info(f"Summary: Found {len(standups)} unfinalized standups in the last 24 hours.")
+        
+        results = []
+        for standup in standups:
+            try:
+                # 1. Catch any remaining replies
+                self.process_new_replies(str(standup.id))
+                # 2. Finalize (posts to Slack and sets .summary)
+                self.finalize_standup(str(standup.id))
+                results.append(str(standup.id))
+            except Exception as e:
+                logger.error(f"Failed to auto-finalize standup {standup.id}: {e}")
+        
+        return results
 
     def finalize_standup(self, standup_id: str):
         """

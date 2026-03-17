@@ -11,3 +11,4 @@ langchain-core
 slack-bolt
 slack-sdk
 python-multipart
+apscheduler
