@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     SMTP_USERNAME: str | None = None
     SMTP_PASSWORD: str | None = None
     FRONTEND_URL: str = "http://localhost:5173"
-
+    OPENAI_API_KEY: str | None=None
     model_config = SettingsConfigDict(
         env_file=".env",
         extra="ignore"
