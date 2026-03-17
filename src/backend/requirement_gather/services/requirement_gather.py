@@ -9,7 +9,6 @@ from src.backend.requirement_gather.services.chat_history import (
     save_chat_message,
     build_initial_user_prompt
 )
-from src.backend.requirement_gather.services.save_requirement import save_requirement_spec_document
 from src.backend.utils.workflow_utils import (
     set_workflow_status,
     check_completion_and_redirect,
@@ -28,7 +27,10 @@ def _execute_agent_run(db: Session, user_id: UUID, project_id: UUID, run_message
     agent = RequirementAgent(user_id, project_id)
     
     try:
-        response = agent.run(run_messages)
+        from src.backend.technical_doc.services.tech_doc_service import fetch_document_text_by_label
+        current_doc = fetch_document_text_by_label(db, project_id, RequirementAgentConstants.REQ_DOC_LABEL)
+        
+        response = agent.run(run_messages, current_doc=current_doc)
         content = response.get("content")
         
         if not content:
@@ -37,45 +39,29 @@ def _execute_agent_run(db: Session, user_id: UUID, project_id: UUID, run_message
         save_chat_message(db=db, project_id=project_id, role="assistant", content=content)
         
         set_workflow_status(db, project_id, AGENT_CONST.WORKFLOW_NAME, "in_progress")
-        
-        # Backend Auto-save Fallback: If agent extracted a document but didn't call the tool
-        document = response.get("document")
-        if document and not response.get("saved", False):
-            try:
-                save_requirement_spec_document(
-                    db=db,
-                    user_id=user_id,
-                    project_id=project_id,
-                    markdown_content=document
-                )
-                response["saved"] = True
-                print(f"DEBUG: Auto-saved fallback document for project {project_id}")
-            except Exception as save_err:
-                print(f"ERROR: Failed to auto-save fallback document: {save_err}")
             
         if is_recovering:
             return {
                 "messages": get_chat_history(db, project_id),
                 "status": "resumed",
                 "saved": response.get("saved", False),
-                "document": response.get("document"),
-                "content": response.get("content", "")
+                "document": response.get("doc")
             }
         
         workflow_status = get_workflow_status(db, project_id, AGENT_CONST.WORKFLOW_NAME)
         if workflow_status:
             response["status"] = workflow_status.status
         
+        if "doc" in response:
+            response["document"] = response.pop("doc")
+
         return response
 
     except Exception as e:
         set_workflow_status(db, project_id, AGENT_CONST.WORKFLOW_NAME, "in_progress")
         if isinstance(e, HTTPException):
             raise e
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
-            detail=f"An unexpected error occurred: {str(e)}"
-        )
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Agent failed: {str(e)}")
 
 def start_requirement_agent(db: Session, user_id: UUID, project_id: UUID, background: str = None):
     """Entry point for starting or resuming the requirement gathering session."""
@@ -84,32 +70,11 @@ def start_requirement_agent(db: Session, user_id: UUID, project_id: UUID, backgr
     if redirect:
         return redirect
 
-    # Check for thinking lock BEFORE starting anything - fixes duplicate initial messages
-    if handle_thinking_lock(db, project_id, AGENT_CONST.WORKFLOW_NAME):
-        return {
-            "messages": get_chat_history(db, project_id), 
-            "status": "resumed", 
-            "thinking": True,
-            "document": "", # Will be filled by poll or next check
-            "content": ""
-        }
-
     history = get_chat_history(db, project_id)
     is_interrupted = history and history[-1]["role"] == "user"
     
     if is_interrupted and handle_thinking_lock(db, project_id, AGENT_CONST.WORKFLOW_NAME):
-        get_draft_tool = get_requirement_draft_tool(project_id)
-        current_doc = get_draft_tool.invoke({})
-        if "draft found" in current_doc or "no content" in current_doc or "Error" in current_doc:
-            current_doc = ""
-            
-        return {
-            "messages": history, 
-            "status": "resumed", 
-            "thinking": True,
-            "document": current_doc,
-            "content": ""
-        }
+        return {"messages": history, "status": "resumed", "thinking": True}
         
 
     if history and not is_interrupted:
@@ -121,8 +86,7 @@ def start_requirement_agent(db: Session, user_id: UUID, project_id: UUID, backgr
         return {
             "messages": history, 
             "status": "resumed",
-            "document": current_doc,
-            "content": ""
+            "document": current_doc
         }
 
     project_context = build_initial_user_prompt(db, project_id, background)

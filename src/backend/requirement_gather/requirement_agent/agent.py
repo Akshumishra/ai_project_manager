@@ -93,7 +93,7 @@ class RequirementAgent:
                     return tool_call.get("args", {}).get("markdown_content", "")
         return ""
 
-    def run(self, messages: List[Dict[str, str]]) -> Dict[str, Any]:
+    def run(self, messages: List[Dict[str, str]], current_doc: str = "") -> Dict[str, Any]:
         try:
             response = self.agent.invoke({
                 "messages": messages

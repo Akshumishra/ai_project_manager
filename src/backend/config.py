@@ -1,4 +1,6 @@
+import os
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import field_validator
 
 class Settings(BaseSettings):
     DATABASE_URL: str
@@ -8,6 +10,14 @@ class Settings(BaseSettings):
     ACCESS_SECRET_KEY: str
     REFRESH_SECRET_KEY: str
     REFRESH_TOKEN_EXPIRE_DAYS: int
+
+    @field_validator("*", mode="before")
+    @classmethod
+    def clean_strings(cls, v, info):
+        if isinstance(v, str):
+            # Remove leading/trailing spaces and quotes
+            return v.strip().strip('"').strip("'")
+        return v
 
     # Email Config
     EMAILS_FROM: str | None = None
@@ -19,8 +29,9 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str | None = None
     FRONTEND_URL: str = "http://localhost:5173"
     OPENAI_API_KEY: str | None=None
+    
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=os.path.join(os.path.dirname(__file__), "../../.env"),
         extra="ignore"
     )
 
