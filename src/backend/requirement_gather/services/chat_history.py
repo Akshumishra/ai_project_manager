@@ -60,8 +60,8 @@ def save_chat_message(db: Session, project_id: UUID, role: str, content: str, us
 def build_initial_user_prompt(db: Session, project_id: UUID, background: str = None) -> str:
     try:
         project_detail = get_project_detail(db, project_id)
-        project_title = project_detail["project_title"].strip()
-        project_description = project_detail["project_description"].strip()
+        project_title = project_detail["name"].strip()
+        project_description = project_detail["description"].strip()
         
         if not background:
             member = db.query(ProjectMember).filter(ProjectMember.project_id == project_id).first()

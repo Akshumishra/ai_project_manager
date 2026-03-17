@@ -3,6 +3,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     DATABASE_URL: str
     ALGORITHM: str
+    ALLOWED_ORIGINS: list
     ACCESS_TOKEN_EXPIRE_MINUTES: int
     ACCESS_SECRET_KEY: str
     REFRESH_SECRET_KEY: str

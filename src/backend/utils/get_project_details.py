@@ -24,10 +24,11 @@ def get_project_detail(db: Session, project_id: UUID) -> dict | None:
             requirement_doc_id = str(doc.id)
         
     return {
-        "project_id": str(project.id),
-        "project_title": project.name,
-        "project_description": project.description or "",
-        "owned_by": str(project.created_by),
+        "id": project.id,
+        "name": project.name,
+        "description": project.description or "",
+        "status": project.status,
+        "created_by": project.created_by,
         "requirement_document_id": requirement_doc_id,
         "tech_document_id": tech_doc_id,
     }
