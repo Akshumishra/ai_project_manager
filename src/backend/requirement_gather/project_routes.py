@@ -10,7 +10,7 @@ from src.backend.requirement_gather.services.requirement_gather import (
 from src.backend.requirement_gather.services.project import create_project_with_owner
 from src.backend.requirement_gather.schemas import CreateProjectRequest, RequirementAgentRequest, SaveRequirementRequest
 from src.backend.utils.get_project_details import get_project_detail
-from src.backend.requirement_gather.services.save_requirement import save_requirement_spec_in_db
+from src.backend.requirement_gather.services.save_requirement import save_requirement_spec_document
 from src.backend.requirement_gather.services.save_requirement import complete_requirement_step
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
@@ -94,7 +94,7 @@ def save_requirement_doc(
     """
     Save the collective requirement specification into the database and sync with documents.
     """
-    success, message = save_requirement_spec_in_db(
+    success, message = save_requirement_spec_document(
         db=db,
         user_id=request.user_id,
         project_id=project_id,

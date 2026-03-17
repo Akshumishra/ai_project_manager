@@ -31,7 +31,7 @@ def create_project_with_owner(
             project_id=project.id,
             user_id=user_id,
             slack_id=None,
-            background=background
+            background=background.lower()
         )
         db.add(project_member)
 

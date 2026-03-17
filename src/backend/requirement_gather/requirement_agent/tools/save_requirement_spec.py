@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from uuid import UUID
 
 from src.backend.db.database import SessionLocal
-from src.backend.requirement_gather.services.save_requirement import save_requirement_spec_in_db
+from src.backend.requirement_gather.services.save_requirement import save_requirement_spec_document
 
 
 def save_requirement_spec_tool(user_id: UUID, project_id: UUID):
@@ -19,7 +19,7 @@ def save_requirement_spec_tool(user_id: UUID, project_id: UUID):
         db: Session = SessionLocal()
 
         try:
-            success, message = save_requirement_spec_in_db(
+            success, message = save_requirement_spec_document(
                 db=db,
                 user_id=user_id,
                 project_id=project_id,

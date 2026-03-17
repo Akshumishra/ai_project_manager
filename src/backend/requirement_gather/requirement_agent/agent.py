@@ -5,7 +5,7 @@ from uuid import UUID
 import json
 
 from src.backend.requirement_gather.requirement_agent.prompt import SYSTEM_PROMPT
-from src.backend.config import Config
+from src.backend.config import Settings
 from src.backend.requirement_gather.requirement_agent.tools.save_requirement_spec import save_requirement_spec_tool
 from src.backend.requirement_gather.requirement_agent.tools.get_current_requirement_draft import get_requirement_draft_tool
 from src.backend.requirement_gather.constants import RequirementAgentConstants
@@ -24,7 +24,7 @@ class RequirementAgent:
         model_name = RequirementAgentConstants.MODEL
         kwargs = {
             "model": model_name,
-            "api_key": Config.OPENAI_API_KEY
+            "api_key": Settings.OPENAI_API_KEY
         }
         if not (model_name.startswith("o1") or model_name.startswith("o3")):
             kwargs["temperature"] = RequirementAgentConstants.TEMPERATURE
