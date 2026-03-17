@@ -13,7 +13,6 @@ class ScheduleCalendarMeetingRequest(BaseModel):
     agenda: str
     title: str = Field(default="Scheduled Meeting")
     task_id: UUID | None = None
-    scheduled_at: str = Field(description="ISO-8601 formatted datetime string with timezone.")
     duration_minutes: int = Field(
         default=45,
         ge=5,
@@ -28,7 +27,6 @@ class ScheduleCalendarMeetingResponse(BaseModel):
     meeting_id: UUID
     meet_url: str
     message: str
-    inferred_participants: list[dict]
 
 
 class FirefliesWebhookPayload(BaseModel):

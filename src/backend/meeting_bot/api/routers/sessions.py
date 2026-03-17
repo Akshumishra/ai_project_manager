@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from fastapi import APIRouter, HTTPException
 
@@ -39,20 +39,9 @@ async def schedule_meeting_calendar(
     Because Fireflies automations auto-join Calendar items, no manual
     invocation is required.
     """
-    # ── 1. Parse and validate the scheduled datetime ────────────────────────
-    try:
-        scheduled_at_dt = datetime.fromisoformat(request.scheduled_at)
-    except ValueError:
-        raise HTTPException(
-            status_code=422,
-            detail="scheduled_at must be a valid ISO-8601 datetime string.",
-        )
-
-    if scheduled_at_dt.tzinfo is None:
-        raise HTTPException(
-            status_code=422,
-            detail="scheduled_at must include timezone information (e.g. '+05:30' or 'Z').",
-        )
+    # ── 1. Calculate the scheduled datetime (5 mins from now in IST) ────────
+    ist = timezone(timedelta(hours=5, minutes=30))
+    scheduled_at_dt = datetime.now(ist) + timedelta(minutes=5)
 
     # ── 2. Generate Google Meet space via Calendar API ──────────────────────
     try:
