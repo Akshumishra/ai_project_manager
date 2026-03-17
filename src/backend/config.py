@@ -9,76 +9,56 @@ _backend_root = Path(__file__).resolve().parent
 _project_root = _backend_root.parent.parent
 
 
-DEFAULT_MAX_DURATION = 4 * 60 * 60  # 4 hours
-
-
-class AppConfig(BaseSettings):
+class Settings(BaseSettings):
     """
-    Immutable structure containing ALL configuration vars with native Pydantic
-    type casting and environment variable extraction.
+    Centralized configuration management with type validation and environment loading.
     """
 
-    # ── General Backend Configurations ───────────────────────────────────────
-    database_url: str | None = Field(default=None, alias="DATABASE_URL")
-    openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
+    DATABASE_URL: str
+    ALGORITHM: str
+    ACCESS_TOKEN_EXPIRE_MINUTES: int
+    ACCESS_SECRET_KEY: str
+    REFRESH_SECRET_KEY: str
+    REFRESH_TOKEN_EXPIRE_DAYS: int
 
-    # ── OAuth Credential Paths ───────────────────────────────────────────────
-    google_credentials_path: Path = Field(
-        default_factory=lambda: _project_root / "credentials.json",
-        alias="GOOGLE_CREDENTIALS_PATH",
+    # ── Email Config ─────────────────────────────────────────────────────────
+    EMAILS_FROM: str | None = None
+    RESEND_API_KEY: str | None = None
+    BREVO_API_KEY: str | None = None
+    SMTP_SERVER: str | None = None
+    SMTP_PORT: int | None = None
+    SMTP_USERNAME: str | None = None
+    SMTP_PASSWORD: str | None = None
+    FRONTEND_URL: str = "http://localhost:5173"
+
+    # ── AI / OpenAI ──────────────────────────────────────────────────────────
+    OPENAI_API_KEY: str | None = None
+
+    # ── Meeting Bot Specific Configurations ──────────────────────────────────
+    FIREFLIES_API_KEY: str | None = None
+    APP_ENVIRONMENT: str = "development"
+
+    GOOGLE_CREDENTIALS_PATH: Path = Field(
+        default_factory=lambda: _project_root / "credentials.json"
     )
-    google_token_path: Path = Field(
-        default_factory=lambda: _project_root / "token.json",
-        alias="GOOGLE_TOKEN_PATH",
+    GOOGLE_TOKEN_PATH: Path = Field(
+        default_factory=lambda: _project_root / "token.json"
     )
 
-    # ── Fireflies ────────────────────────────────────────────────────────────
-    fireflies_api_key: str | None = Field(default=None, alias="FIREFLIES_API_KEY")
-
-    # ── App Environment ──────────────────────────────────────────────────────
-    environment: str = Field(default="development", alias="APP_ENVIRONMENT")
-
-    # ── Configurations Dict for Environment mapping ──────────────────────────
     model_config = SettingsConfigDict(
-        # Load from multiple env paths with priority triggers.
-        # Inside the tuple, the files are loaded and merged.
         env_file=(
             str(_backend_root / ".env"),
             str(_backend_root / "meeting_bot" / ".env"),
+            ".env",
         ),
-        env_file_encoding="utf-8",
-        extra="ignore",  # Ignore unmapped fields safely
+        extra="ignore",
     )
 
     @property
     def is_production(self) -> bool:
         """Return True when running in production mode."""
-        return self.environment == "production"
+        return self.APP_ENVIRONMENT == "production"
 
 
-# Backward Compatibility Alias for old Bot Config import chains
-BotConfig = AppConfig
-
-# Module-level singleton
-_config: AppConfig | None = None
-
-
-def get_app_config() -> AppConfig:
-    """Return the global AppConfig singleton, initializing on first call."""
-    global _config  # noqa: PLW0603
-    if _config is None:
-        # Pydantic BaseSettings automatically reads environment layout
-        # during constructor instantiation.
-        try:
-            _config = AppConfig()
-        except Exception as exc:
-            # Re-raise friendly config error layout
-            print(f"\n❌  Configuration Validation Error:\n{exc}\n")
-            raise exc
-    return _config
-
-
-# Backward Compatibility Alias for Meeting Bot code
-def get_config() -> AppConfig:
-    """Alias for get_app_config() to prevent breaking old bot code imports."""
-    return get_app_config()
+settings = Settings()
+Config = settings

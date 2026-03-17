@@ -4,7 +4,7 @@ import logging
 
 import httpx
 
-from src.backend.config import get_app_config
+from src.backend.config import Config
 
 logger = logging.getLogger(__name__)
 
@@ -17,8 +17,7 @@ class FirefliesClient:
     """Client for interacting with the Fireflies.ai GraphQL API."""
 
     def __init__(self, api_key: str | None = None) -> None:
-        config = get_app_config()
-        self.api_key = api_key or config.fireflies_api_key
+        self.api_key = api_key or Config.FIREFLIES_API_KEY
         self.base_url = "https://api.fireflies.ai/graphql"
 
     def _get_headers(self) -> dict[str, str]:
