@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, status
 
 from meeting_bot.api.schemas import FirefliesWebhookPayload
 from src.backend.services.fireflies_client import FirefliesClient
@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Webhooks"])
 
 
-@router.post("/webhooks/fireflies/transcript", status_code=200)
+@router.post("/webhooks/fireflies/transcript", status_code=status.HTTP_200_OK)
 async def fireflies_transcript_webhook(
     payload: FirefliesWebhookPayload,
 ) -> dict:
@@ -31,7 +31,7 @@ async def fireflies_transcript_webhook(
     target_id = payload.transcript_id or payload.meeting_id
     if not target_id:
         raise HTTPException(
-            status_code=400,
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail="Missing both transcriptId and meetingId in webhook payload.",
         )
 
@@ -40,7 +40,7 @@ async def fireflies_transcript_webhook(
     except Exception:
         logger.exception("Failed to fetch transcript from Fireflies for %s", target_id)
         raise HTTPException(
-            status_code=502,
+            status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Failed to fetch transcript from upstream provider.",
         )
 
@@ -100,7 +100,7 @@ async def fireflies_transcript_webhook(
     except Exception:
         logger.exception("Failed to persist Fireflies transcript to DB")
         raise HTTPException(
-            status_code=500,
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Transcript processing failed. Please contact support.",
         )
 

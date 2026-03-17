@@ -77,7 +77,7 @@ def main() -> None:
             parser.print_help()
             exit_code = 1
     except ValueError as exc:
-        print(f"\n❌  Configuration error: {exc}")
+        print(f"\nConfiguration error: {exc}")
         print("    Copy .env.example to .env and fill in the required values.\n")
         exit_code = 2
     except KeyboardInterrupt:

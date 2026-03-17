@@ -8,6 +8,7 @@ from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from meeting_bot.api.routers import router
+from src.backend.config import Config
 
 logger = logging.getLogger(__name__)
 
@@ -26,8 +27,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 def _get_docs_config() -> dict:
     """Conditionally disable OpenAPI docs in production."""
-    import os
-    if os.environ.get("APP_ENVIRONMENT") == "production":
+    if Config.is_production:
         return {"docs_url": None, "redoc_url": None, "openapi_url": None}
     return {}
 

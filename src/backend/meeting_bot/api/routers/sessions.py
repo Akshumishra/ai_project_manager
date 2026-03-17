@@ -5,7 +5,7 @@ import logging
 import uuid
 from datetime import datetime, timezone, timedelta
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, status
 
 from meeting_bot.api.schemas import (
     ScheduleCalendarMeetingRequest,
@@ -27,7 +27,7 @@ async def root() -> dict:
 @router.post(
     "/sessions/schedule-calendar",
     response_model=ScheduleCalendarMeetingResponse,
-    status_code=201,
+    status_code=status.HTTP_201_CREATED,
 )
 async def schedule_meeting_calendar(
     request: ScheduleCalendarMeetingRequest,
@@ -41,7 +41,7 @@ async def schedule_meeting_calendar(
     """
     # ── 1. Calculate the scheduled datetime (5 mins from now in IST) ────────
     ist = timezone(timedelta(hours=5, minutes=30))
-    scheduled_at_dt = datetime.now(ist) + timedelta(minutes=5)
+    scheduled_at_dt = datetime.now(ist) + timedelta(minutes=2)
 
     # ── 2. Generate Google Meet space via Calendar API ──────────────────────
     try:
@@ -54,13 +54,13 @@ async def schedule_meeting_calendar(
     except Exception:
         logger.exception("Google Calendar Meet generation failed")
         raise HTTPException(
-            status_code=502,
+            status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Failed to generate Google Meet link. Please try again later.",
         )
 
     if not meet_url:
         raise HTTPException(
-            status_code=502,
+            status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Google Calendar created the event but failed to generate a video link.",
         )
 
@@ -82,7 +82,7 @@ async def schedule_meeting_calendar(
     except Exception:
         logger.exception("Database Meeting persistence failed")
         raise HTTPException(
-            status_code=500,
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to persist scheduled meeting. Please contact support.",
         )
 
