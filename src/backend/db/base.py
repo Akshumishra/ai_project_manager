@@ -11,3 +11,7 @@ from src.backend.model.project import (
 )
 from src.backend.model.task import Task
 from src.backend.model.requirement_chat import RequirementChat
+from src.backend.model.standup import Standup
+from src.backend.model.standup_update import StandupUpdate
+from src.backend.model.standup_action_log import StandupActionLog
+from src.backend.model.task_log import TaskLog

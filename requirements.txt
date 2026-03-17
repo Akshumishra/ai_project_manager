@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+sqlalchemy
+psycopg2-binary
+python-dotenv
+python-dateutil
+pydantic
+requests
+langchain-openai
+langchain-core
+slack-bolt
+slack-sdk
+python-multipart
