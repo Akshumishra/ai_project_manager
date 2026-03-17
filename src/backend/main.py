@@ -12,6 +12,7 @@ from src.backend.collaborative_document.utils.block_sync_worker import (
     flush_dirty_blocks,
 )
 from src.backend.requirement_gather.project_routes import router as project_routes
+from src.backend.technical_doc.tech_doc_routes import router as tech_doc_router
 from src.backend.config import settings
 
 import src.backend.model
@@ -33,6 +34,7 @@ app.include_router(doc_routes.router)
 app.include_router(block_routes.router)
 app.include_router(ws_routes.router)
 app.include_router(auth_routes.router)
+app.include_router(tech_doc_router)
 
 @app.on_event("startup")
 def start_worker():
