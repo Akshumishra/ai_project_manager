@@ -8,3 +8,7 @@ class ResumeExtraction(BaseModel):
     )
     yoe: int = Field(description="Total years of professional experience as an integer")
     designation: str = Field(description="Current or most recent job title")
+
+
+class MessageResponse(BaseModel):
+    message: str

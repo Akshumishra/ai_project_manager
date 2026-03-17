@@ -1,8 +1,7 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, status
-from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 import asyncio
-from . import  services
+from . import  services,schemas
 from src.backend.db.database import get_db
 from src.backend.auth.utils import get_current_user
 from src.backend.model.user_detail import UserDetail
@@ -11,7 +10,11 @@ from src.backend.auth.schemas import UserDetailUpdate
 router = APIRouter(prefix="/api/users", tags=["resume"])
 
 
-@router.post("/parse-resume")
+@router.post(
+    "/parse-resume",
+    response_model=services.schemas.ResumeExtraction,
+    status_code=status.HTTP_200_OK
+)
 async def parse_resume(
     file: UploadFile = File(...),
 ):
@@ -33,7 +36,7 @@ async def parse_resume(
             raise HTTPException(status_code=400, detail="Unsupported file type")
 
         result = await services.extract_resume_data(text)
-        return JSONResponse(status_code=status.HTTP_200_OK, content=result.model_dump())
+        return result
     except HTTPException:
         raise
     except Exception as e:
@@ -43,7 +46,11 @@ async def parse_resume(
         )
 
 
-@router.post("/update-profile")
+@router.post(
+    "/update-profile",
+    response_model=services.schemas.MessageResponse,
+    status_code=status.HTTP_200_OK
+)
 def update_profile(
     data: UserDetailUpdate,
     db: Session = Depends(get_db),
@@ -73,10 +80,7 @@ def update_profile(
 
         db.commit()
 
-        return JSONResponse(
-            status_code=status.HTTP_200_OK,
-            content={"message": "Profile updated successfully"}
-        )
+        return {"message": "Profile updated successfully"}
     except Exception as e:
         db.rollback()
         raise HTTPException(
