@@ -1,6 +1,6 @@
 from typing import List, Dict, Any
 from sqlalchemy.orm import Session
-from fastapi import HTTPException
+from fastapi import HTTPException, status
 from uuid import UUID
 
 from src.backend.requirement_gather.requirement_agent.agent import RequirementAgent
@@ -31,7 +31,7 @@ def _execute_agent_run(db: Session, user_id: UUID, project_id: UUID, run_message
         content = response.get("content")
         
         if not content:
-            raise HTTPException(status_code=500, detail="Agent returned empty response")
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Agent returned empty response")
         
         save_chat_message(db=db, project_id=project_id, role="assistant", content=content)
         
@@ -59,7 +59,7 @@ def _execute_agent_run(db: Session, user_id: UUID, project_id: UUID, run_message
         set_workflow_status(db, project_id, AGENT_CONST.WORKFLOW_NAME, "in_progress")
         if isinstance(e, HTTPException):
             raise e
-        raise HTTPException(status_code=500, detail=f"Agent failed: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Agent failed: {str(e)}")
 
 def start_requirement_agent(db: Session, user_id: UUID, project_id: UUID, background: str = None):
     """Entry point for starting or resuming the requirement gathering session."""

@@ -1,3 +1,4 @@
+from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 from uuid import UUID
 
@@ -7,6 +8,7 @@ from src.backend.model.user import User
 from src.backend.utils.workflow_utils import set_workflow_status
 from src.backend.requirement_gather.constants import RequirementAgentConstants
 from src.backend.requirement_gather.utils.doc_utils import sync_blocks_from_text, save_document
+
 
 def save_requirement_spec_document(
     db: Session,
@@ -22,11 +24,14 @@ def save_requirement_spec_document(
     additional_notes: str | None = None,
 ):
     """
-    Main service to orchestrate saving the requirement specification into the database
-    using local document utilities to avoid external service dependencies.
+    Main service to orchestrate saving the requirement specification into the database.
+    Raises HTTPException for errors.
     """
     try:
         project_title = db.query(Project.name).filter(Project.id == project_id).scalar()
+        if not project_title:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+
         if not markdown_content:
             markdown_content = f"# {project_title}\n\n## Requirement Specification\n\n"
             if problem_the_project_solves:
@@ -45,7 +50,7 @@ def save_requirement_spec_document(
         document_title = f"{project_title} - {RequirementAgentConstants.REQ_DOC_LABEL}"
         current_user = db.query(User).filter(User.id == user_id).first()
         if not current_user:
-            return False, "User not found"
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
         existing_doc = (
             db.query(Document)
@@ -70,10 +75,17 @@ def save_requirement_spec_document(
             doc_id = doc_info["document_id"]
 
         db.commit()
-        return True, {"message": "Requirement specification saved successfully.", "document_id": doc_id}
+        return {"status": "success", "message": "Requirement specification saved successfully."}
+    except HTTPException:
+        db.rollback()
+        raise
     except Exception as e:
         db.rollback()
-        return False, str(e)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            detail=f"Failed to save requirement: {str(e)}"
+        )
+
 
 def complete_requirement_step(db: Session, project_id: UUID):
     """
@@ -82,7 +94,10 @@ def complete_requirement_step(db: Session, project_id: UUID):
     try:
         set_workflow_status(db, project_id, RequirementAgentConstants.WORKFLOW_NAME, "completed")
         db.commit()
-        return True, "Requirement step marked as completed."
+        return {"status": "success", "message": "Requirement step marked as completed."}
     except Exception as e:
         db.rollback()
-        return False, str(e)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            detail=f"Failed to complete requirement step: {str(e)}"
+        )
