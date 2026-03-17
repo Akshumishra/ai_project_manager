@@ -5,6 +5,7 @@ from src.backend.model.project import Project
 
 
 from src.backend.requirement_gather.constants import RequirementAgentConstants
+from src.backend.technical_doc.constants import TechDocAgentConstants
 
 def get_project_detail(db: Session, project_id: UUID) -> dict | None:
     project = (
@@ -22,6 +23,8 @@ def get_project_detail(db: Session, project_id: UUID) -> dict | None:
     for doc in project.documents:
         if RequirementAgentConstants.REQ_DOC_LABEL in (doc.title or ""):
             requirement_doc_id = str(doc.id)
+        if TechDocAgentConstants.TECH_DOC_LABEL in (doc.title or ""):
+            tech_doc_id = str(doc.id)
         
     return {
         "id": project.id,

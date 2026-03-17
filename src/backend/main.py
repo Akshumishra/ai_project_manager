@@ -35,9 +35,9 @@ app.include_router(auth_routes.router)
 
 @app.on_event("startup")
 def start_worker():
-    for _ in range(5):
-        flush_dirty_blocks()
-
+    print("Starting AI-Project Manager backend...")
+    # Initial flush to sync any unsaved changes from previous sessions
+    flush_dirty_blocks()
     start_scheduler()
 
 
