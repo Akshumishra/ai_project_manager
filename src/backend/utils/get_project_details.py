@@ -2,9 +2,8 @@ from sqlalchemy.orm import Session
 from uuid import UUID
 
 from src.backend.model.project import Project
-
-
 from src.backend.requirement_gather.constants import RequirementAgentConstants
+
 
 def get_project_detail(db: Session, project_id: UUID) -> dict | None:
     project = (

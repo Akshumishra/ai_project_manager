@@ -17,8 +17,10 @@ from src.backend.requirement_gather.schemas import (
     StandardResponse
 )
 from src.backend.utils.get_project_details import get_project_detail
-from src.backend.requirement_gather.services.save_requirement import save_requirement_spec_document
-from src.backend.requirement_gather.services.save_requirement import complete_requirement_step
+from src.backend.requirement_gather.services.save_requirement import (
+    save_requirement_spec_document,
+    complete_requirement_step
+)
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
 
