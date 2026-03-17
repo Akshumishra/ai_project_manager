@@ -119,7 +119,7 @@ def _trigger_ai_analysis(bot_session_id: str | None, raw_text: str) -> None:
 
     def _run_processor() -> None:
         try:
-            from src.backend.services.ai.processor import process_meeting_transcript
+            from src.backend.services.llm.processor import process_meeting_transcript
 
             process_meeting_transcript(bot_session_id, raw_text)
         except Exception:
