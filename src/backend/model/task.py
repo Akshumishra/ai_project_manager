@@ -1,5 +1,5 @@
 import enum
-from sqlalchemy import Column, String, Text, ForeignKey, DateTime, Enum, Integer, Boolean
+from sqlalchemy import Column, String, ForeignKey, Enum, Integer, DateTime
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import UUID
 
@@ -19,6 +19,12 @@ class TaskPriority(str, enum.Enum):
     LOW = "low"
 
 
+class TaskComplexity(str, enum.Enum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+
 class TaskCategory(str, enum.Enum):
     BACKEND = "backend"
     FRONTEND = "frontend"
@@ -27,12 +33,6 @@ class TaskCategory(str, enum.Enum):
     DEVOPS = "devops"
     QA = "qa"
     SECURITY = "security"
-
-
-class TaskComplexity(str, enum.Enum):
-    LOW = "low"
-    MEDIUM = "medium"
-    HIGH = "high"
 
 
 class Task(BaseModel):
@@ -48,6 +48,11 @@ class Task(BaseModel):
     title = Column(
         String,
         nullable=False
+    )
+
+    description = Column(
+        String,
+        nullable=True
     )
 
     label = Column(

@@ -59,6 +59,7 @@ def register_user(request: schemas.UserCreate):
             detail="A database error occurred during registration. Please try again later."
         )
     except Exception as e:
+        session.rollback()
         logger.error(f"Unexpected error during registration: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=500, 
@@ -91,12 +92,14 @@ def login_user(request: schemas.UserLogin):
     except HTTPException:
         raise
     except SQLAlchemyError as e:
+        session.rollback()
         logger.error(f"Database error during login: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=500, 
             detail="A database error occurred during login."
         )
     except Exception as e:
+        session.rollback()
         logger.error(f"Unexpected error during login: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=500, 
@@ -116,12 +119,14 @@ def refresh_token(request: schemas.TokenRefresh):
     except HTTPException:
         raise
     except SQLAlchemyError as e:
+        session.rollback()
         logger.error(f"Database error during token refresh: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=500, 
             detail="A database error occurred during token refresh."
         )
     except Exception as e:
+        session.rollback()
         logger.error(f"Unexpected error during token refresh: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=500, 
