@@ -9,7 +9,7 @@ Extract the following fields from the resume:
 
 Rules:
 - Return ONLY valid JSON
-- Use the following schema: {"skills": [], "yoe": 0, "designation": ""}
+- Use the following schema: {{"skills": [], "yoe": 0, "designation": ""}}
 - Do not include explanations
 - If information is missing return empty values (0 for yoe)
 
