@@ -208,4 +208,14 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 
+recordings/
+.DS_STORE
+
+# ── Sensitive credential files ─────────────────────────────────────────────────
+credentials.json
+token.json
+client_secret*.json
+*.pem
+*.key
+server_log.txt
 src/backend/scripts/migrate_tasks.py
