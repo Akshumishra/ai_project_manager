@@ -29,31 +29,28 @@ Each task must include the following fields:
 title:
 A short and precise task name.
 
+label:
+A sequential integer starting from 1 that represents the task order.
+
 description:
 A detailed explanation of what must be implemented, written in MARKDOWN format. 
 Critically, you MUST include the Acceptance Criteria within this description field as a separate markdown section (e.g., using a '### Acceptance Criteria' heading).
 
 priority:
-One of ["High", "Medium", "Low"] depending on urgency.
+One of ["high", "medium", "low"] depending on urgency.
 
-story_points:
-Complexity score using Fibonacci scale:
-[1, 2, 3, 5, 8, 13]
-
-estimated_hours:
-Approximate number of hours required to complete the task.
+complexity:
+One of ["high", "medium", "low"] depending on technical difficulty and effort.
 
 category:
 Choose from the following domains:
-["Backend", "Frontend", "Database", "AI/ML", "DevOps", "QA", "Security"]
+["backend", "frontend", "database", "ai_ml", "devops", "qa", "security"]
 Tasks must not combine multiple domains.
 If a feature requires work from multiple domains, split it into separate tasks.
 
 Important requirements:
 - Generate between 15 and 40 tasks depending on project complexity.
 - Tasks must be logically ordered from foundational tasks to advanced tasks.
-- Estimated hours should be realistic.
-- Story points must reflect complexity and uncertainty.
 
 Output format:
 Return ONLY a valid JSON array of objects.

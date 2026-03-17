@@ -4,7 +4,7 @@ from typing import Any, Dict, List
 from uuid import UUID
 
 from src.backend.technical_doc.tech_doc_agent.prompt import SYSTEM_PROMPT
-from src.backend.config import Config
+from src.backend.config import settings
 from src.backend.technical_doc.constants import TechDocAgentConstants
 from src.backend.technical_doc.tech_doc_agent.tools.save_tech_doc import make_save_tech_doc_tool
 from src.backend.technical_doc.tech_doc_agent.tools.update_tech_doc import make_update_tech_doc_tool
@@ -22,7 +22,7 @@ class TechDocAgent:
         return ChatOpenAI(
             model=TechDocAgentConstants.MODEL,
             temperature=TechDocAgentConstants.TEMPERATURE,
-            api_key=Config.OPENAI_API_KEY
+            api_key=settings.OPENAI_API_KEY
         )
 
     def _create_tools(self):

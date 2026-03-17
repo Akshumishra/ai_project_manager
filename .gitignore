@@ -211,3 +211,4 @@ __marimo__/
 .DS_Store
 node_modules/
 insert_dummy_data.py
+package-lock.json

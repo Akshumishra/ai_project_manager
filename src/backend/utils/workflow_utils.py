@@ -16,9 +16,7 @@ def is_status_stale(status: ProjectWorkflowStatus, seconds: int = 60) -> bool:
     if status.status != "thinking" or not status.updated_at:
         return False
     
-    updated_at = status.updated_at
-    if updated_at.tzinfo is None:
-        updated_at = updated_at.replace(tzinfo=timezone.utc)
+    updated_at = status.updated_at.replace(tzinfo=timezone.utc) if status.updated_at.tzinfo is None else status.updated_at
         
     return datetime.now(timezone.utc) - updated_at > timedelta(seconds=seconds)
 

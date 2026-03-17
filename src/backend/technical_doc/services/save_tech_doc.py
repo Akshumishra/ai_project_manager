@@ -8,7 +8,9 @@ from src.backend.model.project import Project
 from src.backend.model.user import User
 from src.backend.utils.workflow_utils import set_workflow_status
 from src.backend.technical_doc.constants import TechDocAgentConstants
-from src.backend.collaborative_document import document_service, utils as doc_utils, schemas as doc_schemas
+from src.backend.collaborative_document.services import document as doc_services
+from src.backend.collaborative_document import schemas as doc_schemas
+from src.backend.technical_doc.doc_sync import sync_blocks_from_text
 
 logger = logging.getLogger(__name__)
 
@@ -53,30 +55,30 @@ def save_technical_spec_in_db(
         if existing_doc:
             logger.info(f"Updating existing tech doc: {existing_doc.id}")
             existing_doc.title = document_title
-            doc_utils.sync_blocks_from_text(existing_doc.id, markdown_content, db)
+            sync_blocks_from_text(existing_doc.id, markdown_content, db)
         else:
             logger.info("Creating new tech doc")
-            document_service.save_document(
-                data=doc_schemas.DocumentCreate(title=document_title, project_id=project_id),
-                markdown_content=markdown_content,
-                db=db,
-                current_user=current_user,
-                auto_commit=False,
+            new_doc = Document(
+                title=document_title,
+                project_id=project_id,
+                created_by=user_id
             )
+            db.add(new_doc)
+            db.flush()
+            sync_blocks_from_text(new_doc.id, markdown_content, db)
 
         set_workflow_status(
             db,
             project_id,
             TechDocAgentConstants.WORKFLOW_NAME,
-            "completed",
-            auto_commit=False,
+            "completed"
         )
         db.commit()
 
         if background_tasks:
             logger.info("Adding task generation to background tasks")
-            from src.backend.task_creator.task_creator_services import generate_and_save_tasks
-            background_tasks.add_task(generate_and_save_tasks, project_id)
+            from src.backend.task_creator.task_creator_service import generate_and_save_tasks
+            background_tasks.add_task(generate_and_save_tasks, project_id, user_id)
 
         return {"success": True, "message": "Technical specification saved successfully."}
     except Exception as e:
