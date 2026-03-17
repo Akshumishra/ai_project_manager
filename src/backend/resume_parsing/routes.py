@@ -12,7 +12,7 @@ router = APIRouter(prefix="/api/users", tags=["resume"])
 
 @router.post(
     "/parse-resume",
-    response_model=schemas.ResumeExtraction,
+    response_model=services.schemas.ResumeExtraction,
     status_code=status.HTTP_200_OK
 )
 async def parse_resume(
@@ -48,6 +48,7 @@ async def parse_resume(
 
 @router.post(
     "/update-profile",
+    response_model=services.schemas.MessageResponse,
     status_code=status.HTTP_200_OK
 )
 def update_profile(
