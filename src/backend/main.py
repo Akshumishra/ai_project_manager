@@ -1,7 +1,12 @@
 import os
 import logging
+from sqlalchemy.orm import configure_mappers
+from src.backend.model import * # Initialize all models for SQLAlchemy registry
+configure_mappers() # Force resolution of all relationships
+
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from src.backend.qa_chatbot.routes import slack_events
 
 import uvicorn
 from fastapi import FastAPI, Request, Response
@@ -33,7 +38,7 @@ def _get_docs_config() -> dict:
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
     app = FastAPI(
-        title="Google Meet Bot API",
+        title="Slack Meet",
         description="API to manage multiple Google Meet recording sessions.",
         version="2.0.0",
         lifespan=lifespan,
@@ -64,6 +69,7 @@ def create_app() -> FastAPI:
 
     # ── Routers ──────────────────────────────────────────────────────────────
     app.include_router(api_router)
+    app.include_router(slack_events.router)
 
     return app
 
