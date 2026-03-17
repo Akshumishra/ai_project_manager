@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
+
 from src.backend.db.database import engine, Base
 from src.backend.auth import routes as auth_routes
 from src.backend.collaborative_document.routes import document as doc_routes
@@ -11,8 +12,7 @@ from src.backend.collaborative_document.utils.block_sync_worker import (
     flush_dirty_blocks,
 )
 from src.backend.requirement_gather.project_routes import router as project_routes
-from src.backend.config import Config
-
+from src.backend.config import settings
 import src.backend.model
 
 Base.metadata.create_all(bind=engine)
@@ -20,7 +20,7 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=Config.ALLOWED_ORIGINS,
+    allow_origins=settings.ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
