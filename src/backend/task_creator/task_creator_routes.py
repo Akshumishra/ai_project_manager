@@ -9,6 +9,8 @@ from . import task_creator_service as task_creator_services
 from .schemas import TaskGenerationResponse
 from .constants import TaskCreatorConstants
 
+from src.backend.utils.queue_utils import get_queue
+
 router = APIRouter(prefix="/api/task-creator", tags=["Task Creator"])
 
 @router.post(
@@ -24,15 +26,30 @@ async def generate_project_tasks(
 ):
     """
     Manually trigger AI-driven task generation for a specific project.
-
-    This process runs in the background to analyze project documentation
-    (Requirements and Technical Specifications) and generate an initial set of tasks.
+    Uses Redis Queue (RQ) if available, falling back to BackgroundTasks.
     """
     try:
-        background_tasks.add_task(task_creator_services.generate_and_save_tasks, project_id, current_user.id)
+        # Try to use RQ
+        queue = get_queue()
+        if queue:
+            queue.enqueue(
+                task_creator_services.generate_and_save_tasks,
+                project_id,
+                current_user.id,
+                job_id=f"task-gen-{project_id}",
+                job_timeout=600,   # 10 minutes — AI generation can take time
+                result_ttl=86400,  # Keep result for 24h
+                failure_ttl=86400, # Keep failed job info for 24h for debugging
+            )
+            message = "Task generation has been initiated via background queue."
+        else:
+            # Fallback to local background tasks if Redis/RQ is not available
+            background_tasks.add_task(task_creator_services.generate_and_save_tasks, project_id, current_user.id)
+            message = "Task generation has been initiated (local fallback)."
+
         return {
             "status": "success",
-            "message": "Task generation has been initiated in the background."
+            "message": message
         }
     except HTTPException as e:
         raise e

@@ -21,6 +21,7 @@ langchain-openai>=0.2.0
 
 # ── Real-time / Caching ────────────────────────────────────────
 redis>=5.0.0                  # Cache + WebSocket pub/sub
+rq>=1.16.2                    # Redis Queue for background tasks
 apscheduler>=3.10.0           # Background job scheduler
 websockets>=12.0              # WebSocket support
 

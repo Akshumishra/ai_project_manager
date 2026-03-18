@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { getTaskGenerationStatusRequest } from '../api';
 
 const POLL_INTERVAL_MS = 3000;
-const MAX_POLL_ATTEMPTS = 40; // Allow up to 2 minutes
+const MAX_POLL_ATTEMPTS = 200; // Allow up to 10 minutes for granular task generation
 
 const STATUS_MESSAGES = {
   not_started: 'Initiating task generation...',
