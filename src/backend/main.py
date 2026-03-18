@@ -74,6 +74,7 @@ app.include_router(doc_routes.router)
 app.include_router(block_routes.router)
 app.include_router(ws_routes.router)
 app.include_router(auth_routes.router)
+app.include_router(tech_doc_router)
 app.include_router(resume_routes.router)
 app.include_router(api_router)
 

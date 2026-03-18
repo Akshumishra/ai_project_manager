@@ -31,12 +31,11 @@ def _execute_agent_run(db: Session, user_id: UUID, project_id: UUID, run_message
         content = response.get("content")
         
         if not content:
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Agent returned empty response")
+            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Agent returned empty response")
         
         save_chat_message(db=db, project_id=project_id, role="assistant", content=content)
         
-        if not response.get("saved", False):
-            set_workflow_status(db, project_id, AGENT_CONST.WORKFLOW_NAME, "in_progress")
+        set_workflow_status(db, project_id, AGENT_CONST.WORKFLOW_NAME, "in_progress")
             
         if is_recovering:
             return {
@@ -59,7 +58,7 @@ def _execute_agent_run(db: Session, user_id: UUID, project_id: UUID, run_message
         set_workflow_status(db, project_id, AGENT_CONST.WORKFLOW_NAME, "in_progress")
         if isinstance(e, HTTPException):
             raise e
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Agent failed: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Agent failed: {str(e)}")
 
 def start_requirement_agent(db: Session, user_id: UUID, project_id: UUID, background: str = None):
     """Entry point for starting or resuming the requirement gathering session."""
