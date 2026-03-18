@@ -22,6 +22,17 @@ from src.backend.meeting_bot.api.routers import router as api_router
 from src.backend.config import settings
 
 
+def configure_logging():
+    """Set up structured console logging."""
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+
+configure_logging()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
