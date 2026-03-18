@@ -61,24 +61,24 @@ class Task(BaseModel):
     )
 
     category = Column(
-        Enum(TaskCategory, name="task_category_enum", values_callable=lambda x: [e.value for e in x]),
+        Enum(TaskCategory, name="task_category_enum", values_callable=lambda x: [e.value.upper() for e in x]),
         nullable=False
     )
 
     priority = Column(
-        Enum(TaskPriority, name="task_priority_enum", values_callable=lambda x: [e.value for e in x]),
+        Enum(TaskPriority, name="task_priority_enum", values_callable=lambda x: [e.value.upper() for e in x]),
         nullable=False,
         default=TaskPriority.MEDIUM
     )
 
     complexity = Column(
-        Enum(TaskComplexity, name="task_complexity_enum", values_callable=lambda x: [e.value for e in x]),
+        Enum(TaskComplexity, name="task_complexity_enum", values_callable=lambda x: [e.value.upper() for e in x]),
         nullable=False,
         default=TaskComplexity.MEDIUM
     )
 
     status = Column(
-        Enum(TaskStatus, name="task_status_enum", values_callable=lambda x: [e.value for e in x]),
+        Enum(TaskStatus, name="task_status_enum", values_callable=lambda x: [e.value.upper() for e in x]),
         nullable=False,
         default=TaskStatus.TODO
     )

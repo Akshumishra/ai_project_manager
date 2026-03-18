@@ -63,7 +63,7 @@ export default function ProjectTasks({ project, tasks, members = [], onCreateTas
 
   useEffect(() => {
     if (assignStatus === 'done' || assignStatus === 'error') {
-      const t = setTimeout(() => { setAssignStatus(null); setAssignMessage(''); }, 8000);
+      const t = setTimeout(() => { setAssignStatus(null); setAssignMessage(''); }, 80000);
       return () => clearTimeout(t);
     }
   }, [assignStatus]);

@@ -116,6 +116,7 @@ export default function RequirementAgentPage() {
   const [isSending, setIsSending] = useState(false);
   const [documentMarkdown, setDocumentMarkdown] = useState("");
   const [isCompleting, setIsCompleting] = useState(false);
+  const [initializing, setInitializing] = useState(true);
 
   const chatBoxRef = useRef(null);
   const inputRef = useRef(null);
@@ -127,6 +128,7 @@ export default function RequirementAgentPage() {
     initRef.current = true;
 
     const init = async () => {
+      setInitializing(true);
       setChatStatus("Checking project status...");
       try {
         let currentTitle = projectTitle;
@@ -191,6 +193,8 @@ export default function RequirementAgentPage() {
       } catch (err) {
         console.error("Agent init failed:", err);
         setChatStatus("Failed to start agent.");
+      } finally {
+        setInitializing(false);
       }
     };
 
@@ -379,7 +383,18 @@ export default function RequirementAgentPage() {
       <div className="workspace-body">
         <section className="chat-panel">
           <div className="messages" ref={chatBoxRef}>
-            {messages.map((m, i) => <ChatMessage key={i} role={m.role} content={m.content} />)}
+            {initializing ? (
+              <div className="message ai">
+                <div className="bubble" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 20px' }}>
+                  <div className="thinking-dots">
+                    <span></span><span></span><span></span>
+                  </div>
+                  <span style={{ fontSize: '14px', color: 'var(--gray-500)', fontStyle: 'italic', fontWeight: '500' }}>Loading requirement agent...</span>
+                </div>
+              </div>
+            ) : (
+              messages.map((m, i) => <ChatMessage key={i} role={m.role} content={m.content} />)
+            )}
           </div>
           <div className="input-area" style={{ display: 'flex', alignItems: 'flex-end', gap: '12px', padding: '16px' }}>
             <textarea

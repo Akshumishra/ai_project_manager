@@ -7,5 +7,5 @@ class TechDocAgentConstants:
     WORKFLOW_NAME = "tech_doc_gathering"
     REQ_WORKFLOW_NAME = "requirement_gathering"
     REDIRECT_PATH = "/project"
-    MODEL = "gpt-4o-mini"
+    MODEL = "gpt-4.1-mini"
     TEMPERATURE = 0
