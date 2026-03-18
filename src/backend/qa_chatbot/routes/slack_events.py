@@ -55,8 +55,8 @@ async def _get_validated_body(request: Request) -> Dict[str, Any]:
 
     try:
         await verify_slack_signature(request, body_bytes)
-    except HTTPException as e:
-        raise e
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Signature verification failed: {e}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Verification error")

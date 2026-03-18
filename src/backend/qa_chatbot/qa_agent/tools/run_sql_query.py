@@ -1,7 +1,7 @@
 from typing import List, Tuple, Any, Optional
 from langchain_core.tools import tool
 from sqlalchemy import text
-from src.backend.db.database import SessionLocal
+from src.backend.db.database import get_session_local
 from src.backend.config import settings
 from src.backend.qa_chatbot.constants import QAAgentConstants
 from src.backend.logger import get_logger
@@ -73,7 +73,8 @@ def create_sql_query_tool(project_id: str, slack_user_id: str, project_member_id
         if error_msg:
             return error_msg
 
-        session = SessionLocal()
+        factory = get_session_local()
+        session = factory()
         try:
             session.execute(
                 text("SET LOCAL app.project_id = :project_id"),

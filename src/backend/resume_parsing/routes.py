@@ -14,7 +14,11 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/users", tags=["resume"])
 
 
-@router.post("/parse-resume")
+@router.post(
+    "/parse-resume",
+    response_model=services.schemas.ResumeExtraction,
+    status_code=status.HTTP_200_OK
+)
 async def parse_resume(
     file: UploadFile = File(...),
 ):
@@ -53,7 +57,11 @@ async def parse_resume(
         )
 
 
-@router.post("/update-profile")
+@router.post(
+    "/update-profile",
+    response_model=services.schemas.MessageResponse,
+    status_code=status.HTTP_200_OK
+)
 def update_profile(
     data: UserDetailUpdate,
     db: Session = Depends(get_db),

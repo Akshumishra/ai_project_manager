@@ -110,20 +110,58 @@ def configure_logging():
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 
+configure_logging()
 
-def main():
-    configure_logging()
 
-    print("\n🚀  Starting API server on 127.0.0.1:8000")
-    print("    Documentation: http://127.0.0.1:8000/docs\n")
+logger = get_logger("main")
 
-    uvicorn.run(
-        "src.backend.main:app", 
-        host="127.0.0.1", 
-        port=8000, 
-        reload=True
-    )
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Handles background workers and schedulers initial triggers seamlessly.
+    """
+    for _ in range(5):
+        flush_dirty_blocks()
+    start_scheduler()
+    yield
+    
+app = FastAPI(title=settings.APP_TITLE, lifespan=lifespan)
 
+create_tables()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["*"],
+)
+
+# ── Include Routers ──────────────────────────────────────────────────────
+try:
+    app.include_router(project_routes.router)
+except AttributeError:
+    app.include_router(project_routes)
+
+app.include_router(slack_events.router)
+app.include_router(project_routes.router)
+app.include_router(doc_routes.router)
+app.include_router(block_routes.router)
+app.include_router(ws_routes.router)
+app.include_router(auth_routes.router)
+app.include_router(tech_doc_router)
+app.include_router(task_creator_router)
+app.include_router(resume_routes.router)
+app.include_router(api_router)
+
+
+@app.get("/")
+def home():
+    return {"message": "Welcome to AI-Project Manager API"}
+
+
+create_tables()
 
 if __name__ == "__main__":
     main()

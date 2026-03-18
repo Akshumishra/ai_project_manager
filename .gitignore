@@ -4,7 +4,6 @@ __pycache__/
 *$py.class
 .DS_Store
 
-src/backend/scripts/insert_dummy_data.py
 
 # C extensions
 *.so
