@@ -6,10 +6,6 @@ from src.backend.model.base import BaseModel
 
 class RequirementChat(BaseModel):
     __tablename__ = "requirement_chats"
-<<<<<<< feat/qa_chatbot
-=======
-
->>>>>>> dev
     project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
     role = Column(String, nullable=False)
     content = Column(Text, nullable=False)

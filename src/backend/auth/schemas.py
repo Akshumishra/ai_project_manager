@@ -1,5 +1,6 @@
-from pydantic import BaseModel, EmailStr
-from typing import Optional
+from pydantic import BaseModel, EmailStr, field_validator, ConfigDict
+from typing import Optional, List
+from uuid import UUID
 
 class UserCreate(BaseModel):
     name: str
@@ -10,10 +11,6 @@ class UserLogin(BaseModel):
     email: EmailStr
     password: str
 
-<<<<<<< feat/qa_chatbot
-class TokenRefresh(BaseModel):
-    refresh_token: str
-=======
     @field_validator("email")
     @classmethod
     def normalize_email(cls, value: EmailStr) -> str:
@@ -49,4 +46,3 @@ class UserDetailUpdate(BaseModel):
     skills: List[str]
     experience_years: str
     designation: str
->>>>>>> dev
