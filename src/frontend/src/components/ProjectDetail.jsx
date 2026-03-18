@@ -21,7 +21,7 @@ export default function ProjectDetail({ projectId, onSelectDocument, onBack }) {
   const [editingTask, setEditingTask] = useState(null);
 
   const {
-    project, documents, tasks, members, loading,
+    project, setProject, documents, tasks, members, loading,
     setTasks,
     onTaskSaved,
     handleCreateDocument,
@@ -30,6 +30,10 @@ export default function ProjectDetail({ projectId, onSelectDocument, onBack }) {
     updateProjectStatus,
     refreshTasks,
   } = useProjectData(projectId);
+
+  const handleProjectUpdated = (updatedProject) => {
+    if (setProject) setProject(updatedProject);
+  };
 
   const onHandleCreateDocument = async () => {
     const docId = await handleCreateDocument();
@@ -61,6 +65,7 @@ export default function ProjectDetail({ projectId, onSelectDocument, onBack }) {
           onUpdateStatus={updateProjectStatus}
           onAddMember={() => setIsInviteModalOpen(true)}
           onViewMembers={() => setIsMembersModalOpen(true)}
+          onProjectUpdated={handleProjectUpdated}
         />
 
         <div className="document-inner-scroller" style={{ padding: '0 40px 40px 40px' }}>

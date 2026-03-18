@@ -5,7 +5,7 @@ from uuid import UUID
 from langchain.tools import tool
 from sqlalchemy.orm import Session
 
-from src.backend.db.database import SessionLocal
+from src.backend.db.database import get_session_local
 from src.backend.model.task import Task, TaskCategory, TaskPriority, TaskStatus, TaskComplexity
 
 logger = logging.getLogger(__name__)
@@ -21,7 +21,7 @@ def make_save_tasks_tool(user_id: UUID, project_id: UUID):
         Saves a list of generated tasks to the database for a specific project.
         'tasks' should be a list of objects with title, description, priority, complexity, and category.
         """
-        db = SessionLocal()
+        db = get_session_local()()
         try:
             # Get current max label for this project
             max_label = db.query(func.max(Task.label)).filter(Task.project_id == project_id).scalar()

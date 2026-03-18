@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from contextlib import asynccontextmanager
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
-from src.backend.db.database import engine, Base
+from src.backend.db.database import  Base
 from src.backend.auth import routes as auth_routes
 from src.backend.collaborative_document.routes import document as doc_routes
 from src.backend.collaborative_document.routes import block as block_routes
@@ -32,7 +32,6 @@ async def lifespan(app: FastAPI):
     start_scheduler()
     yield
 
-Base.metadata.create_all(bind=engine)
 
 app = FastAPI(lifespan=lifespan)
 

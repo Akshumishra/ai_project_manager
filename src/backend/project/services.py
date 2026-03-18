@@ -418,6 +418,39 @@ def update_project_status(project_id: UUID, data: schemas.ProjectStatusUpdate, d
         return project
     except ValueError:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, 
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid status. Must be one of: {[e.value for e in ProjectStatus]}"
         )
+
+
+def get_slack_join_url(project_id: UUID, db: Session, current_user: User) -> dict:
+    """Return Slack app URL for the project's channel."""
+    project = _ensure_project_access(project_id, db, current_user)
+
+    if not project.slack_channel_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No Slack channel configured for this project"
+        )
+
+    slack_url = f"https://gkmit-projects.slack.com/app_redirect?channel={project.slack_channel_id}"
+    return {"slack_url": slack_url}
+
+
+def set_slack_channel(
+    project_id: UUID, data: schemas.SlackChannelSetRequest, db: Session, current_user: User
+) -> Project:
+    """Allow project creator to set or update the Slack channel ID."""
+    project = _ensure_project_access(project_id, db, current_user)
+
+    if project.created_by != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the project owner can update the Slack channel"
+        )
+
+    project.slack_channel_id = data.slack_channel_id.strip()
+    db.commit()
+    db.refresh(project)
+    project.status = project.status.value if project.status else "active"
+    return project

@@ -24,6 +24,7 @@ class Project(BaseModel):
         default=ProjectStatus.ACTIVE,
         nullable=False
     )
+    slack_channel_id = Column(String, nullable=True)
     created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
 
     creator = relationship("User", back_populates="projects", foreign_keys=[created_by])

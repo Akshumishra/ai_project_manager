@@ -1,5 +1,5 @@
 from langchain.tools import tool
-from src.backend.db.database import SessionLocal
+from src.backend.db.database import get_session_local
 from src.backend.model.project import ProjectMember
 from src.backend.model.user_detail import UserDetail
 from uuid import UUID
@@ -9,7 +9,7 @@ def make_get_project_members_tool(project_id: UUID):
     @tool
     def get_project_members() -> str:
         """Fetch all project members with their skills, background, and designations."""
-        db = SessionLocal()
+        db = get_session_local()()
         try:
             members = db.query(ProjectMember).filter(ProjectMember.project_id == project_id).all()
 

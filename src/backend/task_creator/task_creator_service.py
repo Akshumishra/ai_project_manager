@@ -1,7 +1,7 @@
 import logging
 from uuid import UUID
 
-from src.backend.db.database import SessionLocal
+from src.backend.db.database import get_session_local
 from src.backend.task_creator.task_creator_agent.agent import TaskCreatorAgent
 from src.backend.technical_doc.services.tech_doc_service import (
     fetch_requirement_specification_text,
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 def generate_and_save_tasks(project_id: UUID, user_id: UUID):
     """Generate and persist tasks for a project based on requirement + technical docs."""
 
-    db = SessionLocal()
+    db = get_session_local()()
     try:
         set_workflow_status(db, project_id, TaskConstants.WORKFLOW_NAME, "generating")
         db.commit()

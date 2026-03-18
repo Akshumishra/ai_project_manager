@@ -137,4 +137,19 @@ export const updateProjectStatusRequest = async (projectId, status) => {
   return data;
 };
 
+export const getProjectSlackUrl = async (projectId) => {
+  const { data } = await api.get(`/api/projects/${projectId}/slack-url`);
+  return data;
+};
+
+export const setProjectSlackChannel = async (projectId, slackChannelId) => {
+  const { data } = await api.patch(`/api/projects/${projectId}/slack-channel`, { slack_channel_id: slackChannelId });
+  return data;
+};
+
+export const triggerSlackSetup = async (projectId) => {
+  const { data } = await api.post(`/api/projects/${projectId}/slack-setup`);
+  return data;
+};
+
 export default api;

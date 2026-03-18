@@ -303,3 +303,85 @@ def delete_project(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"An unexpected error occurred: {str(e)}"
         )
+
+
+@router.get(
+    "/{project_id}/slack-url",
+    response_model=schemas.SlackChannelResponse,
+    status_code=status.HTTP_200_OK
+)
+def get_slack_join_url(
+    project_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        return services.get_slack_join_url(project_id, db, current_user)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching Slack URL for project {project_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An unexpected error occurred: {str(e)}"
+        )
+
+
+@router.patch(
+    "/{project_id}/slack-channel",
+    response_model=schemas.ProjectResponse,
+    status_code=status.HTTP_200_OK
+)
+def set_slack_channel(
+    project_id: UUID,
+    data: schemas.SlackChannelSetRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        return services.set_slack_channel(project_id, data, db, current_user)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error setting Slack channel for project {project_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An unexpected error occurred: {str(e)}"
+        )
+
+
+@router.post(
+    "/{project_id}/slack-setup",
+    status_code=status.HTTP_200_OK
+)
+def slack_setup(
+    project_id: UUID,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Manually trigger Slack channel creation + bot join for a project."""
+    try:
+        from src.backend.model.project import Project as ProjectModel
+        from src.backend.slack.slack_service import setup_slack_channel_for_project
+
+        project = db.query(ProjectModel).filter(ProjectModel.id == project_id).first()
+        if not project:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+
+        if project.created_by != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only the project owner can set up Slack"
+            )
+
+        background_tasks.add_task(setup_slack_channel_for_project, project_id, project.name)
+        return {"message": "Slack channel setup started in background", "project_id": str(project_id)}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error starting Slack setup for project {project_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An unexpected error occurred: {str(e)}"
+        )

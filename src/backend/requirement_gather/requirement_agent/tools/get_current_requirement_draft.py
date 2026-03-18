@@ -2,7 +2,7 @@ from langchain_core.tools import tool
 from sqlalchemy.orm import Session
 from uuid import UUID
 
-from src.backend.db.database import SessionLocal
+from src.backend.db.database import get_session_local
 from src.backend.model.document import Document, DocumentBlock
 from src.backend.requirement_gather.constants import RequirementAgentConstants
 
@@ -14,7 +14,7 @@ def get_requirement_draft_tool(project_id: UUID):
         Retrieves the current saved draft of the Requirement Specification for this project.
         Use this to see what has been already documented and saved.
         """
-        db: Session = SessionLocal()
+        db = get_session_local()()
         try:
             doc = db.query(Document).filter(
                 Document.project_id == project_id,

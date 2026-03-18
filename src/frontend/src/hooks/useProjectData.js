@@ -111,6 +111,7 @@ export function useProjectData(projectId) {
 
   return {
     project,
+    setProject,
     documents, tasks, members, loading,
     setTasks,
     onTaskSaved,

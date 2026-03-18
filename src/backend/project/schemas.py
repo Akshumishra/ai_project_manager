@@ -20,8 +20,17 @@ class ProjectResponse(BaseModel):
     name: str
     description: Optional[str]
     status: str
+    slack_channel_id: Optional[str] = None
     created_by: UUID
     created_at: datetime
+
+
+class SlackChannelResponse(BaseModel):
+    slack_url: str
+
+
+class SlackChannelSetRequest(BaseModel):
+    slack_channel_id: str
 
 
 class ProjectWorkflowStatusRead(BaseModel):

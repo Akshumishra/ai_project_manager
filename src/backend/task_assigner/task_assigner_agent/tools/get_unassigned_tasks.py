@@ -1,5 +1,5 @@
 from langchain.tools import tool
-from src.backend.db.database import SessionLocal
+from src.backend.db.database import get_session_local
 from src.backend.model.task import Task
 from uuid import UUID
 
@@ -8,7 +8,7 @@ def make_get_unassigned_tasks_tool(project_id: UUID):
     @tool
     def get_unassigned_tasks() -> str:
         """Fetch all tasks that are currently not assigned to any project member."""
-        db = SessionLocal()
+        db = get_session_local()()
         try:
             tasks = db.query(Task).filter(
                 Task.project_id == project_id,

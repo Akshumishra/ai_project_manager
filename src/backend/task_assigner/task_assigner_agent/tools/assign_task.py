@@ -1,5 +1,5 @@
 from langchain.tools import tool
-from src.backend.db.database import SessionLocal
+from src.backend.db.database import get_session_local
 from src.backend.model.task import Task
 from uuid import UUID
 from datetime import datetime, timedelta
@@ -9,7 +9,7 @@ def make_assign_task_tool():
     @tool
     def assign_task(task_id: str, member_id: str, days_to_complete: int) -> str:
         """Assign a task to a member with an estimated number of days to complete."""
-        db = SessionLocal()
+        db = get_session_local()()
         try:
             task = db.query(Task).filter(Task.id == UUID(task_id)).first()
             if not task:

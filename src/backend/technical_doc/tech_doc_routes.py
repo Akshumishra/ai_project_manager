@@ -8,6 +8,7 @@ from src.backend.technical_doc.services.tech_doc_service import (
     save_final_tech_doc
 )
 from src.backend.task_creator import task_creator_service as task_creator_services
+from src.backend.slack.slack_service import setup_slack_channel_for_project
 from .schemas import (
     TechDocAgentRequest, 
     SaveTechDocRequest,
@@ -90,6 +91,11 @@ async def save_tech_doc(
     Finalizes and saves the technical document.
     """
     try:
+        # Fetch project name for Slack channel creation
+        from src.backend.model.project import Project
+        project = db.query(Project).filter(Project.id == project_id).first()
+        project_name = project.name if project else str(project_id)
+
         response = save_final_tech_doc(
             db=db,
             user_id=request.user_id,
@@ -97,12 +103,22 @@ async def save_tech_doc(
             document_markdown=request.document_markdown,
             background_tasks=background_tasks
         )
-        # Auto-trigger task generation in the background now that the tech doc is complete
+
+        # Auto-trigger task generation in background
         background_tasks.add_task(
             task_creator_services.generate_and_save_tasks,
             project_id,
             request.user_id
         )
+
+        # Auto-create Slack channel + bot join if not already set
+        if project and not project.slack_channel_id:
+            background_tasks.add_task(
+                setup_slack_channel_for_project,
+                project_id,
+                project_name
+            )
+
         return response
     except HTTPException as e:
         raise e

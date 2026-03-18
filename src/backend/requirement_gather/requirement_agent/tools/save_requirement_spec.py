@@ -2,7 +2,7 @@ from langchain_core.tools import tool
 from sqlalchemy.orm import Session
 from uuid import UUID
 
-from src.backend.db.database import SessionLocal
+from src.backend.db.database import get_session_local
 from src.backend.requirement_gather.services.save_requirement import save_requirement_spec_document
 
 
@@ -16,7 +16,7 @@ def save_requirement_spec_tool(user_id: UUID, project_id: UUID):
         Save the final requirement specification in markdown format. 
         The system will automatically organize it into documents and blocks.
         """
-        db: Session = SessionLocal()
+        db = get_session_local()()
 
         try:
             result = save_requirement_spec_document(
