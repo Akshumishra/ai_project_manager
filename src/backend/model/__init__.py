@@ -17,6 +17,8 @@ from .meeting import (
     MeetingSummary,
     MeetingActionItem,
 )
+from .task import Task, TaskStatus, TaskCategory, TaskPriority, TaskComplexity
+from .blocker import Blocker
 
 __all__ = [
     "User",
@@ -40,4 +42,9 @@ __all__ = [
     "MeetingTranscript",
     "MeetingSummary",
     "MeetingActionItem",
+    "TaskStatus",
+    "TaskCategory",
+    "TaskPriority",
+    "TaskComplexity",
+    "Blocker",
 ]

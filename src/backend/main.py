@@ -2,6 +2,8 @@ from fastapi import FastAPI
 from contextlib import asynccontextmanager
 import uvicorn
 import logging
+import sys
+import os
 from fastapi.middleware.cors import CORSMiddleware
 from src.backend.db.database import create_tables
 from src.backend.auth import routes as auth_routes
@@ -21,9 +23,15 @@ from src.backend.task_assigner.routes.task_assigner_routes import router as task
 from src.backend.config import settings
 from src.backend.slack import slack_routes
 
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
+
+from src.backend.slack.routes import slack_events
+from src.backend.standups.routes import standup_routes
+from src.backend.standups.services.standup_scheduler import standup_scheduler
+
 from src.backend.meeting_bot.api.routers import router as api_router
 from collections.abc import AsyncGenerator
-from contextlib import asynccontextmanager
 from src.backend.qa_chatbot.routes import slack_events
 
 create_tables()
@@ -65,6 +73,7 @@ configure_logging()
 
 app = FastAPI(lifespan=lifespan)
 
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -91,6 +100,8 @@ app.include_router(slack_routes.router)
 # Agent & Tool Routes
 app.include_router(requirement_routes.router, prefix="/api/agent")
 app.include_router(tech_doc_routes.router, prefix="/api/agent")
+app.include_router(slack_events.router, prefix="/api", tags=["Slack"])
+app.include_router(standup_routes.router, prefix="/api", tags=["StandUp"])
 app.include_router(task_creator_routes.router)
 app.include_router(task_assigner_router)
 app.include_router(api_router)

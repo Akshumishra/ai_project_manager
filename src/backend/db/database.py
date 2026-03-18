@@ -63,7 +63,10 @@ def get_session_local() -> sessionmaker:
 
 
 SessionLocal = get_session_local()
-
+Base = declarative_base()
+standup_database_url = Config.STANDUP_DATABASE_URL or Config.DATABASE_URL or "sqlite:///./standup.db"
+engine_standup = create_engine(standup_database_url)
+SessionStandup = sessionmaker(autocommit=False, autoflush=False, bind=engine_standup)
 
 def get_db():
     """

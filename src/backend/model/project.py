@@ -41,6 +41,9 @@ class Project(BaseModel):
     standups = relationship(
         "Standup", back_populates="project", cascade="all, delete-orphan"
     )
+    requirement_chats = relationship(
+        "RequirementChat", back_populates="project", cascade="all, delete-orphan"
+    )
 
 
 class ProjectSlackDetail(BaseModel):
