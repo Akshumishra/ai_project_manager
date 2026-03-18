@@ -10,15 +10,6 @@ _project_root = _backend_root.parent.parent
 
 
 class Settings(BaseSettings):
-    """
-    Centralized configuration management with type validation and environment loading.
-    """
-
-    DATABASE_URL: str
-    ALGORITHM: str
-from pydantic_settings import BaseSettings, SettingsConfigDict
-
-class Settings(BaseSettings):
     DATABASE_URL: str
     ALGORITHM: str
     ALLOWED_ORIGINS: list
@@ -66,12 +57,5 @@ class Settings(BaseSettings):
         """Return True when running in production mode."""
         return self.APP_ENVIRONMENT == "production"
 
-
-settings = Settings()
-    OPENAI_API_KEY: str | None=None
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        extra="ignore"
-    )
 
 settings = Settings()
