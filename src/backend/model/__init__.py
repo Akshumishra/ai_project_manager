@@ -4,6 +4,13 @@ from .project import Project, ProjectSlackDetail, ProjectMember, ProjectWorkflow
 from .task import Task
 from .document import Document, DocumentBlock
 from .requirement_chat import RequirementChat
+from .meeting import (
+    Meeting,
+    MeetingParticipant,
+    MeetingTranscript,
+    MeetingSummary,
+    MeetingActionItem,
+)
 from .tech_doc_chat import TechDocChat
 
 __all__ = [
@@ -16,6 +23,11 @@ __all__ = [
     "Document",
     "DocumentBlock",
     "RequirementChat",
+    "Meeting",
+    "MeetingParticipant",
+    "MeetingTranscript",
+    "MeetingSummary",
+    "MeetingActionItem",
     "TechDocChat",
     "ProjectWorkflowStatus",
 ]
