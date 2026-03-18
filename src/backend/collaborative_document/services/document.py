@@ -228,17 +228,25 @@ def update_document(document_id: UUID, data: schemas.DocumentUpdate, db: Session
 
 def delete_document(document_id: UUID, db: Session, current_user: User):
     helper_function.verify_document_access(document_id, current_user.id, db)
-    document = db.query(Document).filter(Document.id == document_id).first()
+    document = db.query(Document).filter(Document.id == document_id, Document.deleted_at.is_(None)).first()
     if not document:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, 
             detail="Document not found"
         )
 
-    db.delete(document)
+    # Soft-delete the document
+    document.deleted_at = func.now()
+    
+    # Cascade soft-delete to blocks
+    db.query(DocumentBlock).filter(
+        DocumentBlock.doc_id == document_id,
+        DocumentBlock.deleted_at.is_(None)
+    ).update({DocumentBlock.deleted_at: func.now()}, synchronize_session=False)
+
     db.commit()
     redis_client.delete(f"doc:{document_id}")
-    return {"message": "Document deleted"}
+    return {"message": "Document and blocks deleted successfully"}
 
 
 # --- Private Helpers ---

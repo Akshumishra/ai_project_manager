@@ -5,7 +5,7 @@ import uuid
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 
-from src.backend.model.document import Document
+from src.backend.model.document import Document,DocumentBlock
 from src.backend.model.project import Project, ProjectMember
 
 
@@ -39,7 +39,7 @@ def generate_position(prev_pos, next_pos):
 
 
 def verify_document_access(document_id: UUID, user_id: UUID, db: Session):
-    document = db.query(Document).filter(Document.id == document_id).first()
+    document = db.query(Document).filter(Document.id == document_id, Document.deleted_at.is_(None)).first()
     if not document:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, 
@@ -208,7 +208,7 @@ def _safe_next_block(blocks, index):
 
 
 def _insert_blocks_between(doc_id: UUID, blocks: list[dict], prev_block, next_block, db: Session):
-    from src.backend.model.document import DocumentBlock
+    
 
     prev_position = prev_block.position_key if prev_block else None
     next_position = next_block.position_key if next_block else None

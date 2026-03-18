@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from contextlib import asynccontextmanager
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
-from src.backend.db.database import  Base
+from src.backend.db.database import Base, create_tables
 from src.backend.auth import routes as auth_routes
 from src.backend.collaborative_document.routes import document as doc_routes
 from src.backend.collaborative_document.routes import block as block_routes
@@ -19,9 +19,6 @@ from src.backend.task_creator import task_creator_routes
 from src.backend.task_assigner.routes.task_assigner_routes import router as task_assigner_router
 from src.backend.config import settings
 
-import src.backend.model
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Initial sweep to recover unsaved edits after a crash
@@ -33,6 +30,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
+create_tables()
 app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(

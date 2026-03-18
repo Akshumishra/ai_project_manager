@@ -4,7 +4,7 @@ from fastapi import HTTPException, BackgroundTasks, status
 from uuid import UUID
 from . import schemas, utils
 from src.backend.model.project import Project, ProjectMember, ProjectWorkflowStatus, ProjectStatus
-from src.backend.model.document import Document
+from src.backend.model.document import Document, DocumentBlock
 from src.backend.model.user import User, UserStatus
 from src.backend.config import settings
 from src.backend.model.task import (
@@ -390,9 +390,26 @@ def delete_project(project_id: UUID, db: Session, current_user: User):
             detail="Only the project owner can delete the project"
         )
 
+    # Soft-delete the project
     project.deleted_at = func.now()
+    
+    # Cascade soft-delete to documents
+    db.query(Document).filter(
+        Document.project_id == project_id,
+        Document.deleted_at.is_(None)
+    ).update({Document.deleted_at: func.now()}, synchronize_session=False)
+
+    # Cascade soft-delete to blocks
+    doc_ids = db.query(Document.id).filter(Document.project_id == project_id).all()
+    if doc_ids:
+        doc_id_list = [d[0] for d in doc_ids]
+        db.query(DocumentBlock).filter(
+            DocumentBlock.doc_id.in_(doc_id_list),
+            DocumentBlock.deleted_at.is_(None)
+        ).update({DocumentBlock.deleted_at: func.now()}, synchronize_session=False)
+
     db.commit()
-    return {"message": "Project deleted successfully"}
+    return {"message": "Project and related documentation deleted successfully"}
 
 
 def update_project_status(project_id: UUID, data: schemas.ProjectStatusUpdate, db: Session, current_user: User):
