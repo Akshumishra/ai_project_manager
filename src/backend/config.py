@@ -1,9 +1,18 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_backend_root = Path(__file__).resolve().parent
+_project_root = _backend_root.parent.parent
+
 
 class Settings(BaseSettings):
     DATABASE_URL: str
     ALGORITHM: str
-    ALLOWED_ORIGINS: list
+    ALLOWED_ORIGINS: list = []
     ACCESS_TOKEN_EXPIRE_MINUTES: int
     ACCESS_SECRET_KEY: str
     REFRESH_SECRET_KEY: str
@@ -18,10 +27,26 @@ class Settings(BaseSettings):
     SMTP_USERNAME: str | None = None
     SMTP_PASSWORD: str | None = None
     FRONTEND_URL: str = "http://localhost:5173"
-    OPENAI_API_KEY: str | None=None
+    OPENAI_API_KEY: str | None = None
+
+    # ── Meeting Bot Specific Configurations ──────────────────────────────────
+    FIREFLIES_API_KEY: str | None = None
+    APP_ENVIRONMENT: str = "development"
+
+    GOOGLE_CREDENTIALS_PATH: Path = Field(
+        default_factory=lambda: _project_root / "credentials.json"
+    )
+    GOOGLE_TOKEN_PATH: Path = Field(
+        default_factory=lambda: _project_root / "token.json"
+    )
+
     model_config = SettingsConfigDict(
-        env_file=".env",
-        extra="ignore"
+        env_file=(
+            str(_backend_root / ".env"),
+            str(_backend_root / "meeting_bot" / ".env"),
+            ".env",
+        ),
+        extra="ignore",
     )
 
 settings = Settings()
