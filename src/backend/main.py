@@ -56,12 +56,11 @@ app.add_middleware(
 )
 
 app.include_router(slack_events.router)
-app.include_router(project_routes)
+app.include_router(project_routes.router)
 app.include_router(doc_routes.router)
 app.include_router(block_routes.router)
 app.include_router(ws_routes.router)
 app.include_router(auth_routes.router)
-app.include_router(project_routes.router)
 app.include_router(resume_routes.router)
 
 Base.metadata.create_all(bind=engine)
