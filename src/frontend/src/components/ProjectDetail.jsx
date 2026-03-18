@@ -9,6 +9,7 @@ import ProjectDocuments from './ProjectDocuments';
 import ProjectTasks from './ProjectTasks';
 import ProjectStandups from './ProjectStandups';
 import { useProjectData } from '../hooks/useProjectData';
+import { getTaskGenerationStatusRequest } from '../api';
 
 export default function ProjectDetail({ projectId, onSelectDocument, onBack }) {
   const { user } = useAuth();
@@ -19,6 +20,7 @@ export default function ProjectDetail({ projectId, onSelectDocument, onBack }) {
   const [isMembersModalOpen, setIsMembersModalOpen] = useState(false);
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
+  const [taskGenStatus, setTaskGenStatus] = useState(null);
 
   const {
     project, setProject, documents, tasks, members, loading,
@@ -34,6 +36,41 @@ export default function ProjectDetail({ projectId, onSelectDocument, onBack }) {
   const handleProjectUpdated = (updatedProject) => {
     if (setProject) setProject(updatedProject);
   };
+
+  useEffect(() => {
+    if (!projectId) return;
+
+    let pollInterval;
+    const pollStatus = async () => {
+      try {
+        const data = await getTaskGenerationStatusRequest(projectId);
+        const currentStatus = data.status;
+        
+        // Only show status when actively generating or recently completed
+        if (currentStatus === 'generating' || currentStatus === 'started') {
+          setTaskGenStatus(currentStatus);
+        } else if (currentStatus === 'completed') {
+          // If it just transitioned from generating to completed:
+          setTaskGenStatus('completed');
+          refreshTasks();
+          clearInterval(pollInterval);
+          setTimeout(() => {
+            setTaskGenStatus(null);
+          }, 4000);
+        } else if (currentStatus === 'failed' || currentStatus === 'not_started' || currentStatus === 'failed_missing_docs') {
+          setTaskGenStatus(null);
+          clearInterval(pollInterval);
+        }
+      } catch (err) {
+        console.error('Polling error:', err);
+      }
+    };
+
+    pollStatus();
+    pollInterval = setInterval(pollStatus, 3000);
+
+    return () => clearInterval(pollInterval);
+  }, [projectId, refreshTasks]);
 
   const onHandleCreateDocument = async () => {
     const docId = await handleCreateDocument();
@@ -135,6 +172,36 @@ export default function ProjectDetail({ projectId, onSelectDocument, onBack }) {
           members={members}
           task={editingTask}
         />
+        
+        {taskGenStatus && (
+          <div style={{
+            position: 'fixed',
+            bottom: '24px',
+            right: '24px',
+            background: taskGenStatus === 'generating' || taskGenStatus === 'started' ? 'var(--brand-600)' : 'var(--success-600)',
+            color: 'white',
+            padding: '16px 24px',
+            borderRadius: '12px',
+            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            animation: 'slideUp 0.3s ease-out',
+            zIndex: 1000
+          }}>
+            {(taskGenStatus === 'generating' || taskGenStatus === 'started') && (
+              <div className="spinner" style={{ width: '20px', height: '20px', border: '3px solid rgba(255,255,255,0.3)', borderTopColor: 'white', flexShrink: 0 }}></div>
+            )}
+            {taskGenStatus === 'completed' && (
+              <span style={{ fontSize: '20px' }}>✅</span>
+            )}
+            <span style={{ fontWeight: '500' }}>
+              {(taskGenStatus === 'generating' || taskGenStatus === 'started') 
+                ? 'Tasks are generating in the background...' 
+                : 'Tasks generated successfully!'}
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );

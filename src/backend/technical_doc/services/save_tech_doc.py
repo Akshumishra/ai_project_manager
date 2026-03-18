@@ -80,9 +80,23 @@ def save_technical_spec_in_db(
         db.commit()
 
         if background_tasks:
-            logger.info("Adding task generation to background tasks")
+            logger.info("Triggering task generation in background")
             from src.backend.task_creator.task_creator_service import generate_and_save_tasks
-            background_tasks.add_task(generate_and_save_tasks, project_id, user_id)
+            from src.backend.utils.queue_utils import get_queue
+            
+            queue = get_queue()
+            if queue:
+                queue.enqueue(
+                    generate_and_save_tasks,
+                    project_id,
+                    user_id,
+                    job_id=f"task-gen-{project_id}",
+                    job_timeout=600,
+                    result_ttl=86400,
+                    failure_ttl=86400,
+                )
+            else:
+                background_tasks.add_task(generate_and_save_tasks, project_id, user_id)
 
         return {
             "success": True, 

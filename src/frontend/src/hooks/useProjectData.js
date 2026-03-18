@@ -48,12 +48,25 @@ export function useProjectData(projectId) {
     const load = async () => {
       setLoading(true);
       if (projectId) {
-        await Promise.all([fetchProject(), fetchDocuments(), fetchMembers()]);
+        await Promise.all([fetchProject(), fetchDocuments(), fetchMembers(), fetchTasks()]);
       }
       setLoading(false);
     };
     load();
-  }, [projectId, fetchProject, fetchDocuments, fetchMembers]);
+
+    // Auto-refresh project data (Polling)
+    let pollInterval;
+    if (projectId) {
+      pollInterval = setInterval(() => {
+        fetchMembers();
+        fetchProject();
+        fetchTasks();
+      }, 5000);
+    }
+    return () => {
+      if (pollInterval) clearInterval(pollInterval);
+    };
+  }, [projectId, fetchProject, fetchDocuments, fetchMembers, fetchTasks]);
 
   const handleCreateDocument = async () => {
     const title = prompt('Document Title:', 'Untitled Document');

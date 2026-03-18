@@ -281,9 +281,9 @@ export default function TechDocPage() {
     setChatStatus("Saving document...");
     try {
       await saveTechDocRequest(activeProjectId, documentMarkdown, user.id);
-      setChatStatus("Document saved! Redirecting to task generation...");
+      setChatStatus("Document saved! Tasks are generating in background...");
       setTimeout(() => {
-        navigate(`/project/${activeProjectId}/generating-tasks`);
+        navigate(`/project/${activeProjectId}`);
       }, 1500);
     } catch (err) {
       console.error("Save failed:", err);

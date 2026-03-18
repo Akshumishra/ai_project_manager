@@ -67,11 +67,12 @@ def start_requirement_agent(db: Session, user_id: UUID, project_id: UUID, backgr
     if redirect:
         return redirect
 
+    if handle_thinking_lock(db, project_id, AGENT_CONST.WORKFLOW_NAME):
+        history = get_chat_history(db, project_id)
+        return {"messages": history, "status": "resumed", "thinking": True}
+
     history = get_chat_history(db, project_id)
     is_interrupted = history and history[-1]["role"] == "user"
-    
-    if is_interrupted and handle_thinking_lock(db, project_id, AGENT_CONST.WORKFLOW_NAME):
-        return {"messages": history, "status": "resumed", "thinking": True}
         
 
     if history and not is_interrupted:
