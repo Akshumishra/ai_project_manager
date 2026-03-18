@@ -17,6 +17,7 @@ import TechDocPage from './pages/TechDocPage'
 import AddMember from './pages/AddMember'
 import EditorPage from './pages/EditorPage'
 import TaskDetailPage from './pages/TaskDetailPage'
+import TaskGenerationLoading from './pages/TaskGenerationLoading'
 import { getProjectStatusRequest } from './api'
 
 function ProjectDetailRoute() {
@@ -196,6 +197,7 @@ function AppContent() {
             <Route path="/tech-doc" element={<TechDocPage />} />
             <Route path="/project/:projectId/add-member" element={<AddMember />} />
             <Route path="/project/:projectId/task/:taskId" element={<TaskDetailPage />} />
+            <Route path="/project/:projectId/generating-tasks" element={<TaskGenerationLoading />} />
             <Route path="/editor/:id" element={
               <EditorPage 
                 docId={docId}

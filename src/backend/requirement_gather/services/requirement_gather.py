@@ -27,10 +27,7 @@ def _execute_agent_run(db: Session, user_id: UUID, project_id: UUID, run_message
     agent = RequirementAgent(user_id, project_id)
     
     try:
-        from src.backend.technical_doc.services.tech_doc_service import fetch_document_text_by_label
-        current_doc = fetch_document_text_by_label(db, project_id, RequirementAgentConstants.REQ_DOC_LABEL)
-        
-        response = agent.run(run_messages, current_doc=current_doc)
+        response = agent.run(run_messages)
         content = response.get("content")
         
         if not content:

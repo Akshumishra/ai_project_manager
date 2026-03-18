@@ -66,8 +66,22 @@ class TechDocAgent:
         })
         response_messages = response["messages"]
 
+        # Extract conversational content: look for the last AIMessage that has text content
+        content = ""
+        for msg in reversed(response_messages):
+            if hasattr(msg, "content") and msg.content and not hasattr(msg, "tool_call_id"):
+                content = msg.content
+                break
+
+        # Fallback to last message if no text AIMessage found
+        if not content and response_messages:
+            content = response_messages[-1].content
+
+        document = self._extract_document(response_messages)
+
         return {
-            "content": response_messages[-1].content,
-            "document": self._extract_document(response_messages),
+            "content": content,
+            "document": document,
+            "doc": document, # For backward compatibility
             "saved": self._was_save_tool_called(response_messages),
         }

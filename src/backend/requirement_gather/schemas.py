@@ -31,8 +31,6 @@ class ProjectResponse(BaseModel):
     description: str | None = None
     status: str | None = None
     created_by: UUID
-    requirement_document_id: UUID | str | None = None
-    tech_document_id: UUID | str | None = None
 
     model_config = {"from_attributes": True}
 

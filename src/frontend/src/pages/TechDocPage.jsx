@@ -5,6 +5,7 @@ import {
   startTechDocAgentRequest,
   sendTechDocAgentMessage,
   saveTechDocRequest,
+  generateTasksRequest,
 } from "../api";
 import { useAuth } from "../context/AuthContext";
 import { getActiveProject } from "../utils/storage";
@@ -101,8 +102,49 @@ export default function TechDocPage() {
 
   const chatBoxRef = useRef(null);
   const inputRef = useRef(null);
-  // Use a ref to prevent re-initialization on re-renders
   const initRef = useRef(false);
+  const pollingIntervalRef = useRef(null);
+
+  const startPolling = () => {
+    if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
+
+    pollingIntervalRef.current = setInterval(async () => {
+      try {
+        const data = await startTechDocAgentRequest(activeProjectId, user?.id);
+        if (data.status !== "thinking") {
+          clearInterval(pollingIntervalRef.current);
+          pollingIntervalRef.current = null;
+          setSending(false);
+          setChatStatus("Ready");
+
+          if (data.messages && data.messages.length > 0) {
+            setMessages(data.messages);
+            const reversedMessages = [...data.messages].reverse();
+            for (const msg of reversedMessages) {
+                if (msg.role === "assistant" && msg.content) {
+                    const extracted = extractTechDoc(msg.content);
+                    if (extracted) {
+                        setDocumentMarkdown(extracted);
+                        break;
+                    }
+                }
+            }
+          }
+          if (data.document) {
+            setDocumentMarkdown(data.document);
+          }
+        }
+      } catch (err) {
+        console.error("Tech Doc polling failed:", err);
+      }
+    }, 3000);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     if (!activeProjectId || !user?.id || initRef.current) return;
@@ -123,6 +165,12 @@ export default function TechDocPage() {
           return;
         }
 
+        if (data.thinking) {
+          setChatStatus("Assistant is thinking...");
+          setSending(true);
+          startPolling();
+        }
+
         if (data.content || data.message) {
           const initialContent = data.content || data.message;
           setMessages([{ role: "assistant", content: initialContent }]);
@@ -130,7 +178,6 @@ export default function TechDocPage() {
           if (extracted) setDocumentMarkdown(extracted);
         } else if (data.messages && data.messages.length > 0) {
           setMessages(data.messages);
-          // Extract canvas from last assistant message
           const reversedMessages = [...data.messages].reverse();
           for (const msg of reversedMessages) {
             if (msg.role === "assistant" && msg.content) {
@@ -151,7 +198,7 @@ export default function TechDocPage() {
           setProjectTitle(data.project_title);
         }
 
-        setChatStatus("Ready");
+        if (!data.thinking) setChatStatus("Ready");
       } catch (err) {
         console.error("Tech Doc failed to start:", err);
         setChatStatus("Error loading draft.");
@@ -181,6 +228,12 @@ export default function TechDocPage() {
 
     try {
       const res = await sendTechDocAgentMessage(activeProjectId, text, documentMarkdown, user.id);
+      
+      if (res.thinking) {
+          startPolling();
+          return;
+      }
+
       setMessages([...newMessages, { role: "assistant", content: res.content }]);
       if (res.document) {
         setDocumentMarkdown(res.document);
@@ -199,7 +252,9 @@ export default function TechDocPage() {
       setMessages([...newMessages, { role: "assistant", content: "Error: Could not process request. Please try again." }]);
       setChatStatus("Error occurred.");
     } finally {
-      setSending(false);
+      if (!pollingIntervalRef.current) {
+          setSending(false);
+      }
       if (inputRef.current) {
         inputRef.current.style.height = 'auto';
       }
@@ -226,11 +281,10 @@ export default function TechDocPage() {
     setChatStatus("Saving document...");
     try {
       await saveTechDocRequest(activeProjectId, documentMarkdown, user.id);
-      // Tech doc saved → task generation starts automatically in the background
-      setChatStatus("✅ Document saved! Generating tasks in background...");
+      setChatStatus("Document saved! Redirecting to task generation...");
       setTimeout(() => {
-        navigate(`/project/${activeProjectId}?tab=tasks`);
-      }, 2000);
+        navigate(`/project/${activeProjectId}/generating-tasks`);
+      }, 1500);
     } catch (err) {
       console.error("Save failed:", err);
       setChatStatus("Failed to save document. Please try again.");

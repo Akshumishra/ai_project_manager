@@ -50,7 +50,6 @@ export const updateProjectTaskRequest = async (projectId, taskId, payload) => {
   return data;
 };
 
-// Agent API Endpoints (matching backend prefix /api/agent/projects)
 export const startRequirementAgentRequest = async (projectId, userId, background = null) => {
   let url = `/api/agent/projects/${projectId}/requirement-agent?user_id=${encodeURIComponent(userId)}`;
   if (background) url += `&background=${encodeURIComponent(background)}`;
@@ -106,7 +105,30 @@ export const generateTasksRequest = async (projectId) => {
 };
 
 export const getTaskGenerationStatusRequest = async (projectId) => {
-  const { data } = await api.get(`/api/task-creator/projects/${projectId}/task-generation-status`);
+  const { data } = await api.get(`/api/task-creator/projects/${projectId}/status`);
+  return data;
+};
+
+// Task Assigner API Endpoints
+export const startTaskAssignerAgentRequest = async (projectId, userId) => {
+  const { data } = await api.get(
+    `/api/task-assigner/projects/${projectId}/agent?user_id=${encodeURIComponent(userId)}`
+  );
+  return data;
+};
+
+export const sendTaskAssignerMessageRequest = async (projectId, message, userId) => {
+  const { data } = await api.post(`/api/task-assigner/projects/${projectId}/agent`, {
+    user_id: userId,
+    message,
+  });
+  return data;
+};
+
+export const autoAssignTasksRequest = async (projectId, userId) => {
+  const { data } = await api.post(
+    `/api/task-assigner/projects/${projectId}/auto-assign?user_id=${encodeURIComponent(userId)}`
+  );
   return data;
 };
 

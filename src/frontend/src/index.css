@@ -490,16 +490,16 @@ textarea.input {
   position: relative;
   transition: background var(--dur-fast);
   cursor: text;
+  white-space: pre-wrap;
 }
 
 .block:hover {
   background: var(--gray-50);
 }
 
-/* While editing: restore pre-wrap so typed newlines are visible */
+/* While editing: background transparent */
 .block:focus {
   background: transparent;
-  white-space: pre-wrap;
 }
 
 .block.selected {

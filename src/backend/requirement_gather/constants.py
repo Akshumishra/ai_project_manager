@@ -5,5 +5,5 @@ class RequirementAgentConstants:
     REQ_DOC_LABEL = "Requirement Specification"
     WORKFLOW_NAME = "requirement_gathering"
     REDIRECT_PATH = "/project"
-    MODEL = "gpt-4o-mini"
+    MODEL = "gpt-5-mini"
     TEMPERATURE = 0

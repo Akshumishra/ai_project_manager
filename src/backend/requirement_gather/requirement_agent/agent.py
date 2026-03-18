@@ -22,15 +22,10 @@ class RequirementAgent:
         self.agent = self._create_agent()
 
     def _create_llm(self):
-        model_name = RequirementAgentConstants.MODEL
-        kwargs = {
-            "model": model_name,
-            "api_key": settings.OPENAI_API_KEY
-        }
-        if not (model_name.startswith("o1") or model_name.startswith("o3")):
-            kwargs["temperature"] = RequirementAgentConstants.TEMPERATURE
-            
-        return ChatOpenAI(**kwargs)
+        return ChatOpenAI(
+            model=RequirementAgentConstants.MODEL,
+            api_key=settings.OPENAI_API_KEY
+        )
 
     def _create_tools(self):
         return [
@@ -63,25 +58,26 @@ class RequirementAgent:
 
     def _extract_document_id(self, response_messages: List[Any]) -> str | None:
         """
-        Filters the messages to find the successful output of the save_requirement_specification tool
-        and extracts the document_id.
+        Filters the messages to find the output of the save_requirement_specification tool.
         """
-        # Search for messages that have a 'name' matching our tool 
-        # (This is usually a ToolMessage containing the tool's result)
         for msg in reversed(response_messages):
             if getattr(msg, "name", None) != "save_requirement_specification":
                 continue
             
             content = getattr(msg, "content", "")
-            if not isinstance(content, str):
+            if not content:
                 continue
 
-            try:
-                data = json.loads(content)
-                if data.get("status") == "success":
-                    return data.get("result", {}).get("document_id")
-            except (json.JSONDecodeError, AttributeError):
-                continue
+            # If it's a dict/json string, parse it
+            if isinstance(content, str):
+                try:
+                    data = json.loads(content)
+                    if isinstance(data, dict):
+                        return data.get("document_id")
+                except:
+                    pass
+            elif isinstance(content, dict):
+                return content.get("document_id")
                 
         return None
 
@@ -93,17 +89,26 @@ class RequirementAgent:
                     return tool_call.get("args", {}).get("markdown_content", "")
         return ""
 
-    def run(self, messages: List[Dict[str, str]], current_doc: str = "") -> Dict[str, Any]:
+    def run(self, messages: List[Dict[str, str]]) -> Dict[str, Any]:
         try:
             response = self.agent.invoke({
                 "messages": messages
             })
             response_messages = response["messages"]
-            last_message = response_messages[-1]
             
-            content = getattr(last_message, "content", "")
-            if not isinstance(content, str):
-                content = str(content)
+            # Extract conversational content: look for the last AIMessage that has text content
+            content = ""
+            for msg in reversed(response_messages):
+                # We want an AIMessage with content that is NOT just a tool call response
+                if hasattr(msg, "content") and msg.content and getattr(msg, "type", "") != "tool":
+                    content = msg.content
+                    break
+
+            # Fallback to last message if no text found
+            if not content and response_messages:
+                content = response_messages[-1].content
+                if not isinstance(content, str):
+                    content = str(content)
 
             document = self._extract_doc(response_messages)
             
@@ -129,6 +134,7 @@ class RequirementAgent:
             return {
                 "content": content,
                 "document": document,
+                "doc": document, # For backward compatibility
                 "saved": self._was_save_tool_called(response_messages),
                 "document_id": self._extract_document_id(response_messages)
             }

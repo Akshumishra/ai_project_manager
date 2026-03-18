@@ -98,6 +98,7 @@ export default function ProjectDetail({ projectId, onSelectDocument, onBack }) {
           {activeTab === 'tasks' && (
             <ProjectTasks
               tasks={tasks}
+              members={members}
               onCreateTask={handleCreateTask}
               refreshTasks={refreshTasks}
             />

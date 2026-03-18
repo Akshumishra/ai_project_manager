@@ -38,30 +38,40 @@ export const AuthProvider = ({ children }) => {
     setIsAuthenticated(false);
   };
 
+  const isCheckingAuth = React.useRef(false);
   const checkAuth = async () => {
+    if (isCheckingAuth.current) return;
     const refreshToken = localStorage.getItem('refresh_token');
-    if (refreshToken) {
-      try {
-        // Add a 5s timeout to prevent hanging forever on a bad network/backend
-        const refreshPromise = api.post('/api/users/refresh', { refresh_token: refreshToken });
-        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Auth timeout')), 5000));
-        
-        const { data } = await Promise.race([refreshPromise, timeoutPromise]);
-        
-        setAccessToken(data.access_token);
-        localStorage.setItem('refresh_token', data.refresh_token);
-        setIsAuthenticated(true);
-        setUser({ 
-          id: data.user_id, 
-          name: data.name, 
-          is_profile_complete: data.is_profile_complete 
-        }); 
-      } catch (err) {
-        console.error('Check auth failed:', err);
-        logout();
-      }
+    if (!refreshToken) {
+      setLoading(false);
+      return;
     }
-    setLoading(false);
+
+    isCheckingAuth.current = true;
+    try {
+      // Add a 30s timeout to be resilient to slow backend/network
+      const refreshPromise = api.post('/api/users/refresh', { refresh_token: refreshToken });
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Auth timeout')), 30000)
+      );
+      
+      const { data } = await Promise.race([refreshPromise, timeoutPromise]);
+      
+      setAccessToken(data.access_token);
+      localStorage.setItem('refresh_token', data.refresh_token);
+      setIsAuthenticated(true);
+      setUser({ 
+        id: data.user_id, 
+        name: data.name, 
+        is_profile_complete: data.is_profile_complete 
+      }); 
+    } catch (err) {
+      console.error('Check auth failed:', err.message || err);
+      logout();
+    } finally {
+      isCheckingAuth.current = false;
+      setLoading(false);
+    }
   };
 
   useEffect(() => {

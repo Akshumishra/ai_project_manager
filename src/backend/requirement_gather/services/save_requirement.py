@@ -27,28 +27,16 @@ def save_requirement_spec_document(
 ):
     """
     Main service to orchestrate saving the requirement specification into the database.
-    Raises HTTPException for errors.
+    On first save: creates the document and all its blocks.
+    On subsequent saves: updates blocks.
+    Returns a success dictionary for the AI to confirm the action.
     """
-    if not markdown_content:
-        markdown_content = f"# Requirement Specification\n\n"
-        if problem_the_project_solves:
-            markdown_content += f"## Problem\n{problem_the_project_solves}\n\n"
-        if target_users:
-            markdown_content += f"## Users\n{target_users}\n\n"
-        if project_goal:
-            markdown_content += f"## Goal\n{project_goal}\n\n"
-        if key_system_capabilities:
-            markdown_content += f"## Core Features\n{key_system_capabilities}\n\n"
-        if expected_outcome:
-            markdown_content += f"## Expected Outcome\n{expected_outcome}\n\n"
-        if major_constraints or additional_notes:
-            markdown_content += f"## Constraints / Notes\n{major_constraints or ''}\n{additional_notes or ''}\n\n"
-
     try:
         project_title = db.query(Project.name).filter(Project.id == project_id).scalar()
         if not project_title:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
 
+        # Build markdown from individual fields if not provided directly
         if not markdown_content:
             markdown_content = f"# {project_title}\n\n## Requirement Specification\n\n"
             if problem_the_project_solves:
@@ -73,15 +61,17 @@ def save_requirement_spec_document(
             db.query(Document)
             .filter(
                 Document.project_id == project_id,
-                Document.title.like(f"%{RequirementAgentConstants.REQ_DOC_LABEL}%")
+                Document.title.ilike(f"%{RequirementAgentConstants.REQ_DOC_LABEL}%")
             )
             .first()
         )
 
         if existing_doc:
+            # Update: only changed blocks are modified (smart diff)
             sync_blocks_from_text(existing_doc.id, markdown_content, db)
             doc_id = str(existing_doc.id)
         else:
+            # First save: create document + all blocks
             doc_info = save_document(
                 title=document_title,
                 project_id=project_id,
@@ -89,23 +79,22 @@ def save_requirement_spec_document(
                 markdown_content=markdown_content,
                 db=db
             )
-            doc_id = doc_info["document_id"]
+            doc_id = str(doc_info["document_id"])
 
         db.commit()
-        return {"status": "success", "message": "Requirement specification saved successfully."}
+        
+        return {
+            "status": "success", 
+            "message": "Requirement specification saved successfully.",
+            "document_id": doc_id
+        }
     except HTTPException:
         db.rollback()
         raise
     except Exception as e:
         db.rollback()
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
-            detail=f"Failed to save requirement: {str(e)}"
-        )
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to save requirement: {str(e)}"
         )
 
@@ -122,14 +111,14 @@ def extract_latest_spec_from_history(db: Session, project_id: UUID) -> str | Non
     )
 
     marker_regex = r"^[—-]{1,5}\s*Requirement Specification\s*$(.*)"
-    
+
     for msg in history:
         content = msg.content or ""
         # 1. Look for marker
         match = re.search(marker_regex, content, re.DOTALL | re.IGNORECASE | re.MULTILINE)
         if match:
             return match.group(1).strip()
-        
+
         # 2. Look for heading fallback
         if "# " in content:
             parts = content.split("# ", 1)
@@ -137,42 +126,22 @@ def extract_latest_spec_from_history(db: Session, project_id: UUID) -> str | Non
                 potential = "# " + parts[1].strip()
                 if len(potential) > 200:
                     return potential
-                    
+
     return None
 
 
-def complete_requirement_step(db: Session, project_id: UUID, user_id: UUID | None = None):
+def complete_requirement_step(db: Session, project_id: UUID):
     """
     Updates the workflow status to completed for the requirement step.
     Also ensures the latest draft is saved if not already present.
     """
     try:
-        # Check if document already exists
-        doc_exists = (
-            db.query(Document)
-            .filter(
-                Document.project_id == project_id,
-                Document.title.like(f"%{RequirementAgentConstants.REQ_DOC_LABEL}%")
-            )
-            .first()
-        )
-
-        if not doc_exists and user_id:
-            latest_spec = extract_latest_spec_from_history(db, project_id)
-            if latest_spec:
-                save_requirement_spec_document(
-                    db=db,
-                    user_id=user_id,
-                    project_id=project_id,
-                    markdown_content=latest_spec
-                )
-
         set_workflow_status(db, project_id, RequirementAgentConstants.WORKFLOW_NAME, "completed")
         db.commit()
         return {"status": "success", "message": "Requirement step marked as completed."}
     except Exception as e:
         db.rollback()
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to complete requirement step: {str(e)}"
         )

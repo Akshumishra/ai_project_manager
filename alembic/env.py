@@ -4,6 +4,8 @@ from sqlalchemy import engine_from_config
 from src.backend.db.database import Base
 from sqlalchemy import pool
 
+import src.backend.model # This ensures all models are registered with Base.metadata
+
 from alembic import context
 
 # this is the Alembic Config object, which provides

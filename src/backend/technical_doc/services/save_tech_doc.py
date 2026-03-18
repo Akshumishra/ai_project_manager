@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from fastapi import BackgroundTasks
 from uuid import UUID
@@ -8,8 +9,6 @@ from src.backend.model.project import Project
 from src.backend.model.user import User
 from src.backend.utils.workflow_utils import set_workflow_status
 from src.backend.technical_doc.constants import TechDocAgentConstants
-from src.backend.collaborative_document.services import document as doc_services
-from src.backend.collaborative_document import schemas as doc_schemas
 from src.backend.technical_doc.doc_sync import sync_blocks_from_text
 
 logger = logging.getLogger(__name__)
@@ -26,10 +25,6 @@ def save_technical_spec_in_db(
     using the collaborative document block-based system.
     """
     try:
-        # Cast to UUID to ensure data type consistency in SQLAlchemy
-        user_id = UUID(str(user_id))
-        project_id = UUID(str(project_id))
-        
         logger.info(f"Saving tech doc for project: {project_id}, user: {user_id}")
         project_title = db.query(Project.name).filter(
             Project.id == project_id, 
@@ -52,14 +47,16 @@ def save_technical_spec_in_db(
         ).all()
 
         existing_doc = existing_docs[0] if existing_docs else None
+        # Soft-delete any duplicate docs (keep the first one)
         for d in existing_docs[1:]:
-            db.delete(d)
+            d.deleted_at = datetime.now(timezone.utc)
         db.flush()
 
         if existing_doc:
             logger.info(f"Updating existing tech doc: {existing_doc.id}")
             existing_doc.title = document_title
             sync_blocks_from_text(existing_doc.id, markdown_content, db)
+            doc_id = existing_doc.id
         else:
             logger.info("Creating new tech doc")
             new_doc = Document(
@@ -70,6 +67,9 @@ def save_technical_spec_in_db(
             db.add(new_doc)
             db.flush()
             sync_blocks_from_text(new_doc.id, markdown_content, db)
+            doc_id = new_doc.id
+
+        db.flush()
 
         set_workflow_status(
             db,
@@ -84,7 +84,11 @@ def save_technical_spec_in_db(
             from src.backend.task_creator.task_creator_service import generate_and_save_tasks
             background_tasks.add_task(generate_and_save_tasks, project_id, user_id)
 
-        return {"success": True, "message": "Technical specification saved successfully."}
+        return {
+            "success": True, 
+            "message": "Technical specification saved successfully.",
+            "document_id": str(doc_id)
+        }
     except Exception as e:
         db.rollback()
         import traceback

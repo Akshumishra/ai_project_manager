@@ -52,7 +52,7 @@ function EditorBlock({
     isTypingRef.current  = true
     if (elRef.current) {
       // Switch from rendered-HTML to raw-text editing mode.
-      const domText  = elRef.current.innerText.trimEnd()
+      const domText  = getRawText(elRef.current).trimEnd()
       const expected = (block.content || '').trimEnd()
       if (domText !== expected) {
         elRef.current.innerText = block.content || ''
@@ -64,7 +64,7 @@ function EditorBlock({
     isFocusedRef.current = false
     isTypingRef.current  = false
     if (!elRef.current) return
-    const content = elRef.current.innerText
+    const content = getRawText(elRef.current)
     const type    = detectBlockType(content)
     onUpdate(block.block_id, content, type)
     elRef.current.innerHTML = renderMarkdown(content)
@@ -72,7 +72,7 @@ function EditorBlock({
 
   const handleInput = useCallback(() => {
     if (!elRef.current) return
-    const content = elRef.current.innerText
+    const content = getRawText(elRef.current)
     const type    = detectBlockType(content)
     onUpdate(block.block_id, content, type)
   }, [block.block_id, onUpdate])
@@ -272,7 +272,12 @@ function EditorBlock({
     // If it's a table, paste it directly into the current block to keep it together
     if (text.trim().startsWith('|')) {
       e.preventDefault();
-      document.execCommand('insertText', false, text);
+      const sel = window.getSelection();
+      if (!sel.rangeCount) return;
+      sel.deleteFromDocument();
+      sel.getRangeAt(0).insertNode(document.createTextNode(text));
+      sel.collapseToEnd();
+      handleInput(); // Sync to state
       return;
     }
 

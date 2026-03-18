@@ -84,8 +84,8 @@ export default function ProjectMembersModal({ projectId, isOpen, onClose }) {
                       borderRadius: '20px',
                       fontSize: '11px',
                       fontWeight: '700',
-                      background: member.status === 'Active' ? '#dcfce7' : '#fefae8',
-                      color: member.status === 'Active' ? '#166534' : '#a16207',
+                      background: member.status.toLowerCase() === 'active' ? '#dcfce7' : '#fefae8',
+                      color: member.status.toLowerCase() === 'active' ? '#166534' : '#a16207',
                       textTransform: 'uppercase'
                     }}>
                       {member.status}

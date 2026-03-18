@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from contextlib import asynccontextmanager
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
 from src.backend.db.database import engine, Base
@@ -15,12 +16,25 @@ from src.backend.project import routes as project_routes
 from src.backend.technical_doc import tech_doc_routes
 from src.backend.resume_parsing import routes as resume_routes
 from src.backend.task_creator import task_creator_routes
+from src.backend.task_assigner.routes.task_assigner_routes import router as task_assigner_router
 from src.backend.config import settings
 
 import src.backend.model
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Initial sweep to recover unsaved edits after a crash
+    print("Starting AI-Project Manager backend...")
+    for _ in range(5):
+        flush_dirty_blocks()
+    
+    start_scheduler()
+    yield
+
 Base.metadata.create_all(bind=engine)
-app = FastAPI()
+
+app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -43,15 +57,7 @@ app.include_router(ws_routes.router)
 app.include_router(requirement_routes.router, prefix="/api/agent")
 app.include_router(tech_doc_routes.router, prefix="/api/agent")
 app.include_router(task_creator_routes.router)
-
-
-@app.on_event("startup")
-def start_worker():
-    print("Starting AI-Project Manager backend...")
-    # Initial flush to sync any unsaved changes from previous sessions
-    flush_dirty_blocks()
-    start_scheduler()
-
+app.include_router(task_assigner_router)
 
 @app.get("/")
 def home():

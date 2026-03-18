@@ -44,7 +44,7 @@ async def generate_project_tasks(
 
 
 @router.get(
-    "/projects/{project_id}/task-generation-status",
+    "/projects/{project_id}/status",
     status_code=status.HTTP_200_OK,
 )
 async def get_task_generation_status(
