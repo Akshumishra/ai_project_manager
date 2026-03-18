@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str | None=None
     SLACK_INVITE_URL: str | None=None
     SLACK_BOT_TOKEN: str | None=None
+    SLACK_WORKSPACE_NAME: str | None=None
     model_config = SettingsConfigDict(
         env_file=os.path.join(os.path.dirname(__file__), "../../.env"),
         extra="ignore"

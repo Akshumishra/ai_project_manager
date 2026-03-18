@@ -6,6 +6,7 @@ from . import schemas, utils
 from src.backend.model.project import Project, ProjectMember, ProjectWorkflowStatus, ProjectStatus
 from src.backend.model.document import Document
 from src.backend.model.user import User, UserStatus
+from src.backend.config import settings
 from src.backend.model.task import (
     Task,
     TaskCategory,
@@ -433,7 +434,7 @@ def get_slack_join_url(project_id: UUID, db: Session, current_user: User) -> dic
             detail="No Slack channel configured for this project"
         )
 
-    slack_url = f"https://gkmit-projects.slack.com/app_redirect?channel={project.slack_channel_id}"
+    slack_url = f"https://{settings.SLACK_WORKSPACE_NAME}.slack.com/app_redirect?channel={project.slack_channel_id}"
     return {"slack_url": slack_url}
 
 
