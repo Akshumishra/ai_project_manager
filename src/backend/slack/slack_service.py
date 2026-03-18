@@ -35,6 +35,22 @@ def _slack_api_post(endpoint: str, payload: dict) -> dict:
     return response.json()
 
 
+def _slack_api_get(endpoint: str, params: dict = None) -> dict:
+    """Generic GET to the Slack API."""
+    token = _get_bot_token()
+    if not token:
+        raise RuntimeError("SLACK_BOT_TOKEN is not configured in settings.")
+
+    response = requests.get(
+        f"https://slack.com/api/{endpoint}",
+        headers={"Authorization": f"Bearer {token}"},
+        params=params,
+        timeout=10,
+    )
+    response.raise_for_status()
+    return response.json()
+
+
 def _slugify(name: str) -> str:
     """Convert a project name to a Slack-compatible channel name."""
     slug = name.lower()
@@ -92,6 +108,24 @@ def join_slack_channel(channel_id: str) -> dict:
     return result
 
 
+def lookup_user_by_email(email: str) -> dict | None:
+    """Lookup a user by email across the Slack workspace. Returns the user object or None."""
+    result = _slack_api_get("users.lookupByEmail", {"email": email})
+    if result.get("ok"):
+        return result.get("user", {})
+    return None
+
+
+def invite_user_to_channel(channel_id: str, user_id: str) -> dict:
+    """Invite a user to a Slack channel."""
+    logger.info("Inviting user %s to channel %s", user_id, channel_id)
+    result = _slack_api_post("conversations.invite", {"channel": channel_id, "users": user_id})
+    if not result.get("ok"):
+        error = result.get("error", "unknown")
+        logger.warning(f"Failed to invite {user_id} to {channel_id}: {error}")
+    return result
+
+
 def setup_slack_channel_for_project(project_id: UUID, project_name: str) -> str | None:
     """
     Orchestrates: create channel → bot joins → returns channel_id.
@@ -134,10 +168,18 @@ def setup_slack_channel_for_project(project_id: UUID, project_name: str) -> str 
             logger.warning("Bot failed to join channel %s: %s", channel_id, e)
             # Non-fatal — we still save the channel_id
 
-        # Step 3: Save channel_id to project
+        # Step 3: Save channel_id to project and ProjectSlackDetail
         project.slack_channel_id = channel_id
+        
+        from src.backend.model.project import ProjectSlackDetail
+        slack_detail = db.query(ProjectSlackDetail).filter(ProjectSlackDetail.project_id == project_id).first()
+        if not slack_detail:
+            slack_detail = ProjectSlackDetail(project_id=project_id)
+            db.add(slack_detail)
+        slack_detail.channel_id = channel_id
+
         db.commit()
-        logger.info("Saved Slack channel_id=%s to project %s", channel_id, project_id)
+        logger.info("Saved Slack channel_id=%s to project %s and ProjectSlackDetail", channel_id, project_id)
         return channel_id
 
     except Exception as e:

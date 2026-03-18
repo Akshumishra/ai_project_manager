@@ -16,13 +16,19 @@ export const AuthProvider = ({ children }) => {
     const { data } = await api.post('/api/users/login', { email, password });
     setAccessToken(data.access_token);
     localStorage.setItem('refresh_token', data.refresh_token);
-    setIsAuthenticated(true);
-    setUser({ 
+    
+    const userData = { 
       id: data.user_id, 
       email, 
       name: data.name, 
       is_profile_complete: data.is_profile_complete 
-    }); 
+    };
+    
+    // Cache user to avoid blocking UI on page reload
+    localStorage.setItem('cached_user', JSON.stringify(userData));
+    
+    setIsAuthenticated(true);
+    setUser(userData); 
     return data;
   };
 
@@ -34,6 +40,7 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
+    localStorage.removeItem('cached_user');
     setUser(null);
     setIsAuthenticated(false);
   };
@@ -47,9 +54,22 @@ export const AuthProvider = ({ children }) => {
       return;
     }
 
+    // 1. Immediately load user from cache state to unblock UI
+    let cachedUserStr = localStorage.getItem('cached_user');
+    if (cachedUserStr) {
+      try {
+        const cachedUser = JSON.parse(cachedUserStr);
+        setUser(cachedUser);
+        setIsAuthenticated(true);
+        setLoading(false); // Unblock rendering immediately!
+      } catch (e) {
+        cachedUserStr = null; // invalid cache
+      }
+    }
+
     isCheckingAuth.current = true;
     try {
-      // Add a 30s timeout to be resilient to slow backend/network
+      // 2. Perform silent background refresh
       const refreshPromise = api.post('/api/users/refresh', { refresh_token: refreshToken });
       const timeoutPromise = new Promise((_, reject) => 
         setTimeout(() => reject(new Error('Auth timeout')), 30000)
@@ -59,18 +79,28 @@ export const AuthProvider = ({ children }) => {
       
       setAccessToken(data.access_token);
       localStorage.setItem('refresh_token', data.refresh_token);
-      setIsAuthenticated(true);
-      setUser({ 
+      
+      const newUserData = { 
         id: data.user_id, 
         name: data.name, 
-        is_profile_complete: data.is_profile_complete 
-      }); 
+        is_profile_complete: data.is_profile_complete,
+        email: data.email || (cachedUserStr ? JSON.parse(cachedUserStr).email : null)
+      };
+      
+      localStorage.setItem('cached_user', JSON.stringify(newUserData));
+      setUser(newUserData); 
+      setIsAuthenticated(true);
+      
     } catch (err) {
-      console.error('Check auth failed:', err.message || err);
+      console.error('Check auth failed in background:', err.message || err);
+      // If the background silent refresh fails, perform hard logout
       logout();
     } finally {
       isCheckingAuth.current = false;
-      setLoading(false);
+      // If there was no cached user, we need to unblock UI now whether it succeeded or failed
+      if (!cachedUserStr) {
+        setLoading(false);
+      }
     }
   };
 

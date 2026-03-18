@@ -48,12 +48,12 @@ export function useProjectData(projectId) {
     const load = async () => {
       setLoading(true);
       if (projectId) {
-        await Promise.all([fetchProject(), fetchDocuments(), fetchTasks(), fetchMembers()]);
+        await Promise.all([fetchProject(), fetchDocuments(), fetchMembers()]);
       }
       setLoading(false);
     };
     load();
-  }, [projectId, fetchProject, fetchDocuments, fetchTasks, fetchMembers]);
+  }, [projectId, fetchProject, fetchDocuments, fetchMembers]);
 
   const handleCreateDocument = async () => {
     const title = prompt('Document Title:', 'Untitled Document');

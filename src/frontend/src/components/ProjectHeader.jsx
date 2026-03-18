@@ -1,85 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { getProjectSlackUrl, triggerSlackSetup, getProjectRequest } from '../api';
 
-const SLACK_INVITE_URL = import.meta.env.VITE_SLACK_INVITE_URL || 'https://join.slack.com/t/gkmit-projects/shared_invite/zt-3s1oifhky-2O7ayFsBuOezBpr7WlZEfw';
 
-/** Confirmation modal: asks whether user is in the workspace */
-function SlackJoinModal({ channelUrl, onClose }) {
-  return (
-    <div
-      style={{
-        position: 'fixed', inset: 0, zIndex: 1000,
-        background: 'rgba(0,0,0,0.45)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}
-      onClick={onClose}
-    >
-      <div
-        style={{
-          background: '#fff', borderRadius: '16px', padding: '36px',
-          maxWidth: '420px', width: '90%', boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Slack logo */}
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
-          <svg width="48" height="48" viewBox="0 0 122.8 122.8">
-            <path fill="#E01E5A" d="M25.8 77.6c0 7.1-5.8 12.9-12.9 12.9S0 84.7 0 77.6s5.8-12.9 12.9-12.9h12.9v12.9zm6.5 0c0-7.1 5.8-12.9 12.9-12.9s12.9 5.8 12.9 12.9v32.3c0 7.1-5.8 12.9-12.9 12.9s-12.9-5.8-12.9-12.9V77.6z"/>
-            <path fill="#36C5F0" d="M45.2 25.8c-7.1 0-12.9-5.8-12.9-12.9S38.1 0 45.2 0s12.9 5.8 12.9 12.9v12.9H45.2zm0 6.5c7.1 0 12.9 5.8 12.9 12.9s-5.8 12.9-12.9 12.9H12.9C5.8 58.1 0 52.3 0 45.2s5.8-12.9 12.9-12.9h32.3z"/>
-            <path fill="#2EB67D" d="M97 45.2c0-7.1 5.8-12.9 12.9-12.9s12.9 5.8 12.9 12.9-5.8 12.9-12.9 12.9H97V45.2zm-6.5 0c0 7.1-5.8 12.9-12.9 12.9s-12.9-5.8-12.9-12.9V12.9C64.7 5.8 70.5 0 77.6 0s12.9 5.8 12.9 12.9v32.3z"/>
-            <path fill="#ECB22E" d="M77.6 97c7.1 0 12.9 5.8 12.9 12.9s-5.8 12.9-12.9 12.9-12.9-5.8-12.9-12.9V97h12.9zm0-6.5c-7.1 0-12.9-5.8-12.9-12.9s5.8-12.9 12.9-12.9h32.3c7.1 0 12.9 5.8 12.9 12.9s-5.8 12.9-12.9 12.9H77.6z"/>
-          </svg>
-        </div>
-
-        <h2 style={{ textAlign: 'center', margin: '0 0 10px', fontSize: '18px', color: '#1a1a2e' }}>
-          Join the Project Slack Channel
-        </h2>
-        <p style={{ textAlign: 'center', color: '#555', fontSize: '14px', margin: '0 0 28px', lineHeight: 1.6 }}>
-          To access this project's channel, you need to be a member of the <strong>GKMIT Slack workspace</strong> first.
-        </p>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          <button
-            onClick={() => { window.open(channelUrl, '_blank', 'noopener,noreferrer'); onClose(); }}
-            style={{
-              padding: '12px', borderRadius: '8px', border: 'none',
-              background: '#4A154B', color: '#fff',
-              fontWeight: '600', fontSize: '14px', cursor: 'pointer',
-            }}
-          >
-            ✅ I'm already in — Open Channel
-          </button>
-          <button
-            onClick={() => { window.open(SLACK_INVITE_URL, '_blank', 'noopener,noreferrer'); onClose(); }}
-            style={{
-              padding: '12px', borderRadius: '8px',
-              border: '2px solid #4A154B', background: 'transparent',
-              color: '#4A154B', fontWeight: '600', fontSize: '14px', cursor: 'pointer',
-            }}
-          >
-            📩 Send me a workspace invite first
-          </button>
-          <button
-            onClick={onClose}
-            style={{
-              padding: '8px', borderRadius: '8px', border: 'none',
-              background: 'transparent', color: '#888',
-              fontSize: '13px', cursor: 'pointer',
-            }}
-          >
-            Cancel
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
+import { joinSlackChannelRequest, triggerSlackSetup, getProjectRequest } from '../api';
 
 export default function ProjectHeader({ user, project, onBack, onUpdateStatus, onAddMember, onViewMembers, onProjectUpdated }) {
   const [isUpdating, setIsUpdating] = useState(false);
   const [isJoiningSlack, setIsJoiningSlack] = useState(false);
   const [isInitializingSlack, setIsInitializingSlack] = useState(false);
-  const [slackChannelUrl, setSlackChannelUrl] = useState(null);
   const pollingRef = useRef(null);
   const isCreator = user && project && user.id === project.created_by;
 
@@ -100,10 +27,13 @@ export default function ProjectHeader({ user, project, onBack, onUpdateStatus, o
   const handleJoinSlack = async () => {
     setIsJoiningSlack(true);
     try {
-      const result = await getProjectSlackUrl(project.id);
-      setSlackChannelUrl(result.slack_url);
+      const result = await joinSlackChannelRequest(project.id);
+      if (result.invite_sent) {
+        alert('An invite has been sent to your email. You are being redirected to Slack.');
+      }
+      window.open(result.redirect_url, '_blank', 'noopener,noreferrer');
     } catch {
-      alert('No Slack channel available yet. Ask the project creator to initialize it.');
+      alert('Failed to join Slack channel. Make sure the project has a channel set up.');
     } finally {
       setIsJoiningSlack(false);
     }
@@ -292,13 +222,6 @@ export default function ProjectHeader({ user, project, onBack, onUpdateStatus, o
 
       {/* Spin keyframe */}
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
-
-      {slackChannelUrl && (
-        <SlackJoinModal
-          channelUrl={slackChannelUrl}
-          onClose={() => setSlackChannelUrl(null)}
-        />
-      )}
     </>
   );
 }

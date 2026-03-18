@@ -21,6 +21,7 @@ from src.backend.resume_parsing import routes as resume_routes
 from src.backend.task_creator import task_creator_routes
 from src.backend.task_assigner.routes.task_assigner_routes import router as task_assigner_router
 from src.backend.config import settings
+from src.backend.slack import slack_routes
 
 from src.backend.meeting_bot.api.routers import router as api_router
 from collections.abc import AsyncGenerator
@@ -58,6 +59,7 @@ app.include_router(project_routes.router)
 app.include_router(doc_routes.router)
 app.include_router(block_routes.router)
 app.include_router(ws_routes.router)
+app.include_router(slack_routes.router)
 
 # Agent & Tool Routes
 app.include_router(requirement_routes.router, prefix="/api/agent")
