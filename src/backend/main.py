@@ -15,7 +15,7 @@ from src.backend.collaborative_document.utils.scheduler import start_scheduler
 from src.backend.collaborative_document.utils.block_sync_worker import flush_dirty_blocks
 
 from src.backend.project import routes as project_routes
-# from src.backend.resume_parsing import routes as resume_routes
+from src.backend.resume_parsing import routes as resume_routes
 
 # ── Meeting Bot ──────────────────────────────────────────────────────────────
 from src.backend.meeting_bot.api.routers import router as api_router
@@ -54,7 +54,7 @@ app.include_router(doc_routes.router)
 app.include_router(block_routes.router)
 app.include_router(ws_routes.router)
 app.include_router(auth_routes.router)
-# app.include_router(resume_routes.router)
+app.include_router(resume_routes.router)
 app.include_router(api_router)
 
 
