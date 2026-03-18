@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
-from sqlalchemy import cast, Float
+from sqlalchemy import cast, Float, func
 from uuid import UUID
 import uuid
 import json, time, redis

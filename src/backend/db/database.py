@@ -62,6 +62,9 @@ def get_session_local() -> sessionmaker:
     return _get_session_local()
 
 
+SessionLocal = get_session_local()
+
+
 def get_db():
     """
     FastAPI dependency: yield a DB session and close it after the request.

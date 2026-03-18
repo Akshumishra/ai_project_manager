@@ -12,3 +12,11 @@ from src.backend.model.project import (
 )
 from src.backend.model.task import Task
 from src.backend.model.requirement_chat import RequirementChat
+from src.backend.model.meeting import (
+    Meeting,
+    MeetingParticipant,
+    MeetingTranscript,
+    MeetingSummary,
+    MeetingActionItem,
+)
+

@@ -3,6 +3,9 @@ __pycache__/
 *.py[codz]
 *$py.class
 .DS_Store
+
+src/backend/scripts/insert_dummy_data.py
+
 # C extensions
 *.so
 node_modules/
@@ -212,3 +215,14 @@ __marimo__/
 node_modules/
 insert_dummy_data.py
 package-lock.json
+recordings/
+.DS_STORE
+
+# ── Sensitive credential files ─────────────────────────────────────────────────
+credentials.json
+token.json
+client_secret*.json
+*.pem
+*.key
+server_log.txt
+src/backend/scripts/migrate_tasks.py
