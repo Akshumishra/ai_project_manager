@@ -9,7 +9,7 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..")))
 
 from sqlalchemy import text
-from src.backend.db.database import engine as default_engine
+from src.backend.db.database import get_session_local
 from sqlalchemy import create_engine
 
 # Allow overriding the engine for RLS migration (e.g., to run as superuser)
@@ -17,7 +17,8 @@ rls_db_url = os.getenv("DATABASE_URL_RLS")
 if rls_db_url:
     migrate_engine = create_engine(rls_db_url)
 else:
-    migrate_engine = default_engine
+    factory = get_session_local()
+    migrate_engine = factory.kw["bind"]
 # Direct: has project_id column
 # Indirect: needs join to identify project_id
 RLS_CONFIG = {

@@ -11,7 +11,7 @@ from src.backend.qa_chatbot.routes import slack_events
 from src.backend.logger import get_logger
 from src.backend.config import settings
 
-from src.backend.db.database import engine, Base
+from src.backend.db.database import Base, create_tables
 from src.backend.auth import routes as auth_routes
 from src.backend.collaborative_document.routes import document as doc_routes
 from src.backend.collaborative_document.routes import block as block_routes
@@ -63,7 +63,7 @@ app.include_router(ws_routes.router)
 app.include_router(auth_routes.router)
 app.include_router(resume_routes.router)
 
-Base.metadata.create_all(bind=engine)
+create_tables()
 
 if __name__ == "__main__":
     uvicorn.run("src.backend.main:app", host="0.0.0.0", port=8000, reload=True)

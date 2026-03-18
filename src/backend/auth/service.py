@@ -3,14 +3,15 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 import src.backend.model.user as user_model
-from src.backend.db.database import SessionLocal
+from src.backend.db.database import get_session_local
 from src.backend.logger import get_logger
 from . import schemas, utils
 
 logger = get_logger("auth_service")
 
 def register_user(request: schemas.UserCreate):
-    session = SessionLocal()
+    factory = get_session_local()
+    session = factory()
     try:
         normalized_email = str(request.email).lower()
         existing_user = (
@@ -70,7 +71,8 @@ def register_user(request: schemas.UserCreate):
 
 
 def login_user(request: schemas.UserLogin):
-    session = SessionLocal()
+    factory = get_session_local()
+    session = factory()
     try:
         db_user = (
             session.query(user_model.User)
@@ -110,7 +112,8 @@ def login_user(request: schemas.UserLogin):
 
 
 def refresh_token(request: schemas.TokenRefresh):
-    session = SessionLocal()
+    factory = get_session_local()
+    session = factory()
     try:
         db_user = utils.verify_refresh_token(request.refresh_token, session)
         if db_user.deleted_at is not None:
