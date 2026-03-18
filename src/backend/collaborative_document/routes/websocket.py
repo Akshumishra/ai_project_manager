@@ -13,7 +13,7 @@ from src.backend.collaborative_document.utils import helper_function
 
 manager = ConnectionManager()
 
-router = APIRouter(prefix="/ws", tags=["websocket"])
+router = APIRouter(prefix="/api/ws", tags=["websocket"])
 
 
 @router.websocket("/{document_id}")

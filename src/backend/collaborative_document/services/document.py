@@ -15,180 +15,223 @@ from src.backend.model.user import User
 
 
 def create_document(data: schemas.DocumentCreate, db: Session, current_user: User):
-    project = db.query(Project).filter(Project.id == data.project_id).first()
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+    try:
+        project = db.query(Project).filter(Project.id == data.project_id, Project.deleted_at.is_(None)).first()
+        if not project:
+            raise HTTPException(status_code=404, detail="Project not found")
 
-    is_member = (
-        db.query(ProjectMember)
-        .filter(
-            ProjectMember.project_id == data.project_id,
-            ProjectMember.user_id == current_user.id,
-        )
-        .first()
-    )
-
-    if project.created_by != current_user.id and not is_member:
-        raise HTTPException(
-            status_code=403, detail="No access to create documents in this project"
+        is_member = (
+            db.query(ProjectMember)
+            .filter(
+                ProjectMember.project_id == data.project_id,
+                ProjectMember.user_id == current_user.id,
+                ProjectMember.deleted_at.is_(None)
+            )
+            .first()
         )
 
-    document = Document(
-        title=data.title, project_id=data.project_id, created_by=current_user.id
-    )
-    db.add(document)
-    db.flush()
+        if project.created_by != current_user.id and not is_member:
+            raise HTTPException(
+                status_code=403, detail="No access to create documents in this project"
+            )
 
-    block = DocumentBlock(doc_id=document.id, position_key="1000")
-    db.add(block)
-    db.commit()
-    return {"document_id": str(document.id), "initial_block_id": str(block.id)}
+        document = Document(
+            title=data.title, project_id=data.project_id, created_by=current_user.id
+        )
+        db.add(document)
+        db.flush()
+
+        block = DocumentBlock(doc_id=document.id, position_key="1000")
+        db.add(block)
+        db.commit()
+        return {"document_id": str(document.id), "initial_block_id": str(block.id)}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to create document: {str(e)}")
 
 
 def get_document(document_id: UUID, db: Session, current_user: User):
-    helper_function.verify_document_access(document_id, current_user.id, db)
-    redis_key = f"doc:{document_id}"
-    cached = redis_client.get(redis_key)
-    if cached:
-        doc_data = json.loads(cached)
-        if "title" in doc_data:
-            return doc_data
+    try:
+        helper_function.verify_document_access(document_id, current_user.id, db)
+        redis_key = f"doc:{document_id}"
+        cached = redis_client.get(redis_key)
+        if cached:
+            doc_data = json.loads(cached)
+            if "title" in doc_data:
+                return doc_data
 
-    document = db.query(Document).filter(Document.id == document_id).first()
-    if not document:
-        raise HTTPException(status_code=404, detail="Document not found")
+        document = db.query(Document).filter(Document.id == document_id, Document.deleted_at.is_(None)).first()
+        if not document:
+            raise HTTPException(status_code=404, detail="Document not found")
 
-    blocks = (
-        db.query(DocumentBlock)
-        .filter(DocumentBlock.doc_id == document_id)
-        .order_by(cast(DocumentBlock.position_key, Float))
-        .all()
-    )
+        blocks = (
+            db.query(DocumentBlock)
+            .filter(DocumentBlock.doc_id == document_id)
+            .order_by(cast(DocumentBlock.position_key, Float))
+            .all()
+        )
 
-    result_blocks = [
-        {
-            "block_id": str(b.id),
-            "position_key": b.position_key,
-            "content": b.content,
-            "type": b.type,
+        result_blocks = [
+            {
+                "block_id": str(b.id),
+                "position_key": b.position_key,
+                "content": b.content,
+                "type": b.type,
+            }
+            for b in blocks
+        ]
+
+        response = {
+            "document_id": str(document_id),
+            "title": document.title,
+            "blocks": result_blocks,
         }
-        for b in blocks
-    ]
-
-    response = {
-        "document_id": str(document_id),
-        "title": document.title,
-        "blocks": result_blocks,
-    }
-    redis_client.set(redis_key, json.dumps(response), ex=3000)
-    return response
+        redis_client.set(redis_key, json.dumps(response), ex=3000)
+        return response
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch document: {str(e)}")
 
 
 async def insert_block(
     document_id: UUID, data: schemas.BlockCreate, db: Session, current_user: User
 ):
-    helper_function.verify_document_access(document_id, current_user.id, db)
-    _verify_document_exists(document_id, db)
-
-    new_id = uuid.uuid4()
-    new_key = data.position_key or _calculate_position(document_id, data.prev_block_id, data.next_block_id, db)
-
-    block_data = {
-        "block_id": str(new_id),
-        "position_key": new_key,
-        "content": data.content,
-        "type": data.type,
-    }
-
-    # Redis-buffered Insert
     try:
-        redis_client.set(f"pending_insert:{new_id}", json.dumps({"doc_id": str(document_id), **block_data}), ex=3600)
-        redis_client.sadd("pending_inserts", str(new_id))
-        _update_doc_cache(document_id, block_data)
-    except (redis.ConnectionError, redis.TimeoutError):
-        _persist_block_to_db(new_id, document_id, new_key, data, db)
+        helper_function.verify_document_access(document_id, current_user.id, db)
+        _verify_document_exists(document_id, db)
 
-    await _broadcast_update(document_id, "insert", {"block": block_data, "client_id": data.client_id})
-    
-    return {"block_id": str(new_id), "position_key": new_key, "client_id": data.client_id}
+        new_id = uuid.uuid4()
+        new_key = data.position_key or _calculate_position(document_id, data.prev_block_id, data.next_block_id, db)
+
+        block_data = {
+            "block_id": str(new_id),
+            "position_key": new_key,
+            "content": data.content,
+            "type": data.type,
+        }
+
+        # Redis-buffered Insert
+        try:
+            redis_client.set(f"pending_insert:{new_id}", json.dumps({"doc_id": str(document_id), **block_data}), ex=3600)
+            redis_client.sadd("pending_inserts", str(new_id))
+            _update_doc_cache(document_id, block_data)
+        except (redis.ConnectionError, redis.TimeoutError):
+            _persist_block_to_db(new_id, document_id, new_key, data, db)
+
+        await _broadcast_update(document_id, "insert", {"block": block_data, "client_id": data.client_id})
+        
+        return {"block_id": str(new_id), "position_key": new_key, "client_id": data.client_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to insert block: {str(e)}")
 
 
 async def edit_block(block_id: str, data: schemas.BlockUpdate, db: Session, current_user: User):
-    block = db.query(DocumentBlock).filter(DocumentBlock.id == block_id).first()
-    if not block:
-        raise HTTPException(404, "Block not found")
-
-    helper_function.verify_document_access(block.doc_id, current_user.id, db)
-
     try:
-        redis_client.set(f"block_update:{block_id}", json.dumps({"content": data.content, "type": data.type}))
-        redis_client.zadd("dirty_blocks", {block_id: time.time()})
-        _update_doc_cache(block.doc_id, {"block_id": block_id, "content": data.content, "type": data.type})
-    except (redis.ConnectionError, redis.TimeoutError):
-        block.content = data.content
-        if data.type is not None:
-            block.type = data.type
-        db.commit()
-        
-    return {"message": "updated"}
+        block = db.query(DocumentBlock).filter(DocumentBlock.id == block_id).first()
+        if not block:
+            raise HTTPException(404, "Block not found")
+
+        helper_function.verify_document_access(block.doc_id, current_user.id, db)
+
+        try:
+            redis_client.set(f"block_update:{block_id}", json.dumps({"content": data.content, "type": data.type}))
+            redis_client.zadd("dirty_blocks", {block_id: time.time()})
+            _update_doc_cache(block.doc_id, {"block_id": block_id, "content": data.content, "type": data.type})
+        except (redis.ConnectionError, redis.TimeoutError):
+            block.content = data.content
+            if data.type is not None:
+                block.type = data.type
+            db.commit()
+            
+        return {"message": "updated"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to edit block: {str(e)}")
 
 
 async def delete_block(block_id: str, db: Session, current_user: User):
-    doc_id = _find_doc_id_for_block(block_id, db)
-    helper_function.verify_document_access(doc_id, current_user.id, db)
-
-    # 1. Handle Pending Insert
-    is_pending = False
     try:
-        is_pending = redis_client.exists(f"pending_insert:{block_id}")
-    except (redis.ConnectionError, redis.TimeoutError):
-        pass # Fallback to trying delete in DB
-        
-    if is_pending:
-        redis_client.srem("pending_inserts", block_id)
-        redis_client.delete(f"pending_insert:{block_id}")
-    else:
-        # 2. Handle Persisted Block
-        try:
-            redis_client.sadd("pending_deletes", block_id)
-        except (redis.ConnectionError, redis.TimeoutError):
-            db.query(DocumentBlock).filter(DocumentBlock.id == block_id).delete()
-            db.commit()
+        doc_id = _find_doc_id_for_block(block_id, db)
+        helper_function.verify_document_access(doc_id, current_user.id, db)
 
-    _remove_from_doc_cache(doc_id, block_id)
-    await _broadcast_update(doc_id, "delete", {"block_id": block_id})
-    return {"message": "Block deleted"}
+        # 1. Handle Pending Insert
+        is_pending = False
+        try:
+            is_pending = redis_client.exists(f"pending_insert:{block_id}")
+        except (redis.ConnectionError, redis.TimeoutError):
+            pass # Fallback to trying delete in DB
+            
+        if is_pending:
+            redis_client.srem("pending_inserts", block_id)
+            redis_client.delete(f"pending_insert:{block_id}")
+        else:
+            # 2. Handle Persisted Block (Physical Delete)
+            try:
+                redis_client.sadd("pending_deletes", block_id)
+            except (redis.ConnectionError, redis.TimeoutError):
+                db.query(DocumentBlock).filter(DocumentBlock.id == block_id).delete()
+                db.commit()
+
+        _remove_from_doc_cache(doc_id, block_id)
+        await _broadcast_update(doc_id, "delete", {"block_id": block_id})
+        return {"message": "Block deleted"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to delete block: {str(e)}")
 
 
 def update_document(document_id: UUID, data: schemas.DocumentUpdate, db: Session, current_user: User):
-    helper_function.verify_document_access(document_id, current_user.id, db)
-    document = db.query(Document).filter(Document.id == document_id).first()
-    if not document:
-        raise HTTPException(404, "Document not found")
+    try:
+        helper_function.verify_document_access(document_id, current_user.id, db)
+        document = db.query(Document).filter(Document.id == document_id, Document.deleted_at.is_(None)).first()
+        if not document:
+            raise HTTPException(404, "Document not found")
 
-    document.title = data.title
-    db.commit()
-    db.refresh(document)
-    _sync_title_to_cache(document_id, document.title)
-    return document
+        document.title = data.title
+        db.commit()
+        db.refresh(document)
+        _sync_title_to_cache(document_id, document.title)
+        return document
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to update document: {str(e)}")
 
 
 def delete_document(document_id: UUID, db: Session, current_user: User):
-    helper_function.verify_document_access(document_id, current_user.id, db)
-    document = db.query(Document).filter(Document.id == document_id).first()
-    if not document:
-        raise HTTPException(404, "Document not found")
+    try:
+        from datetime import datetime
+        helper_function.verify_document_access(document_id, current_user.id, db)
+        document = db.query(Document).filter(Document.id == document_id, Document.deleted_at.is_(None)).first()
+        if not document:
+            raise HTTPException(404, "Document not found")
 
-    db.delete(document)
-    db.commit()
-    redis_client.delete(f"doc:{document_id}")
-    return {"message": "Document deleted"}
+        # Soft delete the document
+        document.deleted_at = datetime.utcnow()
+        db.commit()
+        redis_client.delete(f"doc:{document_id}")
+        return {"message": "Document deleted"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to delete document: {str(e)}")
 
 
 # --- Private Helpers ---
 
 def _verify_document_exists(doc_id: UUID, db: Session):
-    if not db.query(Document).filter(Document.id == doc_id).first():
+    if not db.query(Document).filter(Document.id == doc_id, Document.deleted_at.is_(None)).first():
         raise HTTPException(404, "Document not found")
 
 
