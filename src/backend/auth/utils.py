@@ -2,7 +2,7 @@ from jose import JWTError, jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from datetime import datetime, timedelta
-from src.backend.config import Config
+from src.backend.config import settings
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 from src.backend.db.database import get_db
@@ -41,17 +41,17 @@ def issue_token_pair(user: User) -> dict:
 
 def create_access_token(data: dict):
     to_encode = data.copy()
-    expire = datetime.utcnow() + timedelta(minutes=int(Config.ACCESS_TOKEN_EXPIRE_MINUTES))
+    expire = datetime.utcnow() + timedelta(minutes=int(settings.ACCESS_TOKEN_EXPIRE_MINUTES))
     to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, Config.ACCESS_SECRET_KEY, algorithm=Config.ALGORITHM)
+    encoded_jwt = jwt.encode(to_encode, settings.ACCESS_SECRET_KEY, algorithm=settings.ALGORITHM)
     return encoded_jwt
 
 
 def create_refresh_token(data: dict):
     to_encode = data.copy()
-    expire = datetime.utcnow() + timedelta(days=int(Config.REFRESH_TOKEN_EXPIRE_DAYS))
+    expire = datetime.utcnow() + timedelta(days=int(settings.REFRESH_TOKEN_EXPIRE_DAYS))
     to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, Config.REFRESH_SECRET_KEY, algorithm=Config.ALGORITHM)
+    encoded_jwt = jwt.encode(to_encode, settings.REFRESH_SECRET_KEY, algorithm=settings.ALGORITHM)
     return encoded_jwt
 
 
@@ -62,7 +62,7 @@ def verify_refresh_token(token: str, db: Session):
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
-        payload = jwt.decode(token, Config.REFRESH_SECRET_KEY, algorithms=[Config.ALGORITHM])
+        payload = jwt.decode(token, settings.REFRESH_SECRET_KEY, algorithms=[settings.ALGORITHM])
         user_id = payload.get("user_id")
         if user_id is None:
             raise credentials_exception
@@ -92,7 +92,7 @@ def get_current_user(
 
     try:
         jwt_token = token.credentials
-        payload = jwt.decode(jwt_token, Config.ACCESS_SECRET_KEY, algorithms=[Config.ALGORITHM])
+        payload = jwt.decode(jwt_token, settings.ACCESS_SECRET_KEY, algorithms=[settings.ALGORITHM])
         user_id = payload.get("user_id")
         if user_id is None:
             raise credentials_exception

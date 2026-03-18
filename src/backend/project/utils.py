@@ -2,7 +2,7 @@ import logging
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from src.backend.config import Config
+from src.backend.config import settings
 
 from . import constants
 
@@ -18,7 +18,7 @@ async def send_invitation_email(to_email: str, project_name: str, inviter_name: 
     html_content = constants.INVITATION_EMAIL_HTML_TEMPLATE.format(
         inviter_name=inviter_name,
         project_name=project_name,
-        frontend_url=Config.FRONTEND_URL,
+        frontend_url=settings.FRONTEND_URL,
         to_email=to_email
     )
 
@@ -29,14 +29,14 @@ async def send_invitation_email(to_email: str, project_name: str, inviter_name: 
 def _send_via_smtp(to_email: str, subject: str, html_content: str):
     try:
         msg = MIMEMultipart()
-        msg['From'] = Config.EMAILS_FROM
+        msg['From'] = settings.EMAILS_FROM
         msg['To'] = to_email
         msg['Subject'] = subject
         msg.attach(MIMEText(html_content, 'html'))
 
-        with smtplib.SMTP(Config.SMTP_SERVER, Config.SMTP_PORT) as server:
+        with smtplib.SMTP(settings.SMTP_SERVER, settings.SMTP_PORT) as server:
             server.starttls()
-            server.login(Config.SMTP_USERNAME, Config.SMTP_PASSWORD)
+            server.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
             server.send_message(msg)
 
         logger.info(f"Email sent via SMTP to {to_email}")
