@@ -1,50 +1,57 @@
+import logging
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
-import uvicorn
-import sys
-import os
 
-# Add project root to sys.path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
+import uvicorn
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from src.backend.qa_chatbot.routes import slack_events
 from src.backend.logger import get_logger
 from src.backend.config import settings
 
-from src.backend.db.database import Base, create_tables
+# ── Core / Database / Auth / Docs ───────────────────────────────────────────
+from src.backend.db.database import create_tables, Base
 from src.backend.auth import routes as auth_routes
 from src.backend.collaborative_document.routes import document as doc_routes
 from src.backend.collaborative_document.routes import block as block_routes
 from src.backend.collaborative_document.routes import websocket as ws_routes
 from src.backend.collaborative_document.utils.scheduler import start_scheduler
-from src.backend.collaborative_document.utils.block_sync_worker import (
-    flush_dirty_blocks,
-)
+from src.backend.collaborative_document.utils.block_sync_worker import flush_dirty_blocks
 
 from src.backend.project import routes as project_routes
 from src.backend.resume_parsing import routes as resume_routes
 
-from src.backend.model.user import User
-from src.backend.model.project import Project, ProjectMember
-from src.backend.model.document import Document, DocumentBlock
-from src.backend.model.user_detail import UserDetail
+# ── Meeting Bot ──────────────────────────────────────────────────────────────
+from src.backend.meeting_bot.api.routers import router as api_router
+from src.backend.config import settings
+
+
+def configure_logging():
+    """Set up structured console logging."""
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+
+configure_logging()
+
 
 logger = get_logger("main")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Initial sweep to recover unsaved edits after a crash
+    """
+    Handles background workers and schedulers initial triggers seamlessly.
+    """
     for _ in range(5):
         flush_dirty_blocks()
-    
     start_scheduler()
     yield
     
 app = FastAPI(title=settings.APP_TITLE, lifespan=lifespan)
 
-@app.get("/")
-async def root():
-    return {"status": "ok", "service": settings.APP_TITLE, "message": "Welcome to AI-Project Manager API"}
+create_tables()
+app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -55,6 +62,12 @@ app.add_middleware(
     expose_headers=["*"],
 )
 
+# ── Include Routers ──────────────────────────────────────────────────────
+try:
+    app.include_router(project_routes.router)
+except AttributeError:
+    app.include_router(project_routes)
+
 app.include_router(slack_events.router)
 app.include_router(project_routes.router)
 app.include_router(doc_routes.router)
@@ -62,6 +75,13 @@ app.include_router(block_routes.router)
 app.include_router(ws_routes.router)
 app.include_router(auth_routes.router)
 app.include_router(resume_routes.router)
+app.include_router(api_router)
+
+
+@app.get("/")
+def home():
+    return {"message": "Welcome to AI-Project Manager API"}
+
 
 create_tables()
 
