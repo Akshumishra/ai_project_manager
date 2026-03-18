@@ -15,7 +15,7 @@ const STATUS_LABELS = {
   failed_missing_docs: 'Missing required documents. Please complete Requirement and Technical Specifications first.',
 };
 
-export default function ProjectTasks({ tasks, members = [], onCreateTask, refreshTasks }) {
+export default function ProjectTasks({ project, tasks, members = [], onCreateTask, refreshTasks }) {
   const navigate = useNavigate();
   const { projectId } = useParams();
   const { user } = useAuth();
@@ -56,7 +56,7 @@ export default function ProjectTasks({ tasks, members = [], onCreateTask, refres
   // Auto-dismiss banners after 8 seconds
   useEffect(() => {
     if (genStatus === 'completed') {
-      const t = setTimeout(() => setGenStatus(null), 8000);
+      const t = setTimeout(() => setGenStatus(null), 600000);
       return () => clearTimeout(t);
     }
   }, [genStatus]);
@@ -140,6 +140,7 @@ export default function ProjectTasks({ tasks, members = [], onCreateTask, refres
   const isAssigning = assignStatus === 'assigning';
   const isAssignError = assignStatus === 'error';
   const isAssignDone = assignStatus === 'done';
+  const isCreator = user && project && user.id === project.created_by;
 
   const bannerBg = isGenError ? '#fef2f2' : isGenSuccess ? '#f0fdf4' : 'var(--brand-50)';
   const bannerBorder = isGenError ? '#fca5a5' : isGenSuccess ? '#86efac' : 'var(--brand-300)';
@@ -154,22 +155,23 @@ export default function ProjectTasks({ tasks, members = [], onCreateTask, refres
       {/* Action Buttons */}
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: (genStatus || assignStatus) ? '16px' : '24px', gap: '12px' }}>
 
-        {/* Assign Task (AI) — wired to task_assigner backend */}
-        <button
-          className="btn btn-secondary"
-          onClick={handleAssignTasks}
-          disabled={isAssigning}
-          title="Automatically assign tasks to team members based on their skills"
-          style={{ display: 'flex', alignItems: 'center', opacity: isAssigning ? 0.7 : 1 }}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '8px' }}>
-            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-            <circle cx="9" cy="7" r="4" />
-            <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-            <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-          </svg>
-          {isAssigning ? 'Assigning...' : 'Assign Task (AI)'}
-        </button>
+        {isCreator && (
+          <button
+            className="btn btn-secondary"
+            onClick={handleAssignTasks}
+            disabled={isAssigning}
+            title="Automatically assign tasks to team members based on their skills"
+            style={{ display: 'flex', alignItems: 'center', opacity: isAssigning ? 0.7 : 1 }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '8px' }}>
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+              <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+            </svg>
+            {isAssigning ? 'Assigning...' : 'Assign Task (AI)'}
+          </button>
+        )}
 
         <button className="btn btn-primary" onClick={onCreateTask}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '8px' }}>
