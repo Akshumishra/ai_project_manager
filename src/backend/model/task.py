@@ -1,5 +1,5 @@
 import enum
-from sqlalchemy import Column, String, ForeignKey, Enum, Integer, DateTime, Text
+from sqlalchemy import Column, String, ForeignKey, Enum, Integer, DateTime
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import UUID
 
@@ -50,40 +50,40 @@ class Task(BaseModel):
         nullable=False
     )
 
+    description = Column(
+        String,
+        nullable=True
+    )
+
     label = Column(
         Integer,
         nullable=False
     )
-    
-    description = Column(
-        Text,
-        nullable=True
-    )
 
     category = Column(
-        Enum(TaskCategory, name="task_category_enum"),
+        Enum(TaskCategory, name="task_category_enum", values_callable=lambda x: [e.value.upper() for e in x]),
         nullable=False
     )
 
     priority = Column(
-        Enum(TaskPriority, name="task_priority_enum"),
+        Enum(TaskPriority, name="task_priority_enum", values_callable=lambda x: [e.value.upper() for e in x]),
         nullable=False,
         default=TaskPriority.MEDIUM
     )
 
     complexity = Column(
-        Enum(TaskComplexity, name="task_complexity_enum"),
+        Enum(TaskComplexity, name="task_complexity_enum", values_callable=lambda x: [e.value.upper() for e in x]),
         nullable=False,
         default=TaskComplexity.MEDIUM
     )
 
     status = Column(
-        Enum(TaskStatus, name="task_status_enum"),
+        Enum(TaskStatus, name="task_status_enum", values_callable=lambda x: [e.value.upper() for e in x]),
         nullable=False,
         default=TaskStatus.TODO
     )
 
-    due_date = Column(
+    deadline = Column(
         DateTime,
         nullable=True
     )
@@ -103,4 +103,10 @@ class Task(BaseModel):
     assignee = relationship(
         "ProjectMember",
         back_populates="tasks"
+    )
+
+    logs = relationship(
+        "TaskLog",
+        back_populates="task",
+        cascade="all, delete-orphan"
     )

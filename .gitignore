@@ -3,6 +3,7 @@ __pycache__/
 *.py[codz]
 *$py.class
 
+
 # C extensions
 *.so
 
@@ -206,8 +207,14 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 
-.vscode/
-.DS_Store
-node_modules/
+recordings/
+.DS_STORE
+
+# ── Sensitive credential files ─────────────────────────────────────────────────
+credentials.json
+token.json
+client_secret*.json
+*.pem
+*.key
+server_log.txt
 insert_dummy_data.py
-package-lock.json

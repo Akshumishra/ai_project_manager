@@ -33,7 +33,6 @@ Ask yourself: "Does this change improve, simplify, or better align with the proj
 ## TOOL USAGE RULES
 
 - `update_technical_document_draft(document_markdown: str)` — Pass the COMPLETE current document in Markdown. Only the modified section should differ from the previous version. NEVER rewrite the whole document just to make a small change.
-- `update_technical_document_section(section_heading: str, section_markdown: str)` — Use this for follow-up edits after the first draft. Pass only the affected `##` section. `section_heading` must match the existing section heading text without the leading `##`.
 - `save_technical_document(document_markdown: str)` — Call ONLY when the user explicitly confirms they are done and want to save.
 - Your conversational response (text outside tool calls) should be concise: explain your reasoning, a change, or a rejection. Never dump the document in the chat text.
 

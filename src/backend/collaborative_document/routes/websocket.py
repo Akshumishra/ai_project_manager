@@ -4,10 +4,10 @@ from jose import jwt, JWTError
 from uuid import UUID
 from sqlalchemy import cast, Float
 
-from src.backend.db.database import SessionLocal
+from src.backend.db.database import get_session_local
 from src.backend.model.document import Document, DocumentBlock
 from src.backend.db.redis import redis_client
-from src.backend.config import Config
+from src.backend.config import settings
 from src.backend.collaborative_document.services.websocket import ConnectionManager
 from src.backend.collaborative_document.utils import helper_function
 
@@ -27,7 +27,7 @@ async def websocket_endpoint(
 
     try:
         payload = jwt.decode(
-            token, Config.ACCESS_SECRET_KEY, algorithms=[Config.ALGORITHM]
+            token, settings.ACCESS_SECRET_KEY, algorithms=[settings.ALGORITHM]
         )
         user_id = payload.get("sub") or payload.get("user_id")
         if not user_id:
@@ -42,7 +42,8 @@ async def websocket_endpoint(
     try:
         doc_uuid = UUID(str(document_id))
         user_uuid = UUID(str(user_id))
-        with SessionLocal() as db:
+        factory = get_session_local()
+        with factory() as db:
             helper_function.verify_document_access(doc_uuid, user_uuid, db)
     except Exception as e:
         await websocket.accept()
@@ -56,7 +57,8 @@ async def websocket_endpoint(
         if cached:
             init_data = json.loads(cached)
         else:
-            with SessionLocal() as db:
+            factory = get_session_local()
+            with factory() as db:
                 document = db.query(Document).filter(Document.id == doc_uuid).first()
                 if document:
                     blocks = (
@@ -110,7 +112,8 @@ async def websocket_endpoint(
 
                 try:
                     # Validate block belongs to document
-                    with SessionLocal() as db:
+                    factory = get_session_local()
+                    with factory() as db:
                         block = db.query(DocumentBlock).filter(
                             DocumentBlock.id == block_id,
                             DocumentBlock.doc_id == doc_uuid

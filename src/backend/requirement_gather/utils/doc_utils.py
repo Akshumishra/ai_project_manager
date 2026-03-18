@@ -1,6 +1,6 @@
 import uuid
-from typing import List
 from sqlalchemy.orm import Session
+
 from src.backend.model.document import Document, DocumentBlock
 
 def save_document(title: str, project_id: uuid.UUID, created_by: uuid.UUID, markdown_content: str, db: Session):

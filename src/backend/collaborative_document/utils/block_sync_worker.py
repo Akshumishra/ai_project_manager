@@ -2,11 +2,12 @@ import json
 from sqlalchemy.orm import Session
 
 from src.backend.db.redis import redis_client
-from src.backend.db.database import SessionLocal
+from src.backend.db.database import get_session_local
 from src.backend.model.document import DocumentBlock
 
 def flush_dirty_blocks():
-    db: Session = SessionLocal()
+    factory = get_session_local()
+    db: Session = factory()
     try:
         # 1. Process Pending Inserts
         # Use SMEMBERS to get IDs added via SADD in services.py
