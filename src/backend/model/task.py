@@ -50,6 +50,11 @@ class Task(BaseModel):
         nullable=False
     )
 
+    description = Column(
+        String,
+        nullable=True
+    )
+
     label = Column(
         Integer,
         nullable=False
