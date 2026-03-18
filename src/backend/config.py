@@ -58,6 +58,7 @@ class Settings(BaseSettings):
     SLACK_SIGNING_SECRET: Optional[str] = None
     BOT_USER_ID: Optional[str] = None
     SLACK_API_BASE_URL: str = "https://slack.com/api"
+    STANDUP_DATABASE_URL: str = "sqlite:///./standup.db"
 
     # ── Misc / Optional integrations ─────────────────────────────────────────
     FIREFLIES_API_KEY: Optional[str] = None

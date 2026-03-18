@@ -95,21 +95,59 @@ def _handle_filtering(body: Dict[str, Any]) -> Union[Dict[str, Any], ChallengeRe
     if not slack_user_id or slack_user_id == settings.BOT_USER_ID or event_data.get("subtype") == "bot_message":
         return GenericResponse(status="ignored", detail="Message from bot")
 
+    # 1. Determine if it's a direct mention (QA Chatbot)
     mention_str = f"<@{settings.BOT_USER_ID}>"
-    if mention_str not in user_text:
-        return GenericResponse(status="ignored", detail="Bot not mentioned")
+    is_mention = mention_str in user_text
+    
+    # 2. Determine if it's a thread reply (Potential Standup)
+    is_thread_reply = event_data.get("thread_ts") is not None
+    
+    if is_mention:
+        event_data["dispatch_type"] = "qa"
+        return event_data
+        
+    if is_thread_reply:
+        event_data["dispatch_type"] = "standup"
+        return event_data
 
-    return event_data
+    return GenericResponse(status="ignored", detail="Neither a mention nor a standup thread reply")
 
 async def _orchestrate_agent(event_data: Dict[str, Any]) -> GenericResponse:
-    """Handles context resolution and agent execution."""
+    """Handles context resolution and agent execution for both QA and Standups."""
+    dispatch_type = event_data.get("dispatch_type")
     ts = event_data.get("ts")
     slack_user_id = event_data.get("user")
     user_text = event_data.get("text", "")
     channel_id = event_data.get("channel")
     thread_ts = event_data.get("thread_ts", ts)
-    mention_str = f"<@{settings.BOT_USER_ID}>"
 
+    if dispatch_type == "standup":
+        from src.backend.db.database_standup import SessionStandup
+        from src.backend.model.standup import Standup
+        from src.backend.standups.services.standup_manager import StandupManager
+        
+        db = SessionStandup()
+        try:
+            standup = db.query(Standup).filter(
+                Standup.message_ts == thread_ts,
+                Standup.slack_channel_id == channel_id
+            ).first()
+            
+            if standup:
+                logger.info(f"Detected reply in standup thread: {thread_ts}")
+                manager = StandupManager(db)
+                manager.process_new_replies(str(standup.id))
+                return GenericResponse(status="success", detail="Standup reply processed")
+            else:
+                return GenericResponse(status="ignored", detail="Thread is not a standup")
+        except Exception as e:
+            logger.error(f"Standup reply processing failed: {e}")
+            return GenericResponse(status="error", detail=str(e))
+        finally:
+            db.close()
+
+    # Default to QA logic
+    mention_str = f"<@{settings.BOT_USER_ID}>"
     try:
         question = user_text.replace(mention_str, "").strip()
 
@@ -135,7 +173,7 @@ async def _orchestrate_agent(event_data: Dict[str, Any]) -> GenericResponse:
         return GenericResponse(status="success", message_sent=True)
 
     except Exception as e:
-        logger.error(f"Error processing Slack event: {e}", exc_info=True)
+        logger.error(f"Error processing Slack QA event: {e}", exc_info=True)
         await send_message(channel_id, "I encountered an error while processing your request. Please try again later.", thread_ts=thread_ts)
         return GenericResponse(status="error", detail=str(e))
 

@@ -5,7 +5,7 @@ from typing import List, Optional
 from pydantic import BaseModel, Field
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
-from src.backend.config import Config
+from src.backend.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +65,7 @@ class StandupReplyAgent:
     def __init__(self, api_key: Optional[str] = None):
         self.llm = ChatOpenAI(
             model="gpt-4o-mini",
-            api_key=api_key or Config.OPENAI_API_KEY,
+            api_key=api_key or settings.OPENAI_API_KEY,
             temperature=0
         )
         self.structured_llm = self.llm.with_structured_output(StandupParsedResponse)

@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 
 from sqlalchemy import create_engine
+from src.backend.config import settings
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 logger = logging.getLogger(__name__)
@@ -63,8 +64,7 @@ def get_session_local() -> sessionmaker:
 
 
 SessionLocal = get_session_local()
-Base = declarative_base()
-standup_database_url = Config.STANDUP_DATABASE_URL or Config.DATABASE_URL or "sqlite:///./standup.db"
+standup_database_url = settings.STANDUP_DATABASE_URL or settings.DATABASE_URL or "sqlite:///./standup.db"
 engine_standup = create_engine(standup_database_url)
 SessionStandup = sessionmaker(autocommit=False, autoflush=False, bind=engine_standup)
 

@@ -9,7 +9,7 @@ from src.backend.model.user import User
 from src.backend.model.blocker import Blocker
 from src.backend.model.task_log import TaskLog
 from datetime import datetime, timezone
-from src.backend.config import Config
+from src.backend.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +68,7 @@ class StandupGenerator:
         """Formats a task label as a clickable Slack link (<url|text>)."""
         if label is None:
             return ""
-        url = f"{Config.BASE_TASK_URL}/{label}"
+        url = f"{settings.BASE_TASK_URL}/{label}"
         return f"<{url}|Task {label}>"
     
     def get_idle_member_suggestions(self, project_id: str) -> Dict[str, List[Dict[str, Any]]]:

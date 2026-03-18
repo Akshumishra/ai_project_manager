@@ -1,14 +1,14 @@
 import requests
 import logging
 from typing import Optional, Dict, Any, List
-from src.backend.config import Config
+from src.backend.config import settings
 from src.backend.slack.constants import SlackConstants
 
 logger = logging.getLogger(__name__)
 
 class SlackService:
     def __init__(self, token: Optional[str] = None):
-        self.token = token or Config.SLACK_BOT_TOKEN
+        self.token = token or settings.SLACK_BOT_TOKEN
         self.base_url = SlackConstants.SLACK_API_BASE_URL
         self.headers = {
             "Authorization": f"Bearer {self.token}",

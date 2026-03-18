@@ -16,6 +16,7 @@ from src.backend.model.task import (
 )
 from src.backend.model.task_log import TaskLog
 from src.backend.model.standup import Standup
+from src.backend.slack.slack_service import lookup_user_by_email
 from typing import List
 
 
@@ -277,7 +278,6 @@ def get_project_members(project_id: UUID, db: Session, current_user: User):
         .all()
     )
     
-    from src.backend.slack.slack_service import lookup_user_by_email
     
     result = []
     for user_obj, pm_obj in members:

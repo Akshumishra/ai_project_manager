@@ -10,7 +10,6 @@ class RequirementChat(BaseModel):
     project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
     role = Column(String, nullable=False)
     content = Column(Text, nullable=False)
-    project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
     project_member_id = Column(
         UUID(as_uuid=True), ForeignKey("project_members.id"), nullable=True
     )
