@@ -41,38 +41,41 @@ class Task(BaseModel):
     project_id = Column(
         UUID(as_uuid=True),
         ForeignKey("projects.id"),
-        nullable=False
+        nullable=False,
+        index=True
     )
 
     title = Column(String, nullable=False)
-    label = Column(Integer, nullable=False)
     description = Column(String, nullable=True)
-    status = Column(
-        Enum(TaskStatus, name="task_status_enum"),
+    label = Column(Integer, nullable=False)
+    category = Column(
+        Enum(TaskCategory, name="task_category_enum"),
         nullable=False,
-        default=TaskStatus.TODO
+        default=TaskCategory.BACKEND
     )
     priority = Column(
         Enum(TaskPriority, name="task_priority_enum"),
         nullable=False,
         default=TaskPriority.MEDIUM
     )
-    category = Column(
-        Enum(TaskCategory, name="task_category_enum"),
-        nullable=False,
-        default=TaskCategory.BACKEND
-    )
     complexity = Column(
         Enum(TaskComplexity, name="task_complexity_enum"),
         nullable=False,
         default=TaskComplexity.MEDIUM
     )
-    assignee_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("project_members.id"),
-        nullable=True
+    status = Column(
+        Enum(TaskStatus, name="task_status_enum"),
+        nullable=False,
+        default=TaskStatus.TODO
     )
     deadline = Column(DateTime, nullable=True)
+
+    project_member_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("project_members.id"),
+        nullable=True,
+        index=True
+    )
 
     project = relationship("Project", back_populates="tasks")
     assignee = relationship("ProjectMember", back_populates="tasks")

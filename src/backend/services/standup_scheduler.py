@@ -41,7 +41,7 @@ class StandupScheduler:
         # Morning standup at 9:30 AM Mon-Fri
         self.scheduler.add_job(
             self.morning_job,
-            CronTrigger(day_of_week='mon-fri', hour=9, minute=30),
+            CronTrigger(day_of_week='mon-fri', hour=9, minute=42),
             id='morning_standup',
             replace_existing=True
         )

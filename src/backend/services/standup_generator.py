@@ -73,20 +73,19 @@ class StandupGenerator:
         url = f"{Config.BASE_TASK_URL}/{label}"
         return f"<{url}|Task {label}>"
     
-    def promote_idle_todo_to_inprogress(self, project_id: str) -> None:
+    def get_idle_member_suggestions(self, project_id: str) -> Dict[str, List[Dict[str, Any]]]:
         """
-        Ensures no one shows up as "No active tasks" when they still have TODOs.
-
-        Rule:
-        - If a member has *no* active work (IN_PROGRESS or BLOCKED),
-          promote their nearest-deadline TODO task to IN_PROGRESS.
+        Identifies members with no active tasks and finds potential TODO tasks to suggest.
+        
+        Returns:
+            Dict mapping member names to a list of suggested task info.
         """
         from src.backend.model.project import ProjectMember
-
+        
         members = self.db.query(ProjectMember).filter(ProjectMember.project_id == project_id).all()
+        suggestions = {}
 
         def _deadline_key(task: Task) -> tuple:
-            # Null deadlines sort last; tie-break by created_at (oldest first).
             dl = task.deadline
             if dl and dl.tzinfo is None:
                 dl = dl.replace(tzinfo=timezone.utc)
@@ -96,77 +95,67 @@ class StandupGenerator:
             max_dt = datetime.max.replace(tzinfo=timezone.utc)
             return (0, dl or max_dt, created or max_dt)
 
-        changed = False
         for member in members:
-            inprogress_count = self.db.query(Task).filter(
+            # Check if member has active tasks (IN_PROGRESS or BLOCKED)
+            active_count = self.db.query(Task).filter(
                 Task.project_id == project_id,
-                Task.assignee_id == member.id,
-                Task.status == TaskStatus.IN_PROGRESS,
+                Task.project_member_id == member.id,
+                Task.status.in_([TaskStatus.IN_PROGRESS, TaskStatus.BLOCKED]),
                 Task.deleted_at.is_(None),
             ).count()
-            if inprogress_count > 0:
+            
+            if active_count > 0:
                 continue
 
-            # Try to find unblocked TODO tasks assigned to this member first
-            todo_tasks = self.db.query(Task).filter(
+            # Identify candidates for suggestions
+            # 1. TODO tasks assigned to this member
+            personal_todos = self.db.query(Task).filter(
                 Task.project_id == project_id,
-                Task.assignee_id == member.id,
+                Task.project_member_id == member.id,
                 Task.status == TaskStatus.TODO,
                 Task.deleted_at.is_(None),
-            ).all()
+            ).order_by(Task.deadline.asc().nullslast(), Task.label.asc()).limit(3).all()
 
-            msg = "Auto-promoted to IN_PROGRESS (no other active tasks assigned)."
-
-            # If none, try to find unassigned TODO tasks in the project
-            if not todo_tasks:
-                todo_tasks = self.db.query(Task).filter(
+            # 2. Unassigned TODO tasks (if they don't have enough personal ones)
+            unassigned_todos = []
+            if len(personal_todos) < 3:
+                unassigned_todos = self.db.query(Task).filter(
                     Task.project_id == project_id,
-                    Task.assignee_id.is_(None),
+                    Task.project_member_id.is_(None),
                     Task.status == TaskStatus.TODO,
                     Task.deleted_at.is_(None),
-                ).all()
-                msg = f"Auto-assigned and promoted to IN_PROGRESS (idle member, next available unassigned task)."
+                ).order_by(Task.deadline.asc().nullslast(), Task.label.asc()).limit(3 - len(personal_todos)).all()
 
-            if not todo_tasks:
-                continue
-
-            next_task = min(todo_tasks, key=_deadline_key)
-            logger.info(
-                "MOMENTUM: Promoting task '%s' (label=%s) to IN_PROGRESS and assigning to member ID %s",
-                next_task.title,
-                next_task.label,
-                member.id,
-            )
-            next_task.status = TaskStatus.IN_PROGRESS
-            next_task.assignee_id = member.id
-            self.db.add(next_task)
-            self.db.add(
-                TaskLog(
-                    task_id=next_task.id,
-                    log=msg,
-                )
-            )
-            self.db.flush() # Ensure this task is no longer seen as 'unassigned' by next member
-            changed = True
-
-        if changed:
-            try:
-                self.db.commit()
-            except Exception as exc:
-                self.db.rollback()
-                logger.error("Failed to commit auto-promoted tasks: %s", exc)
+            candidates = personal_todos + unassigned_todos
+            if candidates:
+                user = self.db.query(User).get(member.user_id)
+                member_name = user.name if user else "Unknown"
+                
+                suggestions[member_name] = [
+                    {
+                        "id": str(t.id),
+                        "title": t.title,
+                        "label": t.label,
+                        "deadline": t.deadline.strftime("%Y-%m-%d") if t.deadline else "No deadline",
+                        "is_unassigned": t.project_member_id is None
+                    } for t in candidates
+                ]
+        
+        return suggestions
 
     def fetch_active_tasks(self, project_id: str) -> tuple[Dict[str, List[Dict[str, Any]]], List[Dict[str, Any]]]:
         """
         Fetches active tasks for a project and groups them by developer.
-        Returns a tuple of (grouped_tasks, overdue_tasks).
+        Also identifies suggestions for idle members.
+        Returns a tuple of (grouped_tasks, overdue_tasks, suggestions).
         """
-        # Get tasks that are either TODO, IN_PROGRESS, or BLOCKED for this project
+        # Get tasks that are either IN_PROGRESS or BLOCKED for this project
+        # Note: we exclude TODO from grouped_tasks now because they will be in suggestions
         tasks = (
             self.db.query(Task)
             .filter(
                 Task.project_id == project_id,
-                Task.status.in_([TaskStatus.TODO, TaskStatus.IN_PROGRESS, TaskStatus.BLOCKED]),
+                Task.status.in_([TaskStatus.IN_PROGRESS, TaskStatus.BLOCKED]),
                 Task.deleted_at.is_(None)
             )
             .all()
@@ -177,22 +166,19 @@ class StandupGenerator:
         now = datetime.now(timezone.utc)
 
         for task in tasks:
-            # We need to find the member name. 
-            if not task.assignee_id:
+            if not task.project_member_id:
                 continue
-            member = self.db.query(ProjectMember).get(task.assignee_id)
+            member = self.db.query(ProjectMember).get(task.project_member_id)
             if not member:
                 continue
                 
             user = self.db.query(User).get(member.user_id)
             member_name = user.name if user else "Unknown"
 
-            # Check for deadline risk (not completed and deadline passed)
             is_overdue = False
-            # Check for deadline in Task model
             deadline = getattr(task, 'deadline', None)
             if deadline:
-                if deadline.tzinfo is None: # Keep original timezone awareness check
+                if deadline.tzinfo is None:
                     deadline = deadline.replace(tzinfo=timezone.utc)
                 if deadline < now:
                     is_overdue = True
@@ -201,7 +187,7 @@ class StandupGenerator:
                 "id": str(task.id),
                 "title": task.title,
                 "status": task.status.value,
-                "description": task.description, # Kept from original
+                "description": task.description,
                 "deadline": task.deadline.strftime("%Y-%m-%d") if task.deadline else None,
                 "complexity": task.complexity,
                 "label": task.label,
@@ -217,7 +203,9 @@ class StandupGenerator:
             
             grouped_tasks[member_name].append(task_info)
             
-        return grouped_tasks, overdue_tasks
+        suggestions = self.get_idle_member_suggestions(project_id)
+        
+        return grouped_tasks, overdue_tasks, suggestions
 
 
     def fetch_active_blockers(self, project_id: str) -> Dict[str, List[Dict[str, Any]]]:
@@ -253,6 +241,7 @@ class StandupGenerator:
         project_name: str, 
         grouped_tasks: Dict[str, List[Dict[str, Any]]],
         overdue_tasks: List[Dict[str, Any]] = None,
+        suggestions: Dict[str, List[Dict[str, Any]]] = None,
         historical_highlights: Optional[Dict[str, Dict[str, Any]]] = None,
         active_blockers: Optional[Dict[str, List[Dict[str, Any]]]] = None,
         missed_update_members: Optional[List[str]] = None,
@@ -375,13 +364,18 @@ class StandupGenerator:
         message += "2. What are you planning to do today?\n"
         message += "3. Any blockers?\n\n"
         
-        if grouped_tasks:
+        # Render tasks and suggestions by member
+        all_members = sorted(set(grouped_tasks.keys()) | set(suggestions.keys() if suggestions else []))
+        
+        if all_members:
             message += "*Tasks by Member:*\n"
-            for member, tasks in grouped_tasks.items():
+            for member in all_members:
                 message += f"• *{member}:*\n"
                 
+                tasks = grouped_tasks.get(member, [])
+                member_suggestions = suggestions.get(member, []) if suggestions else []
+                
                 inprogress_tasks = [t for t in tasks if t["status"] == "in_progress"]
-                todo_tasks = [t for t in tasks if t["status"] == "todo"]
                 
                 if inprogress_tasks:
                     message += "  *⏳ In Progress:*\n"
@@ -391,13 +385,15 @@ class StandupGenerator:
                         message += f"    {link} {t['title']}{deadline_str}\n"
                 
                 if not inprogress_tasks:
-                    if todo_tasks:
-                        sorted_todos = sorted(todo_tasks, key=self._todo_sort_key)
-                        message += "  *Next Up:*\n"
-                        for t in sorted_todos:
-                            deadline_str = f" (Deadline: {t['deadline']})" if t.get('deadline') else ""
-                            link = self._format_task_link(t.get('label'))
-                            message += f"    {link} {t['title']}{deadline_str}\n"
+                    if member_suggestions:
+                        message += "  ✅ *No active tasks in progress.*\n"
+                        message += "  💡 *Suggestions for today:* (Please reply with which one you'll take)\n"
+                        for t in member_suggestions:
+                            label = t.get('label')
+                            link = self._format_task_link(label)
+                            deadline = t.get('deadline')
+                            unassigned = " (Unassigned)" if t.get('is_unassigned') else ""
+                            message += f"    - {link} {t['title']} [Deadline: {deadline}]{unassigned}\n"
                     else:
                         message += "  ✅ No active tasks in progress.\n"
                 

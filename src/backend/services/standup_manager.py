@@ -59,9 +59,8 @@ class StandupManager:
         Starts a new standup session by posting a prompt to Slack.
         """
         try:
-            self.generator.promote_idle_todo_to_inprogress(project_id)
             # 1. Fetch active tasks, deadline risks, and persistent blockers
-            grouped_tasks, overdue_tasks = self.generator.fetch_active_tasks(project_id)
+            grouped_tasks, overdue_tasks, suggestions = self.generator.fetch_active_tasks(project_id)
             active_blockers = self.generator.fetch_active_blockers(project_id)
             
             # 2. Get project name
@@ -79,7 +78,8 @@ class StandupManager:
             raw_prompt = self.generator.generate_standup_prompt(
                 project_name, 
                 grouped_tasks, 
-                overdue_tasks, 
+                overdue_tasks,
+                suggestions,
                 historical_highlights,
                 active_blockers,
                 missed_update_members,
@@ -156,7 +156,7 @@ class StandupManager:
         return selected_highlights, summary_insights
 
     def _project_has_active_blocked_tasks(self, project_id: str) -> bool:
-        grouped_tasks, _ = self.generator.fetch_active_tasks(project_id)
+        grouped_tasks, _, _ = self.generator.fetch_active_tasks(project_id)
         return any(task.get("status") == "blocked" for tasks in grouped_tasks.values() for task in tasks)
 
     def _get_missed_update_members(self, project_id: str, grouped_tasks: Dict[str, List[Dict[str, Any]]]) -> List[str]:
@@ -365,14 +365,16 @@ class StandupManager:
                     continue
 
                 # 2. Extract structured data via AI
-                active_tasks, _ = self.generator.fetch_active_tasks(str(standup.project_id))
+                active_tasks, _, suggestions = self.generator.fetch_active_tasks(str(standup.project_id))
                 user = self.db.query(User).get(member.user_id)
                 user_name = user.name if user else "Developer"
                 
-                # Flatten tasks for the agent
+                # Flatten tasks and suggestions for the agent
                 flat_tasks = []
                 for m_tasks in active_tasks.values():
                     flat_tasks.extend(m_tasks)
+                for s_tasks in suggestions.values():
+                    flat_tasks.extend(s_tasks)
 
                 # Calculate message date from Slack TS for relative deadline logic
                 msg_date = None
@@ -428,17 +430,18 @@ class StandupManager:
         """
         Applies the changes extracted by the AI Agent to the database.
         """
+        standup_update = self.db.query(StandupUpdate).get(update_id)
+        standup = self.db.query(Standup).get(standup_update.standup_id)
+        member = self.db.query(ProjectMember).filter(
+            ProjectMember.project_id == standup.project_id,
+            ProjectMember.user_id == standup_update.user_id
+        ).first()
+
         for up in parsed.updates:
             try:
+                task = None
                 if not up.task_id or up.task_id == "null":
                     # Fallback: Try to find an existing task by name for this member/project
-                    standup_update = self.db.query(StandupUpdate).get(update_id)
-                    standup = self.db.query(Standup).get(standup_update.standup_id)
-                    
-                    member = self.db.query(ProjectMember).filter(
-                        ProjectMember.project_id == standup.project_id,
-                        ProjectMember.user_id == standup_update.user_id
-                    ).first()
                     
                     # Try finding by label first if provided
                     if hasattr(up, 'task_label') and up.task_label:
@@ -476,6 +479,11 @@ class StandupManager:
                     task = self.db.query(Task).get(up.task_id)
                 if not task:
                     continue
+
+                # Auto-assign if task is unassigned and user is taking it
+                if member and task.project_member_id is None:
+                    logger.info(f"Auto-assigning task {task.label} to {member.user.name if member.user else 'current user'}")
+                    task.project_member_id = member.id
 
                 # Record change
                 old_status = task.status.value.lower()
@@ -881,7 +889,7 @@ class StandupManager:
                                 project_id=standup.project_id,
                                 description=new_t.description or f"Created via StandUp Agent from reply: {new_t.title}",
                                 status=status_obj,
-                                assignee_id=target_member_id,
+                                project_member_id=target_member_id,
                                 deadline=parsed_deadline or default_deadline,
                                 complexity=new_t.complexity,
                             )
@@ -934,7 +942,7 @@ class StandupManager:
             
         return self.db.query(Task).filter(
             Task.project_id == project_id,
-            Task.assignee_id == member_id,
+            Task.project_member_id == member_id,
             Task.title.ilike(title.strip()),
             Task.deleted_at.is_(None)
         ).first()

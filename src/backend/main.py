@@ -19,9 +19,9 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="AI Project Manager - StandUp Agent", lifespan=lifespan)
 
-# Include the standup routes
-app.include_router(slack_events.router, tags=["Slack"])
-app.include_router(standup_routes.router, tags=["StandUp"])
+# Include the standup routes with /api prefix to match Slack configuration
+app.include_router(slack_events.router, prefix="/api", tags=["Slack"])
+app.include_router(standup_routes.router, prefix="/api", tags=["StandUp"])
 
 @app.get("/")
 async def root():
