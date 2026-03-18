@@ -15,14 +15,16 @@ from src.backend.collaborative_document.routes import document as doc_routes
 from src.backend.collaborative_document.routes import block as block_routes
 from src.backend.collaborative_document.routes import websocket as ws_routes
 from src.backend.collaborative_document.utils.scheduler import start_scheduler
+from src.backend.requirement_gather.project_routes import router as project_routes
+from src.backend.technical_doc.tech_doc_routes import router as tech_doc_router
+from src.backend.task_creator.task_creator_routes import router as task_creator_router
+from src.backend.config import settings
 from src.backend.collaborative_document.utils.block_sync_worker import flush_dirty_blocks
-
 from src.backend.project import routes as project_routes
 from src.backend.resume_parsing import routes as resume_routes
 
 # ── Meeting Bot ──────────────────────────────────────────────────────────────
 from src.backend.meeting_bot.api.routers import router as api_router
-from src.backend.config import settings
 
 
 def configure_logging():
@@ -51,7 +53,6 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title=settings.APP_TITLE, lifespan=lifespan)
 
 create_tables()
-app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -75,6 +76,7 @@ app.include_router(block_routes.router)
 app.include_router(ws_routes.router)
 app.include_router(auth_routes.router)
 app.include_router(tech_doc_router)
+app.include_router(task_creator_router)
 app.include_router(resume_routes.router)
 app.include_router(api_router)
 
