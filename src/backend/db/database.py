@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 from __future__ import annotations
 
 import logging
@@ -60,6 +61,15 @@ def _get_session_local() -> sessionmaker:
 def get_session_local() -> sessionmaker:
     """Public accessor for the shared sessionmaker singleton."""
     return _get_session_local()
+=======
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker, declarative_base
+from src.backend.config import settings
+
+engine = create_engine(settings.DATABASE_URL)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
+>>>>>>> af8dd30d58119a11f2c37c2545e22d54abe63d01
 
 
 def get_db():
