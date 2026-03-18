@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,12 +12,26 @@ from src.backend.collaborative_document.utils.scheduler import start_scheduler
 from src.backend.collaborative_document.utils.block_sync_worker import (
     flush_dirty_blocks,
 )
-from src.backend.requirement_gather.project_routes import router as project_routes
-from src.backend.config import settings
-import src.backend.model
+
+from src.backend.auth import routes as auth_routes
+from src.backend.resume_parsing import routes as resume_routes
+
+from src.backend.model.user import User
+from src.backend.model.project import Project, ProjectMember
+from src.backend.model.document import Document, DocumentBlock
+from src.backend.model.user_detail import UserDetail
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Initial sweep to recover unsaved edits after a crash
+    for _ in range(5):
+        flush_dirty_blocks()
+    
+    start_scheduler()
+    yield
 
 Base.metadata.create_all(bind=engine)
-app = FastAPI()
+app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -32,13 +47,8 @@ app.include_router(doc_routes.router)
 app.include_router(block_routes.router)
 app.include_router(ws_routes.router)
 app.include_router(auth_routes.router)
+app.include_router(resume_routes.router)
 
-@app.on_event("startup")
-def start_worker():
-    for _ in range(5):
-        flush_dirty_blocks()
-
-    start_scheduler()
 
 
 @app.get("/")
