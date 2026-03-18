@@ -113,6 +113,7 @@ def lookup_user_by_email(email: str) -> dict | None:
     result = _slack_api_get("users.lookupByEmail", {"email": email})
     if result.get("ok"):
         return result.get("user", {})
+    logger.warning("Slack users.lookupByEmail failed for email %s: %s", email, result.get("error", "unknown"))
     return None
 
 

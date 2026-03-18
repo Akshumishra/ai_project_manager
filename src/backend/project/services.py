@@ -179,7 +179,6 @@ def create_project_task(
         project_id=project.id,
         project_member_id=data.project_member_id,
         status=TaskStatus.TODO,
-        ai_generated=False,
     )
     if "deadline" in Task.__table__.columns.keys():
         task_kwargs["deadline"] = data.deadline
@@ -272,19 +271,32 @@ def get_project_members(project_id: UUID, db: Session, current_user: User):
     _ensure_project_access(project_id, db, current_user)
     
     members = (
-        db.query(User, ProjectMember.id.label("project_member_id"))
+        db.query(User, ProjectMember)
         .join(ProjectMember, ProjectMember.user_id == User.id)
         .filter(ProjectMember.project_id == project_id)
         .all()
     )
     
+    from src.backend.slack.slack_service import lookup_user_by_email
+    
     result = []
-    for user_obj, pm_id in members:
+    for user_obj, pm_obj in members:
+        # Dynamically sync missing slack ID if they joined the workspace since the last check
+        if not pm_obj.slack_id:
+            try:
+                slack_user = lookup_user_by_email(user_obj.email)
+                if slack_user and slack_user.get("id"):
+                    pm_obj.slack_id = slack_user.get("id")
+                    db.commit()
+            except Exception:
+                pass
+            
         result.append({
-            "id": pm_id,
+            "id": pm_obj.id,
             "user_id": user_obj.id,
             "name": user_obj.name,
             "email": user_obj.email,
+            "slack_id": pm_obj.slack_id,
             "status": user_obj.status.value if user_obj.status else "Pending"
         })
     return result

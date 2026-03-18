@@ -1,11 +1,9 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 import uvicorn
-import os
 import logging
-from sqlalchemy.orm import configure_mappers
 from fastapi.middleware.cors import CORSMiddleware
-from src.backend.db.database import Base, create_tables
+from src.backend.db.database import create_tables
 from src.backend.auth import routes as auth_routes
 from src.backend.collaborative_document.routes import document as doc_routes
 from src.backend.collaborative_document.routes import block as block_routes
@@ -28,59 +26,7 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from src.backend.qa_chatbot.routes import slack_events
 
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Initial sweep to recover unsaved edits after a crash
-    print("Starting AI-Project Manager backend...")
-    for _ in range(5):
-        flush_dirty_blocks()
-    
-    start_scheduler()
-    yield
-
-
 create_tables()
-app = FastAPI(lifespan=lifespan)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173", 
-        "http://127.0.0.1:5173",
-        "http://localhost:5175",
-        "http://127.0.0.1:5175"
-        ],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-    expose_headers=["*"],
-)
-
-# Application Routes
-app.include_router(auth_routes.router)
-app.include_router(resume_routes.router)
-app.include_router(project_routes.router)
-app.include_router(doc_routes.router)
-app.include_router(block_routes.router)
-app.include_router(ws_routes.router)
-app.include_router(slack_routes.router)
-
-# Agent & Tool Routes
-app.include_router(requirement_routes.router, prefix="/api/agent")
-app.include_router(tech_doc_routes.router, prefix="/api/agent")
-app.include_router(task_creator_routes.router)
-app.include_router(task_assigner_router)
-app.include_router(api_router)
-app.include_router(slack_events.router)
-
-@app.get("/")
-def home():
-    return {"message": "Welcome to AI-Project Manager API"}
-
-
-if __name__ == "__main__":
-    uvicorn.run("src.backend.main:app", host="0.0.0.0", port=8000, reload=True)
 
 logger = logging.getLogger(__name__)
 
@@ -115,20 +61,46 @@ def configure_logging():
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 
+configure_logging()
 
-def main():
-    configure_logging()
+app = FastAPI(lifespan=lifespan)
 
-    print("\n🚀  Starting API server on 127.0.0.1:8000")
-    print("    Documentation: http://127.0.0.1:8000/docs\n")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:5175",
+        "http://127.0.0.1:5175"
+        ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["*"],
+)
 
-    uvicorn.run(
-        "src.backend.main:app", 
-        host="127.0.0.1", 
-        port=8000, 
-        reload=True
-    )
+# Application Routes
+app.include_router(auth_routes.router)
+app.include_router(resume_routes.router)
+app.include_router(project_routes.router)
+app.include_router(doc_routes.router)
+app.include_router(block_routes.router)
+app.include_router(ws_routes.router)
+app.include_router(slack_routes.router)
+
+# Agent & Tool Routes
+app.include_router(requirement_routes.router, prefix="/api/agent")
+app.include_router(tech_doc_routes.router, prefix="/api/agent")
+app.include_router(task_creator_routes.router)
+app.include_router(task_assigner_router)
+app.include_router(api_router)
+app.include_router(slack_events.router)
+
+
+@app.get("/")
+def home():
+    return {"message": "Welcome to AI-Project Manager API"}
 
 
 if __name__ == "__main__":
-    main()
+    uvicorn.run("src.backend.main:app", host="0.0.0.0", port=8000, reload=True)

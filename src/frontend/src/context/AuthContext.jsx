@@ -70,12 +70,11 @@ export const AuthProvider = ({ children }) => {
     isCheckingAuth.current = true;
     try {
       // 2. Perform silent background refresh
-      const refreshPromise = api.post('/api/users/refresh', { refresh_token: refreshToken });
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Auth timeout')), 30000)
+      const { data } = await api.post(
+        '/api/users/refresh', 
+        { refresh_token: refreshToken },
+        { timeout: 30000 }
       );
-      
-      const { data } = await Promise.race([refreshPromise, timeoutPromise]);
       
       setAccessToken(data.access_token);
       localStorage.setItem('refresh_token', data.refresh_token);
@@ -93,8 +92,11 @@ export const AuthProvider = ({ children }) => {
       
     } catch (err) {
       console.error('Check auth failed in background:', err.message || err);
-      // If the background silent refresh fails, perform hard logout
-      logout();
+      // Only perform a hard logout if the token is explicitly rejected (401 Unauthorized)
+      // Otherwise (e.g., timeout or network error), keep the cached session alive
+      if (err.response && err.response.status === 401) {
+        logout();
+      }
     } finally {
       isCheckingAuth.current = false;
       // If there was no cached user, we need to unblock UI now whether it succeeded or failed

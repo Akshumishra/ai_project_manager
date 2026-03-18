@@ -8,6 +8,7 @@ from src.backend.db.database import get_db
 from src.backend.model.project import Project, ProjectMember
 from src.backend.model.user import User
 from src.backend.auth.utils import get_current_user
+from src.backend.config import settings
 from src.backend.slack.slack_service import lookup_user_by_email, invite_user_to_channel
 
 logger = logging.getLogger(__name__)
@@ -48,11 +49,10 @@ async def join_slack_channel(
     if not channel_id:
         raise HTTPException(status_code=400, detail="Slack channel has not been created for this project yet")
 
-    workspace_domain = "YOUR_WORKSPACE" # Ideally from config or workspace info
-    # In a real scenario, the workspace name is needed. Using generic fallback for now.
-    redirect_url = f"slack://channel?team=T0000000&id={channel_id}" # Deep link
+    workspace_domain = settings.SLACK_WORKSPACE_NAME
+
     # Fallback web URL
-    redirect_url_web = f"https://slack.com/app_redirect?channel={channel_id}"
+    redirect_url_web = f"https://{workspace_domain}.slack.com/app_redirect?channel={channel_id}"
 
     invite_sent = False
 
