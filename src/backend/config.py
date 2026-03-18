@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     REFRESH_SECRET_KEY: str = "your_refresh_secret_key"
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
-    # Email Config
+    # Email settings
     EMAILS_FROM: str | None = None
     RESEND_API_KEY: str | None = None
     BREVO_API_KEY: str | None = None
@@ -32,4 +32,3 @@ class Settings(BaseSettings):
     )
 
 settings = Settings()
-Config = settings
