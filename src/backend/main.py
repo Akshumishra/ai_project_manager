@@ -4,6 +4,9 @@ from contextlib import asynccontextmanager
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from src.backend.qa_chatbot.routes import slack_events
+from src.backend.logger import get_logger
+from src.backend.config import settings
 
 # ── Core / Database / Auth / Docs ───────────────────────────────────────────
 from src.backend.db.database import create_tables, Base
@@ -33,6 +36,8 @@ def configure_logging():
 configure_logging()
 
 
+logger = get_logger("main")
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
@@ -42,6 +47,8 @@ async def lifespan(app: FastAPI):
         flush_dirty_blocks()
     start_scheduler()
     yield
+    
+app = FastAPI(title=settings.APP_TITLE, lifespan=lifespan)
 
 create_tables()
 app = FastAPI(lifespan=lifespan)
@@ -61,6 +68,8 @@ try:
 except AttributeError:
     app.include_router(project_routes)
 
+app.include_router(slack_events.router)
+app.include_router(project_routes.router)
 app.include_router(doc_routes.router)
 app.include_router(block_routes.router)
 app.include_router(ws_routes.router)
@@ -73,6 +82,8 @@ app.include_router(api_router)
 def home():
     return {"message": "Welcome to AI-Project Manager API"}
 
+
+create_tables()
 
 if __name__ == "__main__":
     uvicorn.run("src.backend.main:app", host="0.0.0.0", port=8000, reload=True)
