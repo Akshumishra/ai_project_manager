@@ -32,8 +32,8 @@ python src/backend/main.py
 
 ## ⏰ Standup Scheduler
 The scheduler runs two daily jobs (Monday–Friday):
-- **Morning Job (8:40 AM)**: Initiates standup prompts in configured Slack channels.
-- **Evening Job (6:00 PM)**: Finalizes standups and posts summaries.
+- **Morning Job (9:30 AM)**: Initiates standup prompts in configured Slack channels.
+- **Evening Job (6:30 PM)**: Finalizes standups and posts summaries.
 
 ### Instantly Verify the Scheduler
 To check if the morning and evening jobs are working without waiting for the scheduled time, run the verification script:

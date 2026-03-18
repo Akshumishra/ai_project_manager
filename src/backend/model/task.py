@@ -1,5 +1,5 @@
 import enum
-from sqlalchemy import Column, String, Text, ForeignKey, DateTime, Enum, Integer, Boolean
+from sqlalchemy import Column, String, Text, ForeignKey, DateTime, Enum, Integer
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import UUID
 
@@ -98,13 +98,11 @@ def set_next_label(mapper, connection, target):
     from src.backend.model.task import Task as TaskModel
     from sqlalchemy.orm import object_session
     
-    # Construct the query to get max label from DB
     table = TaskModel.__table__
     query = table.select().with_only_columns(func.max(table.c.label)).where(table.c.project_id == target.project_id)
     
     db_max = connection.execute(query).scalar() or 0
     
-    # Also check the current session for other tasks that haven't been flushed/committed yet
     session = object_session(target)
     session_max = 0
     if session:

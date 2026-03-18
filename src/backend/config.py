@@ -1,11 +1,9 @@
 import os
 from dotenv import load_dotenv
 
-# Load .env file if it exists, otherwise use environment variables
 try:
     load_dotenv(override=False)
 except Exception:
-    # If .env file doesn't exist or can't be read, continue with environment variables
     pass
 
 class Config:
