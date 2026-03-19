@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
-from fastapi import HTTPException
-from sqlalchemy import cast, Float
+from fastapi import HTTPException, status
+from sqlalchemy import cast, Float, func
 from uuid import UUID
 import uuid
 import json, time, redis
@@ -17,7 +17,10 @@ from src.backend.model.user import User
 def create_document(data: schemas.DocumentCreate, db: Session, current_user: User):
     project = db.query(Project).filter(Project.id == data.project_id).first()
     if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Project not found"
+        )
 
     is_member = (
         db.query(ProjectMember)
@@ -30,7 +33,7 @@ def create_document(data: schemas.DocumentCreate, db: Session, current_user: Use
 
     if project.created_by != current_user.id and not is_member:
         raise HTTPException(
-            status_code=403, detail="No access to create documents in this project"
+            status_code=status.HTTP_403_FORBIDDEN, detail="No access to create documents in this project"
         )
 
     document = Document(
@@ -45,6 +48,47 @@ def create_document(data: schemas.DocumentCreate, db: Session, current_user: Use
     return {"document_id": str(document.id), "initial_block_id": str(block.id)}
 
 
+def save_document(
+    data: schemas.DocumentCreate,
+    markdown_content: str,
+    db: Session,
+    current_user: User,
+    auto_commit: bool = True,
+):
+    project = db.query(Project).filter(Project.id == data.project_id).first()
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Project not found"
+        )
+
+    is_member = (
+        db.query(ProjectMember)
+        .filter(
+            ProjectMember.project_id == data.project_id,
+            ProjectMember.user_id == current_user.id,
+        )
+        .first()
+    )
+
+    if project.created_by != current_user.id and not is_member:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="No access to create documents in this project"
+        )
+
+    document = Document(
+        title=data.title, project_id=data.project_id, created_by=current_user.id
+    )
+    db.add(document)
+    db.flush()
+
+    helper_function.create_blocks_from_text(document.id, markdown_content, db)
+    if auto_commit:
+        db.commit()
+    return {"document_id": str(document.id)}
+
+
 def get_document(document_id: UUID, db: Session, current_user: User):
     helper_function.verify_document_access(document_id, current_user.id, db)
     redis_key = f"doc:{document_id}"
@@ -56,7 +100,10 @@ def get_document(document_id: UUID, db: Session, current_user: User):
 
     document = db.query(Document).filter(Document.id == document_id).first()
     if not document:
-        raise HTTPException(status_code=404, detail="Document not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Document not found"
+        )
 
     blocks = (
         db.query(DocumentBlock)
@@ -116,7 +163,10 @@ async def insert_block(
 async def edit_block(block_id: str, data: schemas.BlockUpdate, db: Session, current_user: User):
     block = db.query(DocumentBlock).filter(DocumentBlock.id == block_id).first()
     if not block:
-        raise HTTPException(404, "Block not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Block not found"
+        )
 
     helper_function.verify_document_access(block.doc_id, current_user.id, db)
 
@@ -164,7 +214,10 @@ def update_document(document_id: UUID, data: schemas.DocumentUpdate, db: Session
     helper_function.verify_document_access(document_id, current_user.id, db)
     document = db.query(Document).filter(Document.id == document_id).first()
     if not document:
-        raise HTTPException(404, "Document not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Document not found"
+        )
 
     document.title = data.title
     db.commit()
@@ -175,21 +228,35 @@ def update_document(document_id: UUID, data: schemas.DocumentUpdate, db: Session
 
 def delete_document(document_id: UUID, db: Session, current_user: User):
     helper_function.verify_document_access(document_id, current_user.id, db)
-    document = db.query(Document).filter(Document.id == document_id).first()
+    document = db.query(Document).filter(Document.id == document_id, Document.deleted_at.is_(None)).first()
     if not document:
-        raise HTTPException(404, "Document not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Document not found"
+        )
 
-    db.delete(document)
+    # Soft-delete the document
+    document.deleted_at = func.now()
+    
+    # Cascade soft-delete to blocks
+    db.query(DocumentBlock).filter(
+        DocumentBlock.doc_id == document_id,
+        DocumentBlock.deleted_at.is_(None)
+    ).update({DocumentBlock.deleted_at: func.now()}, synchronize_session=False)
+
     db.commit()
     redis_client.delete(f"doc:{document_id}")
-    return {"message": "Document deleted"}
+    return {"message": "Document and blocks deleted successfully"}
 
 
 # --- Private Helpers ---
 
 def _verify_document_exists(doc_id: UUID, db: Session):
     if not db.query(Document).filter(Document.id == doc_id).first():
-        raise HTTPException(404, "Document not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Document not found"
+        )
 
 
 def _calculate_position(doc_id: UUID, prev_id: str | None, next_id: str | None, db: Session) -> str:
@@ -207,7 +274,10 @@ def _get_block_position(block_id: str, db: Session) -> str:
     if cached:
         return json.loads(cached).get("position_key")
     
-    raise HTTPException(400, f"Block {block_id} not found")
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST, 
+        detail=f"Block {block_id} not found"
+    )
 
 
 def _persist_block_to_db(block_id: UUID | str, doc_id: UUID, key: str, data: schemas.BlockCreate, db: Session):
@@ -269,7 +339,10 @@ def _find_doc_id_for_block(block_id: str, db: Session) -> UUID:
     # Fallback to DB
     block = db.query(DocumentBlock).filter(DocumentBlock.id == block_id).first()
     if not block:
-        raise HTTPException(404, "Block not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Block not found"
+        )
     return block.doc_id
 
 

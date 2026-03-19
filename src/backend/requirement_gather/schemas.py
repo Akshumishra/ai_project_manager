@@ -31,14 +31,12 @@ class ProjectResponse(BaseModel):
     description: str | None = None
     status: str | None = None
     created_by: UUID
-    requirement_document_id: UUID | str | None = None
-    tech_document_id: UUID | str | None = None
 
     model_config = {"from_attributes": True}
 
 
 class RequirementAgentResponse(BaseModel):
-    content: str
+    content: str | None = ""
     document: str | None = ""
     saved: bool | None = False
     document_id: UUID | None = None

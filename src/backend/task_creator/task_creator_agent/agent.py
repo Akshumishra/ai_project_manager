@@ -1,12 +1,16 @@
-from langchain.agents import create_agent
-from langchain_openai import ChatOpenAI
-from typing import Any, Dict, List, Optional
+import logging
+from typing import Any, Dict, List
 from uuid import UUID
+
+from langchain_openai import ChatOpenAI
+from langgraph.prebuilt import create_react_agent
 
 from src.backend.config import settings
 from src.backend.task_creator.constants import TaskCreatorConstants as TaskConstants
 from src.backend.task_creator.task_creator_agent.prompt import system_prompt
 from src.backend.task_creator.task_creator_agent.tools.save_tasks import make_save_tasks_tool
+
+logger = logging.getLogger(__name__)
 
 
 class TaskCreatorAgent:
@@ -34,31 +38,44 @@ class TaskCreatorAgent:
         ]
 
     def _create_agent(self):
-        return create_agent(
+        return create_react_agent(
             model=self.llm,
             tools=self.tools,
-            system_prompt=system_prompt
+            prompt=system_prompt,
         )
 
     def run(self, messages: List[Dict[str, str]]) -> Dict[str, Any]:
         """
         Executes the agent with the provided messages.
+        Returns a dict with 'content' (final text) and 'tasks_saved' (bool).
         """
-        response = self.agent.invoke({
-            "messages": messages
-        })
+        try:
+            response = self.agent.invoke({"messages": messages})
+        except Exception as e:
+            logger.exception("TaskCreatorAgent.run() failed: %s", e)
+            return {"content": str(e), "tasks_saved": False}
 
-        response_messages = response["messages"]
-        last_message = response_messages[-1]
-        
-        content = getattr(last_message, "content", "")
-        if not isinstance(content, str):
-            content = str(content)
-        
-        # Check if the tool was called
+        response_messages = response.get("messages", [])
+
+        # Detect if the save_tasks tool was called successfully
         tasks_saved = any(
-            getattr(msg, "name", None) == "save_tasks" for msg in response_messages
+            getattr(msg, "name", None) == "save_tasks"
+            and "Successfully saved" in getattr(msg, "content", "")
+            for msg in response_messages
         )
+
+        last_message = response_messages[-1] if response_messages else None
+        content = (
+            getattr(last_message, "content", "")
+            if last_message
+            else str(response.get("output", ""))
+        )
+
+        if not tasks_saved:
+            logger.warning(
+                "save_tasks tool was not called or returned an error. Response messages: %s",
+                [getattr(m, "content", "")[:100] for m in response_messages]
+            )
 
         return {
             "content": content,

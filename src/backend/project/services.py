@@ -1,195 +1,199 @@
+from sqlalchemy import func
 from sqlalchemy.orm import Session
-from fastapi import HTTPException, BackgroundTasks
+from fastapi import HTTPException, BackgroundTasks, status
 from uuid import UUID
-import datetime
 from . import schemas, utils
-from src.backend.model.project import Project, ProjectMember
-from src.backend.model.document import Document
-from src.backend.model.user import User
+from src.backend.model.project import Project, ProjectMember, ProjectWorkflowStatus, ProjectStatus
+from src.backend.model.document import Document, DocumentBlock
+from src.backend.model.user import User, UserStatus
+from src.backend.config import settings
+from src.backend.model.task import (
+    Task,
+    TaskCategory,
+    TaskComplexity,
+    TaskPriority,
+    TaskStatus,
+)
+from src.backend.model.task_log import TaskLog
+from src.backend.model.standup import Standup
+from typing import List
+
 
 def get_projects(db: Session, current_user: User):
-    try:
-        # User's own projects
-        own_projects = (
-            db.query(Project)
-            .filter(Project.created_by == current_user.id, Project.deleted_at.is_(None))
-            .all()
+    projects = (
+        db.query(Project)
+        .outerjoin(ProjectMember)
+        .filter(
+            (Project.created_by == current_user.id)
+            | (ProjectMember.user_id == current_user.id),
+            Project.deleted_at.is_(None)
         )
+        .all()
+    )
+    for p in projects:
+        p.status = p.status.value if p.status else "active"
+    return projects
 
-        # Projects where user is a member
-        member_project_ids = (
-            db.query(ProjectMember.project_id)
-            .filter(ProjectMember.user_id == current_user.id, ProjectMember.deleted_at.is_(None))
-            .all()
-        )
-        member_project_ids = [pid for (pid,) in member_project_ids]
-
-        member_projects = (
-            db.query(Project)
-            .filter(Project.id.in_(member_project_ids), Project.deleted_at.is_(None))
-            .all()
-        )
-
-        # Merge and remove duplicates
-        all_projects = list({p.id: p for p in (own_projects + member_projects)}.values())
-        return all_projects
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch projects: {str(e)}")
-
-def create_project(data: schemas.ProjectCreateRequest, db: Session, current_user: User):
-    try:
-        new_project = Project(
-            name=data.name, description=data.description, created_by=current_user.id
-        )
-        db.add(new_project)
-        db.flush()
-        creator_member = ProjectMember(project_id=new_project.id, user_id=current_user.id)
-        db.add(creator_member)
-        db.commit()
-        db.refresh(new_project)
-        return new_project
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Failed to create project: {str(e)}")
 
 def get_project(project_id: UUID, db: Session, current_user: User):
-    try:
-        project = db.query(Project).filter(Project.id == project_id, Project.deleted_at.is_(None)).first()
-        if not project:
-            raise HTTPException(status_code=404, detail="Project not found")
-
-        is_member = (
-            db.query(ProjectMember)
-            .filter(ProjectMember.project_id == project_id, ProjectMember.user_id == current_user.id, ProjectMember.deleted_at.is_(None))
-            .first()
+    project = db.query(Project).filter(Project.id == project_id, Project.deleted_at.is_(None)).first()
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Project not found"
         )
 
-        if project.created_by != current_user.id and not is_member:
-            raise HTTPException(status_code=403, detail="No access to this project")
+    is_member = (
+        db.query(ProjectMember)
+        .filter(
+            ProjectMember.project_id == project_id,
+            ProjectMember.user_id == current_user.id,
+        )
+        .first()
+    )
 
-        return project
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch project detail: {str(e)}")
+    if project.created_by != current_user.id and not is_member:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="Access denied to this project"
+        )
+
+    return project
+
+
+def get_project_status(project_id: UUID, db: Session, current_user: User):
+    _ensure_project_access(project_id, db, current_user)
+    statuses = (
+        db.query(ProjectWorkflowStatus)
+        .filter(ProjectWorkflowStatus.project_id == project_id)
+        .all()
+    )
+    return {"project_id": project_id, "workflows": statuses}
+
+
+def create_project(data: schemas.ProjectCreateRequest, db: Session, current_user: User):
+    new_project = Project(
+        name=data.name, 
+        description=data.description, 
+        created_by=current_user.id,
+        status=ProjectStatus.ACTIVE
+    )
+    db.add(new_project)
+    db.flush()
+    creator_member = ProjectMember(
+        project_id=new_project.id, 
+        user_id=current_user.id,
+        background=data.background
+    )
+    db.add(creator_member)
+    db.commit()
+    db.refresh(new_project)
+    return new_project
+
+
+def _ensure_project_access(project_id: UUID, db: Session, current_user: User) -> Project:
+    project = db.query(Project).filter(Project.id == project_id, Project.deleted_at.is_(None)).first()
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Project not found"
+        )
+
+    is_member = (
+        db.query(ProjectMember)
+        .filter(
+            ProjectMember.project_id == project_id,
+            ProjectMember.user_id == current_user.id,
+        )
+        .first()
+    )
+
+    if project.created_by != current_user.id and not is_member:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="Access denied to this project"
+        )
+
+    return project
+
 
 def get_project_documents(project_id: UUID, db: Session, current_user: User):
+    _ensure_project_access(project_id, db, current_user)
+
+    documents = db.query(Document).filter(Document.project_id == project_id, Document.deleted_at.is_(None)).all()
+    return [
+        {"id": str(d.id), "title": d.title, "created_at": d.created_at}
+        for d in documents
+    ]
+
+
+def get_project_tasks(project_id: UUID, db: Session, current_user: User):
+    _ensure_project_access(project_id, db, current_user)
+
+    tasks = (
+        db.query(Task)
+        .filter(Task.project_id == project_id)
+        .order_by(Task.label.asc(), Task.created_at.desc())
+        .all()
+    )
+    for task in tasks:
+        if task.assignee and task.assignee.user:
+            task.assignee_name = task.assignee.user.name or task.assignee.user.email
+    return tasks
+
+
+def _normalize_task_complexity(value: str | None) -> TaskComplexity:
+    normalized = (value or "medium").strip().lower()
+    if normalized == "critical":
+        return TaskComplexity.HIGH
     try:
-        # Use the new get_project function for access control
-        project = get_project(project_id, db, current_user)
+        return TaskComplexity(normalized)
+    except ValueError:
+        return TaskComplexity.MEDIUM
 
-        documents = db.query(Document).filter(Document.project_id == project.id, Document.deleted_at.is_(None)).all()
-        return [
-            {"id": str(d.id), "title": d.title, "created_at": d.created_at}
-            for d in documents
-        ]
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch project documents: {str(e)}")
 
-def update_project(
-    project_id: UUID, data: schemas.ProjectUpdateRequest, db: Session, current_user: User
+def _normalize_task_status(value: str | None) -> TaskStatus:
+    normalized = (value or TaskStatus.TODO.value).strip().lower()
+    try:
+        return TaskStatus(normalized)
+    except ValueError:
+        return TaskStatus.TODO
+
+
+def create_project_task(
+    project_id: UUID, data: schemas.TaskCreate, db: Session, current_user: User
 ):
-    try:
-        project = db.query(Project).filter(Project.id == project_id, Project.deleted_at.is_(None)).first()
-        if not project:
-            raise HTTPException(status_code=404, detail="Project not found")
+    project = _ensure_project_access(project_id, db, current_user)
 
-        if project.created_by != current_user.id:
-            raise HTTPException(
-                status_code=403, detail="Only the creator can update the project"
-            )
+    # Get the next label (sequence number) for this project
+    max_label = db.query(func.max(Task.label)).filter(Task.project_id == project_id).scalar()
+    next_label = (max_label or 0) + 1
 
-        if data.name:
-            project.name = data.name
-        if data.description:
-            project.description = data.description
-        if data.status:
-            project.status = data.status
+    task_kwargs = dict(
+        title=data.title,
+        description=data.description,
+        label=next_label,
+        complexity=_normalize_task_complexity(data.complexity),
+        category=TaskCategory.BACKEND,
+        priority=TaskPriority.MEDIUM,
+        project_id=project.id,
+        project_member_id=data.project_member_id,
+        status=TaskStatus.TODO,
+    )
+    if "deadline" in Task.__table__.columns.keys():
+        task_kwargs["deadline"] = data.deadline
 
-        db.commit()
-        db.refresh(project)
-        return project
-    except HTTPException:
-        raise
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Failed to update project: {str(e)}")
+    new_task = Task(**task_kwargs)
+    db.add(new_task)
+    db.commit()
+    db.refresh(new_task)
+    
+    # Enrich with assignee_name for the immediate response
+    if new_task.assignee and new_task.assignee.user:
+        new_task.assignee_name = new_task.assignee.user.name or new_task.assignee.user.email
+        
+    return new_task
 
-def delete_project(project_id: UUID, db: Session, current_user: User):
-    try:
-        project = db.query(Project).filter(Project.id == project_id, Project.deleted_at.is_(None)).first()
-        if not project:
-            raise HTTPException(status_code=404, detail="Project not found")
-
-        if project.created_by != current_user.id:
-            raise HTTPException(
-                status_code=403, detail="Only the creator can delete the project"
-            )
-
-        # Soft delete the project
-        project.deleted_at = datetime.datetime.utcnow()
-        db.commit()
-        return {"message": "Project deleted successfully"}
-    except HTTPException:
-        raise
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Failed to delete project: {str(e)}")
-
-def _verify_project_ownership(project_id: UUID, db: Session, user_id: UUID) -> Project:
-    try:
-        project = db.query(Project).filter(Project.id == project_id, Project.deleted_at.is_(None)).first()
-        if not project:
-            raise HTTPException(status_code=404, detail="Project not found")
-
-        if project.created_by != user_id:
-            raise HTTPException(
-                status_code=403, detail="Only the project owner can add members"
-            )
-        return project
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to verify project ownership: {str(e)}")
-
-def _get_or_create_user_by_email(email: str, db: Session) -> User:
-    try:
-        target_email = email.lower().strip()
-        target_user = db.query(User).filter(User.email == target_email).first()
-
-        if not target_user:
-            target_user = User(
-                name=target_email.split("@")[0],
-                email=target_email,
-                password_hash=None,
-            )
-            db.add(target_user)
-            db.flush()
-        return target_user
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get/create user: {str(e)}")
-
-def _check_if_member_exists(project_id: UUID, user_id: UUID, creator_id: UUID, db: Session):
-    try:
-        existing_member = (
-            db.query(ProjectMember)
-            .filter(
-                ProjectMember.project_id == project_id,
-                ProjectMember.user_id == user_id,
-                ProjectMember.deleted_at.is_(None)
-            )
-            .first()
-        )
-        if existing_member or user_id == creator_id:
-            raise HTTPException(
-                status_code=400, detail="User is already a member of this project"
-            )
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error checking member existence: {str(e)}")
 
 def add_project_member(
     project_id: UUID,
@@ -198,25 +202,285 @@ def add_project_member(
     db: Session,
     current_user: User,
 ):
-    try:
-        project = _verify_project_ownership(project_id, db, current_user.id)
-        target_user = _get_or_create_user_by_email(data.email, db)
-        _check_if_member_exists(project_id, target_user.id, project.created_by, db)
+    project = get_project(project_id, db, current_user)
 
-        new_member = ProjectMember(project_id=project_id, user_id=target_user.id)
-        db.add(new_member)
-        db.commit()
-
-        background_tasks.add_task(
-            utils.send_invitation_email,
-            to_email=target_user.email,
-            project_name=project.name,
-            inviter_name=current_user.name,
+    if project.created_by != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="Only the project owner can add members"
         )
 
-        return {"message": f"User {target_user.email} added to project."}
-    except HTTPException:
-        raise
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Failed to add project member: {str(e)}")
+    target_email = data.email.lower().strip()
+    target_user = _find_or_create_user(target_email, db)
+    
+    _check_membership_exists(project_id, target_user, project.created_by, db)
+
+    new_member = ProjectMember(project_id=project_id, user_id=target_user.id)
+    db.add(new_member)
+    db.commit()
+    db.refresh(new_member)
+    db.refresh(target_user)
+
+    background_tasks.add_task(
+        utils.send_invitation_email,
+        to_email=target_email,
+        project_name=project.name,
+        inviter_name=current_user.name,
+    )
+
+    return {
+        "id": new_member.id,
+        "user_id": target_user.id,
+        "name": target_user.name,
+        "email": target_user.email,
+        "status": target_user.status.value if target_user.status else "Pending"
+    }
+
+
+def _find_or_create_user(email: str, db: Session) -> User:
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        user = User(
+            name=email.split("@")[0],
+            email=email,
+            password_hash=None,
+            status=UserStatus.INVITED
+        )
+        db.add(user)
+        db.flush()
+    return user
+
+
+def _check_membership_exists(project_id: UUID, user: User, owner_id: UUID, db: Session):
+    existing_member = (
+        db.query(ProjectMember)
+        .filter(
+            ProjectMember.project_id == project_id,
+            ProjectMember.user_id == user.id,
+        )
+        .first()
+    )
+    if existing_member or user.id == owner_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="User is already a member of this project"
+        )
+
+
+def get_project_members(project_id: UUID, db: Session, current_user: User):
+    _ensure_project_access(project_id, db, current_user)
+    
+    members = (
+        db.query(User, ProjectMember)
+        .join(ProjectMember, ProjectMember.user_id == User.id)
+        .filter(ProjectMember.project_id == project_id)
+        .all()
+    )
+    
+    from src.backend.slack.slack_service import lookup_user_by_email
+    
+    result = []
+    for user_obj, pm_obj in members:
+        # Dynamically sync missing slack ID if they joined the workspace since the last check
+        if not pm_obj.slack_id:
+            try:
+                slack_user = lookup_user_by_email(user_obj.email)
+                if slack_user and slack_user.get("id"):
+                    pm_obj.slack_id = slack_user.get("id")
+                    db.commit()
+            except Exception:
+                pass
+            
+        result.append({
+            "id": pm_obj.id,
+            "user_id": user_obj.id,
+            "name": user_obj.name,
+            "email": user_obj.email,
+            "slack_id": pm_obj.slack_id,
+            "status": user_obj.status.value if user_obj.status else "Pending"
+        })
+    return result
+
+
+def get_task_logs(task_id: UUID, db: Session, current_user: User):
+    # Security: Ensure user has access to the project this task belongs to
+    task = db.query(Task).filter(Task.id == task_id).first()
+    if not task:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Task not found"
+        )
+    
+    _ensure_project_access(task.project_id, db, current_user)
+    
+    return db.query(TaskLog).filter(TaskLog.task_id == task_id).order_by(TaskLog.created_at.desc()).all()
+
+
+def get_project_standups(project_id: UUID, db: Session, current_user: User):
+    _ensure_project_access(project_id, db, current_user)
+    
+    return db.query(Standup).filter(Standup.project_id == project_id).order_by(Standup.created_at.desc()).all()
+
+
+def get_project_task(project_id: UUID, task_id: UUID, db: Session, current_user: User):
+    _ensure_project_access(project_id, db, current_user)
+    
+    task = db.query(Task).filter(Task.id == task_id, Task.project_id == project_id).first()
+    if not task:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Task not found"
+        )
+        
+    if task.assignee and task.assignee.user:
+        task.assignee_name = task.assignee.user.name or task.assignee.user.email
+    return task
+
+
+def update_project_task(
+    project_id: UUID, task_id: UUID, data: schemas.TaskUpdate, db: Session, current_user: User
+):
+    _ensure_project_access(project_id, db, current_user)
+    
+    task = db.query(Task).filter(Task.id == task_id, Task.project_id == project_id).first()
+    if not task:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Task not found"
+        )
+        
+    changes = []
+    for field, value in data.model_dump(exclude_unset=True).items():
+        if field == "complexity":
+            old_val = task.complexity
+            new_val = _normalize_task_complexity(value)
+            if old_val != new_val:
+                task.complexity = new_val
+                changes.append(f"Complexity changed from {old_val.value} to {new_val.value}")
+            continue
+        if field == "status":
+            old_val = task.status
+            new_val = _normalize_task_status(value)
+            if old_val != new_val:
+                task.status = new_val
+                changes.append(f"Status changed from {old_val.value} to {new_val.value}")
+            continue
+        if field == "deadline" and "deadline" not in Task.__table__.columns.keys():
+            continue
+        if hasattr(task, field):
+            old_val = getattr(task, field)
+            if old_val != value:
+                setattr(task, field, value)
+                changes.append(f"{field.capitalize()} updated")
+        
+    if changes:
+        log_entry = TaskLog(task_id=task.id, log=", ".join(changes))
+        db.add(log_entry)
+        
+    db.commit()
+    db.refresh(task)
+    
+    if task.assignee and task.assignee.user:
+        task.assignee_name = task.assignee.user.name or task.assignee.user.email
+    else:
+        task.assignee_name = None
+        
+    return task
+
+
+def delete_project(project_id: UUID, db: Session, current_user: User):
+    project = db.query(Project).filter(Project.id == project_id, Project.deleted_at.is_(None)).first()
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Project not found"
+        )
+
+    if project.created_by != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="Only the project owner can delete the project"
+        )
+
+    # Soft-delete the project
+    project.deleted_at = func.now()
+    
+    # Cascade soft-delete to documents
+    db.query(Document).filter(
+        Document.project_id == project_id,
+        Document.deleted_at.is_(None)
+    ).update({Document.deleted_at: func.now()}, synchronize_session=False)
+
+    # Cascade soft-delete to blocks
+    doc_ids = db.query(Document.id).filter(Document.project_id == project_id).all()
+    if doc_ids:
+        doc_id_list = [d[0] for d in doc_ids]
+        db.query(DocumentBlock).filter(
+            DocumentBlock.doc_id.in_(doc_id_list),
+            DocumentBlock.deleted_at.is_(None)
+        ).update({DocumentBlock.deleted_at: func.now()}, synchronize_session=False)
+
+    db.commit()
+    return {"message": "Project and related documentation deleted successfully"}
+
+
+def update_project_status(project_id: UUID, data: schemas.ProjectStatusUpdate, db: Session, current_user: User):
+    project = db.query(Project).filter(Project.id == project_id, Project.deleted_at.is_(None)).first()
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Project not found"
+        )
+
+    if project.created_by != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="Only the project creator can update the status"
+        )
+
+    try:
+        new_status = ProjectStatus(data.status.lower())
+        project.status = new_status
+        db.commit()
+        db.refresh(project)
+        # Convert enum to string for the response
+        project.status = project.status.value
+        return project
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid status. Must be one of: {[e.value for e in ProjectStatus]}"
+        )
+
+
+def get_slack_join_url(project_id: UUID, db: Session, current_user: User) -> dict:
+    """Return Slack app URL for the project's channel."""
+    project = _ensure_project_access(project_id, db, current_user)
+
+    if not project.slack_channel_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No Slack channel configured for this project"
+        )
+
+    slack_url = f"https://{settings.SLACK_WORKSPACE_NAME}.slack.com/app_redirect?channel={project.slack_channel_id}"
+    return {"slack_url": slack_url}
+
+
+def set_slack_channel(
+    project_id: UUID, data: schemas.SlackChannelSetRequest, db: Session, current_user: User
+) -> Project:
+    """Allow project creator to set or update the Slack channel ID."""
+    project = _ensure_project_access(project_id, db, current_user)
+
+    if project.created_by != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the project owner can update the Slack channel"
+        )
+
+    project.slack_channel_id = data.slack_channel_id.strip()
+    db.commit()
+    db.refresh(project)
+    project.status = project.status.value if project.status else "active"
+    return project

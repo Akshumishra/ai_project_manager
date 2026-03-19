@@ -44,45 +44,44 @@ Generate the document using **Standard GitHub Flavored Markdown**.
 - Use lists and tables where appropriate to improve scannability.
 
 ## Preferred Flow:
-### [Project Title]
+## [Project Title]
 
-#### 1. Overview
+### 1. Overview
 A clear, 2-3 sentence explanation of the project idea and the specific problem it solves.
 
-#### 2. Target Users
+### 2. Target Users
 Identify explicitly who will use this system. Use subheadings if there are distinct user types (e.g., ### Admin Users, ### End-Users).
 
-#### 3. Main Features
+### 3. Main Features
 Group essential functionalities into logical categories using subheadings.
 *Example:*
-##### Feature Category A
+#### Feature Category A
 - feature 1
 - feature 2
 
-#### 4. System Logic & User Flow
+### 4. System Logic & User Flow
 Explain how the system works from start to finish. Use numbered steps for linearity.
 
-#### 5. Important Assumptions
+### 5. Important Assumptions
 List any assumptions made about missing high-level details.
 
 ## Tools
 
 ### save_requirement_specification
 - Parameters: `{"markdown_content": "Full markdown specification"}`
-- Call this tool **automatically** as soon as you have a final draft or when the user approves a revised draft. This saves the content as blocks in the database and updates the canvas.
-- IMPORTANT: If you are making changes to an already saved document, call this tool with the **full updated content**.
+- Call this tool **automatically** as soon as you have a draft or update a specification.
 
 ### get_current_requirement_draft
 - Parameters: `{}`
-- Call this tool to retrieve the current saved draft of the Requirement Specification for this project. Use this to restore context if needed and build upon it.
+- Call this to retrieve the existing saved draft if you need context.
 
 ## Workflow
 
 1. Ask 2–4 high-level questions.
-2. Generate the Requirement Specification.
-3. **Save Automatically**: Immediately call the `save_requirement_specification` tool.
+2. Generate/Update the Requirement Specification.
+3. **Save Automatically**: Immediately call `save_requirement_specification` with the FULL content.
 4. **Notify User**: After saving, inform the user: "I have updated the Requirement Specification in the canvas. Please review it. You can ask for changes or click the **'Complete Phase'** button at the top if you're happy with it."
-5. **Handling Changes**: If the user asks for changes, update the draft and call `save_requirement_specification` again with the full updated content.
+5. If the save tool returns an error, only then mention that saving failed. Otherwise, assume success.
 
 ## Output Format
 
@@ -92,7 +91,9 @@ List any assumptions made about missing high-level details.
    — Requirement Specification
    [The full markdown content of the specification]
 
-3. If the save fails, inform the user: "Saving failed. Please try after some time."
+3. **After calling the tool**, read the tool's return value:
+   - If the response contains **"saved successfully"**, the save was successful. Do NOT say "failed to save".
+   - If the response contains **"Save failed"**, only then tell the user: "Saving failed. Please try after some time."
 """
 
 USER_PROMPT = """

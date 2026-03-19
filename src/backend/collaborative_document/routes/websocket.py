@@ -42,8 +42,7 @@ async def websocket_endpoint(
     try:
         doc_uuid = UUID(str(document_id))
         user_uuid = UUID(str(user_id))
-        factory = get_session_local()
-        with factory() as db:
+        with get_session_local()() as db:
             helper_function.verify_document_access(doc_uuid, user_uuid, db)
     except Exception as e:
         await websocket.accept()
@@ -57,8 +56,7 @@ async def websocket_endpoint(
         if cached:
             init_data = json.loads(cached)
         else:
-            factory = get_session_local()
-            with factory() as db:
+            with get_session_local()() as db:
                 document = db.query(Document).filter(Document.id == doc_uuid).first()
                 if document:
                     blocks = (
@@ -85,7 +83,7 @@ async def websocket_endpoint(
                     )
                 else:
                     init_data = {"error": "Document not found."}
-
+ 
         await websocket.send_json({"type": "init", "role": role, "data": init_data})
 
         while True:
@@ -112,8 +110,7 @@ async def websocket_endpoint(
 
                 try:
                     # Validate block belongs to document
-                    factory = get_session_local()
-                    with factory() as db:
+                    with get_session_local()() as db:
                         block = db.query(DocumentBlock).filter(
                             DocumentBlock.id == block_id,
                             DocumentBlock.doc_id == doc_uuid

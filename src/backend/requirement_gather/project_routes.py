@@ -9,8 +9,8 @@ from src.backend.requirement_gather.services.requirement_gather import (
 )
 from src.backend.requirement_gather.services.project import create_project_with_owner
 from src.backend.requirement_gather.schemas import (
-    CreateProjectRequest, 
-    RequirementAgentRequest, 
+    CreateProjectRequest,
+    RequirementAgentRequest,
     SaveRequirementRequest,
     ProjectResponse,
     RequirementAgentResponse,
@@ -22,7 +22,7 @@ from src.backend.requirement_gather.services.save_requirement import (
     complete_requirement_step
 )
 
-router = APIRouter(prefix="/api/projects", tags=["projects"])
+router = APIRouter(prefix="/projects", tags=["projects"])
 
 
 @router.post("", response_model=ProjectResponse, status_code=status.HTTP_201_CREATED)
@@ -43,7 +43,7 @@ def create_project(request: CreateProjectRequest, db: Session = Depends(get_db))
         raise e
     except Exception as e:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"An unexpected error occurred: {str(e)}"
         )
     finally:
@@ -66,7 +66,7 @@ def get_project(project_id: UUID, db: Session = Depends(get_db)):
         raise e
     except Exception as e:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"An unexpected error occurred: {str(e)}"
         )
     finally:
@@ -94,7 +94,7 @@ def run_agent(
         raise e
     except Exception as e:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"An unexpected error occurred: {str(e)}"
         )
     finally:
@@ -124,7 +124,7 @@ def start_agent(
         raise e
     except Exception as e:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"An unexpected error occurred: {str(e)}"
         )
     finally:
@@ -158,7 +158,7 @@ def save_requirement_doc(
         raise e
     except Exception as e:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"An unexpected error occurred: {str(e)}"
         )
     finally:
@@ -177,7 +177,7 @@ def mark_requirement_complete(project_id: UUID, db: Session = Depends(get_db)):
         raise e
     except Exception as e:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"An unexpected error occurred: {str(e)}"
         )
     finally:
