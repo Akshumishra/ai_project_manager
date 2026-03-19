@@ -5,12 +5,13 @@ import logging
 import httpx
 
 from src.backend.config import settings
+from src.backend.meeting_bot.constants import (
+    FIREFLIES_API_BASE_URL,
+    FIREFLIES_SCHEDULE_TIMEOUT,
+    FIREFLIES_FETCH_TIMEOUT,
+)
 
 logger = logging.getLogger(__name__)
-
-# Default timeouts for Fireflies API calls
-_SCHEDULE_TIMEOUT = 10.0
-_FETCH_TIMEOUT = 30.0
 
 
 class FirefliesClient:
@@ -18,7 +19,7 @@ class FirefliesClient:
 
     def __init__(self, api_key: str | None = None) -> None:
         self.api_key = api_key or settings.FIREFLIES_API_KEY
-        self.base_url = "https://api.fireflies.ai/graphql"
+        self.base_url = FIREFLIES_API_BASE_URL
 
     def _get_headers(self) -> dict[str, str]:
         """Build authenticated request headers."""
@@ -56,7 +57,7 @@ class FirefliesClient:
         }
 
         try:
-            async with httpx.AsyncClient(timeout=_SCHEDULE_TIMEOUT) as client:
+            async with httpx.AsyncClient(timeout=FIREFLIES_SCHEDULE_TIMEOUT) as client:
                 response = await client.post(
                     self.base_url,
                     headers=self._get_headers(),
@@ -123,7 +124,7 @@ class FirefliesClient:
         }
 
         try:
-            async with httpx.AsyncClient(timeout=_FETCH_TIMEOUT) as client:
+            async with httpx.AsyncClient(timeout=FIREFLIES_FETCH_TIMEOUT) as client:
                 response = await client.post(
                     self.base_url,
                     headers=self._get_headers(),

@@ -5,6 +5,7 @@ from langchain_core.messages import ToolMessage, HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 
 from src.backend.config import settings
+from src.backend.meeting_bot.constants import DEFAULT_AI_MODEL, DEFAULT_AI_TEMPERATURE, AGENT_MAX_ITERATIONS
 from .prompts import SYSTEM_PROMPT
 from .tools import (
     get_pending_tasks,
@@ -25,7 +26,7 @@ def run_task_mapping_agent(context: dict) -> str:
     if not api_key:
          raise ValueError("OPENAI_API_KEY is not configured.")
 
-    llm = ChatOpenAI(model="gpt-4o", temperature=0.1, api_key=api_key)
+    llm = ChatOpenAI(model=DEFAULT_AI_MODEL, temperature=DEFAULT_AI_TEMPERATURE, api_key=api_key)
     tools = [
         get_pending_tasks, 
         create_task, 
@@ -44,8 +45,8 @@ def run_task_mapping_agent(context: dict) -> str:
     # Tool map for string lookup
     tool_map = {t.name: t for t in tools}
 
-    # Custom Agent loop (up to 5 turns to prevent infinite loops)
-    for _ in range(5):
+    # Custom Agent loop (to prevent infinite loops)
+    for _ in range(AGENT_MAX_ITERATIONS):
         try:
             response = llm_with_tools.invoke(messages)
             messages.append(response)

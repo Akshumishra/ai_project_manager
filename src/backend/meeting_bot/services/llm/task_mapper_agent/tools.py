@@ -6,7 +6,14 @@ from typing import List, Optional
 from langchain_core.tools import tool
 from sqlalchemy import text
 
-from src.backend.services.meeting.session import get_db_session
+from src.backend.meeting_bot.constants import (
+    TASK_STATUS_IN_PROGRESS,
+    TASK_STATUS_TODO,
+    TASK_PRIORITY_MEDIUM,
+    TASK_CATEGORY_BACKEND,
+    DOMAIN_MAPPING
+)
+from src.backend.meeting_bot.services.meeting.session import get_db_session
 
 logger = logging.getLogger(__name__)
 
@@ -17,17 +24,17 @@ def get_pending_tasks(project_id: str) -> str:
     """
     with get_db_session() as db:
         result = db.execute(
-            text("SELECT id, title, description, status FROM tasks WHERE project_id = :pid AND status = 'in_progress'"),
+            text(f"SELECT id, title, description, status FROM tasks WHERE project_id = :pid AND status = '{TASK_STATUS_IN_PROGRESS}'"),
             {"pid": project_id}
         )
-        tasks = []
-        for row in result:
-            tasks.append({
+        tasks = [
+            {
                 "id": str(row[0]),
                 "title": row[1],
                 "description": row[2] or "",
                 "status": row[3]
-            })
+            } for row in result
+        ]
     return json.dumps(tasks)
 
 @tool
@@ -45,7 +52,7 @@ def create_task(
     """
     with get_db_session() as db:
         db.execute(
-            text("INSERT INTO tasks (deleted_at, project_id, id, created_at, updated_at, deadline, status, description, title, category, label, priority, complexity) VALUES (NULL, :pid, gen_random_uuid(), :now, :now, NULL, 'todo', :desc, :title, 'backend', 1, 'medium', 'medium')"),
+            text(f"INSERT INTO tasks (deleted_at, project_id, id, created_at, updated_at, deadline, status, description, title, category, label, priority, complexity) VALUES (NULL, :pid, gen_random_uuid(), :now, :now, NULL, '{TASK_STATUS_TODO}', :desc, :title, '{TASK_CATEGORY_BACKEND}', 1, '{TASK_PRIORITY_MEDIUM}', 'medium')"),
             {
                 "pid": project_id,
                 "now": datetime.now(timezone.utc),
@@ -79,21 +86,7 @@ def match_participant_by_domain(domain_tags: List[str], project_id: str) -> str:
     Find a project member that matches the domain tags (role, tags).
     Returns matched candidates list.
     """
-    DOMAIN_DICT = {
-        "frontend": "technical",
-        "backend": "technical",
-        "database": "technical",
-        "ai_ml": "technical",
-        "devops": "technical",
-        "qa": "technical",
-        "security": "technical",
-        "design": "non_technical",
-        "product": "non_technical",
-        "management": "non_technical",
-        "product manager": "non_technical"
-    }
-
-    backgrounds = {DOMAIN_DICT.get(tag.lower()) for tag in domain_tags if tag.lower() in DOMAIN_DICT}
+    backgrounds = {DOMAIN_MAPPING.get(tag.lower()) for tag in domain_tags if tag.lower() in DOMAIN_MAPPING}
     backgrounds.discard(None)
 
     with get_db_session() as db:

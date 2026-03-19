@@ -2,7 +2,7 @@ import logging
 from uuid import UUID
 
 from src.backend.model.meeting import MeetingParticipant, InviteSource, ParticipantRole
-from src.backend.services.meeting.session import get_db_session, get_meeting_by_session
+from src.backend.meeting_bot.services.meeting.session import get_db_session, get_meeting_by_session
 
 logger = logging.getLogger(__name__)
 

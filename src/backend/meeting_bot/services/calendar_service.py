@@ -12,6 +12,7 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 
 from src.backend.config import settings
+from src.backend.meeting_bot.constants import DEFAULT_MEETING_DURATION_MINS, FIREFLIES_BOT_EMAIL
 
 logger = logging.getLogger(__name__)
 
@@ -87,7 +88,7 @@ def _get_calendar_service():
 def create_calendar_meet(
     title: str,
     scheduled_at: datetime,
-    duration_minutes: int = 45,
+    duration_minutes: int = DEFAULT_MEETING_DURATION_MINS,
     invite_fireflies: bool = True,
 ) -> tuple[str | None, dict]:
     """
@@ -124,9 +125,9 @@ def create_calendar_meet(
     }
 
     if invite_fireflies:
-        event_body["attendees"] = [{"email": "fred@fireflies.ai"}]
+        event_body["attendees"] = [{"email": FIREFLIES_BOT_EMAIL}]
         logger.info(
-            "Automatically adding fred@fireflies.ai to avoid Google Meet admit prompts."
+            f"Automatically adding {FIREFLIES_BOT_EMAIL} to avoid Google Meet admit prompts."
         )
 
     logger.info("Pushing Google Calendar event creation for '%s'...", title)
@@ -137,14 +138,8 @@ def create_calendar_meet(
         .execute()
     )
 
-    meet_url = None
-    conference_data = event.get("conferenceData", {})
-    entry_points = conference_data.get("entryPoints", [])
-
-    for entry in entry_points:
-        if entry.get("entryPointType") == "video":
-            meet_url = entry.get("uri")
-            break
+    entry_points = event.get("conferenceData", {}).get("entryPoints", [])
+    meet_url = next((e.get("uri") for e in entry_points if e.get("entryPointType") == "video"), None)
 
     if not meet_url:
         logger.warning(
