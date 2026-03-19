@@ -50,7 +50,7 @@ class Settings(BaseSettings):
     SMTP_USERNAME: Optional[str] = None
     SMTP_PASSWORD: Optional[str] = None
     FRONTEND_URL: str = "http://localhost:5173"
-    BASE_TASK_URL: str = "http://localhost:5173/tasks"
+    BASE_TASK_URL: str = "http://localhost:5173"
 
     # ── Slack ────────────────────────────────────────────────────────────────
     SLACK_BOT_TOKEN: Optional[str] = None

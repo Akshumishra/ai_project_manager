@@ -1,9 +1,9 @@
+import bcrypt
 from jose import JWTError, jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from datetime import datetime, timedelta
 from src.backend.config import settings
-from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 from src.backend.db.database import get_db
 from src.backend.model.user import User
@@ -12,15 +12,22 @@ from uuid import UUID
 bearer_scheme = HTTPBearer(auto_error=False)
 
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Use bcrypt directly for compatibility and speed on Python 3.13+
+def get_password_hash(password: str) -> str:
+    # bcrypt.hashpw expects bytes
+    pwd_bytes = password.encode('utf-8')
+    salt = bcrypt.gensalt()
+    hashed_pwd = bcrypt.hashpw(pwd_bytes, salt)
+    return hashed_pwd.decode('utf-8')
 
 
-def get_password_hash(password):
-    return pwd_context.hash(password)
-
-
-def verify_password(plain_password, hashed_password):
-    return pwd_context.verify(plain_password, hashed_password)
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    try:
+        password_bytes = plain_password.encode('utf-8')
+        hashed_bytes = hashed_password.encode('utf-8')
+        return bcrypt.checkpw(password_bytes, hashed_bytes)
+    except Exception:
+        return False
 
 
 def build_token_payload(user: User) -> dict:

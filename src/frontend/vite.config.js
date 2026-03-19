@@ -6,6 +6,6 @@ export default defineConfig({
   server: {
     host: true,
     port: 5173,
-    allowedHosts: "all"
+    allowedHosts: [ "http://localhost:5173", "hisako-potatory-emile.ngrok-free.dev"]
   }
 })

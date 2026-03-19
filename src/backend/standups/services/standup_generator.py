@@ -64,12 +64,31 @@ class StandupGenerator:
             return False
         return True
     
-    def _format_task_link(self, label: Optional[int]) -> str:
+    def _format_task_link(self, label: Optional[int], task_id: Optional[str] = None, project_id: Optional[str] = None) -> str:
         """Formats a task label as a clickable Slack link (<url|text>)."""
         if label is None:
             return ""
-        url = f"{settings.BASE_TASK_URL}/{label}"
+        
+        # Prefer deep link to task detail if we have the IDs
+        if task_id and project_id:
+            url = f"{settings.BASE_TASK_URL}/project/{project_id}/task/{task_id}"
+        else:
+            # Fallback for when we only have the label
+            url = f"{settings.BASE_TASK_URL}/tasks/{label}"
+            
         return f"<{url}|Task {label}>"
+
+    def _get_link_from_label(self, label: int, project_id: str) -> str:
+        """Helper to resolve a task link when only the label and project_id are known."""
+        task = self.db.query(Task).filter(
+            Task.project_id == project_id,
+            Task.label == label,
+            Task.deleted_at.is_(None)
+        ).first()
+        
+        if task:
+            return self._format_task_link(label, str(task.id), str(project_id))
+        return self._format_task_link(label)
     
     def get_idle_member_suggestions(self, project_id: str) -> Dict[str, List[Dict[str, Any]]]:
         """
@@ -225,6 +244,7 @@ class StandupGenerator:
 
     def generate_standup_prompt(
         self, 
+        project_id: str,
         project_name: str, 
         grouped_tasks: Dict[str, List[Dict[str, Any]]],
         overdue_tasks: List[Dict[str, Any]] = None,
@@ -251,7 +271,7 @@ class StandupGenerator:
             message += "🚨 *CRITICAL: Deadline Risks Identified*\n"
             message += "The following tasks have missed their deadlines and require urgent attention:\n"
             for t in overdue_tasks:
-                link = self._format_task_link(t.get('label'))
+                link = self._format_task_link(t.get('label'), t.get('id'), project_id)
                 message += f"• {link} *{t['title']}* (Assignee: {t['assignee']}, Deadline: {t['deadline']})\n"
             message += "\n"
 
@@ -261,16 +281,18 @@ class StandupGenerator:
             for member, blockers in active_blockers.items():
                 message += f"• *{member}*:\n"
                 for blk in blockers:
-                    task_context = f" in {self._format_task_link(blk['task_label'])}" if blk['task_label'] else ""
+                    task_link = ""
+                    if blk['task_label']:
+                        task_link = f" in {self._format_task_link(blk['task_label'], blk['task_id'], project_id)}"
                     reason = (blk.get("reason") or "").strip()
                     blocked_by = (blk.get("blocked_by") or "").strip()
                     impact = (blk.get("impact") or "").strip()
 
                     if self._is_meaningful_blocker_reason(reason, blocked_by):
-                        message += f"    ⚠️ *Reason*: {reason}{task_context}\n"
+                        message += f"    ⚠️ *Reason*: {reason}{task_link}\n"
                     else:
                         # Respect "no reason if missing" while still making each blocker visible in the prompt.
-                        message += f"    ⚠️ *Blocker reported*{task_context}\n"
+                        message += f"    ⚠️ *Blocker reported*{task_link}\n"
 
                     if self._should_show_blocked_by(member, blocked_by):
                         message += f"    • *Blocked By*: {blocked_by}\n"
@@ -290,7 +312,7 @@ class StandupGenerator:
                     # Format task links in summary
                     summary = re.sub(
                         r"(?i)\[?Task (\d+)\]?",
-                        lambda m: self._format_task_link(int(m.group(1))),
+                        lambda m: self._get_link_from_label(int(m.group(1)), project_id),
                         summary
                     )
                     insight_content += f"• *{member}*: {summary}\n"
@@ -314,8 +336,8 @@ class StandupGenerator:
                 for member, task_name in new_task_entries:
                     task_name_clean = self._strip_to_self(task_name) or task_name
                     task_name_clean = re.sub(
-                        r"\\[Task (\\d+)\\]",
-                        lambda m: self._format_task_link(int(m.group(1))),
+                        r"\[Task (\d+)\]",
+                        lambda m: self._get_link_from_label(int(m.group(1)), project_id),
                         task_name_clean,
                     )
                     message += f"• *{member}*: {task_name_clean}\n"
@@ -328,7 +350,7 @@ class StandupGenerator:
                 # Format task links in insight
                 insight_clean = re.sub(
                     r"(?i)\[?Task (\d+)\]?",
-                    lambda m: self._format_task_link(int(m.group(1))),
+                    lambda m: self._get_link_from_label(int(m.group(1)), project_id),
                     insight_clean
                 )
                 message += f"• {insight_clean}\n"
@@ -342,7 +364,7 @@ class StandupGenerator:
                 for t in tasks:
                     deadline_str = f" (Deadline: {t['deadline']})" if t.get('deadline') else ""
                     description = t.get('description') or "Blocked task pending updates."
-                    link = self._format_task_link(t.get('label'))
+                    link = self._format_task_link(t.get('label'), t.get('id'), project_id)
                     message += f"    {link} {t['title']}{deadline_str} — {description}\n"
             message += "\n"
 
@@ -387,7 +409,7 @@ class StandupGenerator:
                     message += "  *⏳ In Progress:*\n"
                     for t in inprogress_tasks:
                         deadline_str = f" (Deadline: {t['deadline']})" if t.get('deadline') else ""
-                        link = self._format_task_link(t.get('label'))
+                        link = self._format_task_link(t.get('label'), t.get('id'), project_id)
                         message += f"    {link} {t['title']}{deadline_str}\n"
                     has_shown_tasks = True
                     
@@ -395,7 +417,7 @@ class StandupGenerator:
                     message += "  *🚧 Blocked:*\n"
                     for t in blocked_tasks:
                         deadline_str = f" (Deadline: {t['deadline']})" if t.get('deadline') else ""
-                        link = self._format_task_link(t.get('label'))
+                        link = self._format_task_link(t.get('label'), t.get('id'), project_id)
                         message += f"    {link} {t['title']}{deadline_str}\n"
                     has_shown_tasks = True
                 
@@ -404,7 +426,7 @@ class StandupGenerator:
                         message += "  💡 *Suggestions for today:* (Please reply with which one you'll take)\n"
                         for t in member_suggestions:
                             label = t.get('label')
-                            link = self._format_task_link(label)
+                            link = self._format_task_link(label, t.get('id'), project_id)
                             deadline = t.get('deadline')
                             unassigned = " (Unassigned)" if t.get('is_unassigned') else ""
                             message += f"    - {link} {t['title']} [Deadline: {deadline}]{unassigned}\n"
@@ -434,7 +456,7 @@ class StandupGenerator:
         return blocked
 
 
-    def generate_standup_summary(self, project_name: str, updates: List[Dict[str, Any]], session_blockers: List[str], all_active_blockers: List[Dict[str, Any]] = None, insights: List[str] = None) -> str:
+    def generate_standup_summary(self, project_id: str, project_name: str, updates: List[Dict[str, Any]], session_blockers: List[str], all_active_blockers: List[Dict[str, Any]] = None, insights: List[str] = None) -> str:
         """
         Generates a summary message of all processed updates.
         """
@@ -498,7 +520,9 @@ class StandupGenerator:
                     user = blk.get("user")
                     reason = blk.get("reason")
                     label = blk.get("label")
-                    link = self._format_task_link(label)
+                    # Try to find task_id for this label
+                    t_id = self.db.query(Task.id).filter(Task.project_id == project_id, Task.label == label).scalar()
+                    link = self._format_task_link(label, str(t_id) if t_id else None, project_id)
                     message += f"• {link} (*{user}*): {reason}\n"
             
             if general_blockers:
@@ -525,7 +549,7 @@ class StandupGenerator:
             matches = re.finditer(r"\[Task (\d+)\]", clean_line)
             for m in matches:
                 label_num = m.group(1)
-                link = self._format_task_link(int(label_num))
+                link = self._get_link_from_label(int(label_num), project_id)
                 # Only replace the specific matched text
                 clean_line = clean_line.replace(f"[Task {label_num}]", link)
             final_message += clean_line

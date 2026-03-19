@@ -77,6 +77,7 @@ class StandupManager:
             
             # 5. Generate the standup prompt
             raw_prompt = self.generator.generate_standup_prompt(
+                str(project_id),
                 project_name, 
                 grouped_tasks, 
                 overdue_tasks,
@@ -1335,6 +1336,7 @@ class StandupManager:
         project_name = project.name if project else "Project"
         
         summary_text = self.generator.generate_standup_summary(
+            str(standup.project_id),
             project_name, 
             summary_updates, 
             session_blockers,
