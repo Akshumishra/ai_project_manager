@@ -14,9 +14,9 @@ INVITATION_EMAIL_HTML_TEMPLATE = """
            Get Started
         </a>
         <br>
-        <a href="{slack_invite_url}" 
+        <a href="{slack_workspace_invite_url}" 
            style="display: inline-block; padding: 10px 20px; background-color: #4A154B; color: #fff; text-decoration: none; border-radius: 5px; font-weight: bold;">
-           Join Project Slack
+           Join Project Workspace on Slack
         </a>
     </div>
 

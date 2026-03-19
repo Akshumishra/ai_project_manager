@@ -1,12 +1,17 @@
 from sqlalchemy import func
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 import src.backend.model.user as user_model
-from src.backend.db.database import SessionLocal
+from src.backend.db.database import get_session_local
+from src.backend.logger import get_logger
 from . import schemas, utils
 
+logger = get_logger("auth_service")
+
 def register_user(request: schemas.UserCreate):
-    session = SessionLocal()
+    factory = get_session_local()
+    session = factory()
     try:
         normalized_email = str(request.email).lower()
         existing_user = (
@@ -47,15 +52,27 @@ def register_user(request: schemas.UserCreate):
         }
     except HTTPException:
         raise
+    except SQLAlchemyError as e:
+        session.rollback()
+        logger.error(f"Database error during registration: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500, 
+            detail="A database error occurred during registration. Please try again later."
+        )
     except Exception as e:
         session.rollback()
-        raise HTTPException(status_code=500, detail=f"Database error during registration: {str(e)}")
+        logger.error(f"Unexpected error during registration: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500, 
+            detail="An unexpected error occurred during registration. Please contact support."
+        )
     finally:
         session.close()
 
 
 def login_user(request: schemas.UserLogin):
-    session = SessionLocal()
+    factory = get_session_local()
+    session = factory()
     try:
         db_user = (
             session.query(user_model.User)
@@ -76,14 +93,27 @@ def login_user(request: schemas.UserLogin):
         return utils.issue_token_pair(db_user)
     except HTTPException:
         raise
+    except SQLAlchemyError as e:
+        session.rollback()
+        logger.error(f"Database error during login: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500, 
+            detail="A database error occurred during login."
+        )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error during login: {str(e)}")
+        session.rollback()
+        logger.error(f"Unexpected error during login: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500, 
+            detail="An unexpected error occurred during login."
+        )
     finally:
         session.close()
 
 
 def refresh_token(request: schemas.TokenRefresh):
-    session = SessionLocal()
+    factory = get_session_local()
+    session = factory()
     try:
         db_user = utils.verify_refresh_token(request.refresh_token, session)
         if db_user.deleted_at is not None:
@@ -91,7 +121,19 @@ def refresh_token(request: schemas.TokenRefresh):
         return utils.issue_token_pair(db_user)
     except HTTPException:
         raise
+    except SQLAlchemyError as e:
+        session.rollback()
+        logger.error(f"Database error during token refresh: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500, 
+            detail="A database error occurred during token refresh."
+        )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error during token refresh: {str(e)}")
+        session.rollback()
+        logger.error(f"Unexpected error during token refresh: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500, 
+            detail="An unexpected error occurred during token refresh."
+        )
     finally:
         session.close()

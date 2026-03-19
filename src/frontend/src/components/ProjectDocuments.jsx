@@ -28,7 +28,7 @@ export default function ProjectDocuments({ documents, onSelectDocument, onCreate
             <div className="doc-card-actions" onClick={(e) => e.stopPropagation()}>
               <button
                 className="btn-action-doc btn-rename-doc"
-                onClick={(e) => onRenameDocument(e, doc.id, doc.title)}
+                onClick={(e) => { e.stopPropagation(); onRenameDocument(doc.id, doc.title); }}
                 title="Rename Document"
                 style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '4px' }}
               >
@@ -40,7 +40,7 @@ export default function ProjectDocuments({ documents, onSelectDocument, onCreate
               {!(doc.title.includes('Requirement') || doc.title.includes('Technical')) && (
                 <button
                   className="btn-action-doc btn-delete-doc"
-                  onClick={(e) => onDeleteDocument(e, doc.id, doc.title)}
+                  onClick={(e) => { e.stopPropagation(); onDeleteDocument(doc.id, doc.title); }}
                   title="Delete Document"
                   style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '4px' }}
                 >

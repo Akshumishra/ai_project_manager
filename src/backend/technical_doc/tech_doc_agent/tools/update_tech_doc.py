@@ -10,5 +10,5 @@ def make_update_tech_doc_tool():
         return "Draft updated on user's screen."
 
     return [
-        update_technical_document_draft,
+        update_technical_document_draft
     ]

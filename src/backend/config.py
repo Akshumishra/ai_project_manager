@@ -54,7 +54,7 @@ class Settings(BaseSettings):
 
     # ── Slack ────────────────────────────────────────────────────────────────
     SLACK_BOT_TOKEN: Optional[str] = None
-    SLACK_INVITE_URL: Optional[str] = None
+    SLACK_WORKSPACE_INVITE_URL: Optional[str] = None
     SLACK_WORKSPACE_NAME: Optional[str] = None
     SLACK_SIGNING_SECRET: Optional[str] = None
     BOT_USER_ID: Optional[str] = None

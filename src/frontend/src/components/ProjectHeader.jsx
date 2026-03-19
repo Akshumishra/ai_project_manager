@@ -29,7 +29,7 @@ export default function ProjectHeader({ user, project, onBack, onUpdateStatus, o
     try {
       const result = await joinSlackChannelRequest(project.id);
       if (result.invite_sent) {
-        alert('An invite has been sent to your email. You are being redirected to Slack.');
+        alert('You are being redirected to Slack.');
       }
       window.open(result.redirect_url, '_blank', 'noopener,noreferrer');
     } catch {

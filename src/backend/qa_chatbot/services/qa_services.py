@@ -4,7 +4,7 @@ from sqlalchemy import text
 from typing import Optional, Dict, Any
 from src.backend.config import settings
 from src.backend.qa_chatbot.constants import SlackConstants, QAQueries
-from src.backend.db.database import SessionLocal
+from src.backend.db.database import get_session_local
 from src.backend.logger import get_logger
 
 logger = get_logger("qa_services")
@@ -54,7 +54,8 @@ async def send_message(channel_id: str, text_content: str, thread_ts: Optional[s
 def get_project_id_from_channel(channel_id: str) -> Optional[str]:
     """Find the project_id associated with a Slack channel."""
     logger.debug(f"Looking up project for channel: {channel_id}")
-    session = SessionLocal()
+    factory = get_session_local()
+    session = factory()
     try:
         row = session.execute(
             text(QAQueries.GET_PROJECT_ID_BY_CHANNEL), 
@@ -73,7 +74,8 @@ def get_project_id_from_channel(channel_id: str) -> Optional[str]:
 def get_project_member_id(project_id: str, slack_user_id: str) -> Optional[str]:
     """Resolves the internal project_member_id for a Slack user in a given project."""
     logger.debug(f"Looking up member {slack_user_id} for project: {project_id}")
-    session = SessionLocal()
+    factory = get_session_local()
+    session = factory()
     try:
         # Set the project_id in the session for Row Level Security (RLS)
         session.execute(
