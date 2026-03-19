@@ -631,6 +631,7 @@ class StandupManager:
                         action_taken=action_text
                     )
                     self.db.add(action_log)
+                    self.db.flush() # Ensure visible to subsequent loops or AI parsing (autoflush=False)
             except Exception as e:
                 logger.error(f"Error applying update for task {getattr(up, 'task_title', 'unknown')}: {e}")
                 
@@ -1137,6 +1138,7 @@ class StandupManager:
                 update_id=update_id,
                 action_taken=action_text
             ))
+            self.db.flush() # Ensure visible to subsequent queries in same session (autoflush=False)
             logger.info(f"Task-selection: Created action log for task {task.label}")
 
 
@@ -1237,6 +1239,7 @@ class StandupManager:
         
         # 2. Extract structured summary data from logs
         summary_updates = []
+        seen_updates = set()  # To prevent duplicates in the summary
         session_blockers = []
         session_insights = []
         
@@ -1251,7 +1254,10 @@ class StandupManager:
                     parts = log.action_taken.split("Updated task ")[1].split(" status to ")
                     task_name = parts[0]
                     status = parts[1]
-                    summary_updates.append({"user": user_name, "task": task_name, "status": status})
+                    update_key = (user_name, task_name, status)
+                    if update_key not in seen_updates:
+                        summary_updates.append({"user": user_name, "task": task_name, "status": status})
+                        seen_updates.add(update_key)
                 
                 # Handle persistent blockers reported in this session
                 elif "BLOCKER (" in log.action_taken:
@@ -1261,7 +1267,10 @@ class StandupManager:
                 # Handle resolved blockers
                 elif "RESOLVED BLOCKER: " in log.action_taken:
                     resolved_msg = log.action_taken.split("RESOLVED BLOCKER: ")[1]
-                    summary_updates.append({"user": user_name, "task": f"blocker: {resolved_msg}", "status": "resolved"})
+                    update_key = (user_name, f"blocker: {resolved_msg}", "resolved")
+                    if update_key not in seen_updates:
+                        summary_updates.append({"user": user_name, "task": f"blocker: {resolved_msg}", "status": "resolved"})
+                        seen_updates.add(update_key)
                 
                 # Handle sentiment alerts
                 elif "SENTIMENT ALERT: " in log.action_taken:
@@ -1284,7 +1293,10 @@ class StandupManager:
                                 break
                     
                     if task_part:
-                        summary_updates.append({"user": user_name, "task": task_part, "status": status})
+                        update_key = (user_name, task_part, status)
+                        if update_key not in seen_updates:
+                            summary_updates.append({"user": user_name, "task": task_part, "status": status})
+                            seen_updates.add(update_key)
 
                 # Handle documentation updates
                 elif any(prefix in log.action_taken for prefix in ["CREATED NEW DOCUMENT: ", "UPDATED DOCUMENT: "]):
@@ -1294,7 +1306,11 @@ class StandupManager:
                     else:
                         doc_title = log.action_taken.split("UPDATED DOCUMENT: ")[1].split(" with new info.")[0]
                         status = "document_update"
-                    summary_updates.append({"user": user_name, "task": doc_title, "status": status})
+                    
+                    update_key = (user_name, doc_title, status)
+                    if update_key not in seen_updates:
+                        summary_updates.append({"user": user_name, "task": doc_title, "status": status})
+                        seen_updates.add(update_key)
 
         # 3. Gather ALL currently unresolved blockers for the whole project
         from src.backend.model.blocker import Blocker as DBBlocker

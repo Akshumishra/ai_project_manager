@@ -71,7 +71,7 @@ function AppContent() {
   const navigate = useNavigate()
   const location = useLocation()
   const [showRegister, setShowRegister] = useState(false)
-  
+
   const {
     addBlockAfter,
     connectWebSocket,
@@ -107,7 +107,7 @@ function AppContent() {
     try {
       const statusData = await getProjectStatusRequest(projectId)
       const workflows = statusData.workflows || []
-      
+
       const reqStatus = workflows.find(w => w.workflow_name === 'requirement_gathering')?.status
       const techStatus = workflows.find(w => w.workflow_name === 'tech_doc_gathering')?.status
 
@@ -167,9 +167,9 @@ function AppContent() {
         onLogout={logout}
         onBack={() => {
           if (location.pathname === '/') return;
-          if (location.pathname.startsWith('/project/') || 
-              location.pathname.startsWith('/requirement-agent') || 
-              location.pathname.startsWith('/tech-doc')) {
+          if (location.pathname.startsWith('/project/') ||
+            location.pathname.startsWith('/requirement-agent') ||
+            location.pathname.startsWith('/tech-doc')) {
             navigate('/');
           } else {
             navigate(-1);
@@ -179,12 +179,12 @@ function AppContent() {
 
       <div className="app-main-layout">
         {!shouldHideSidebar() && (
-          <Sidebar 
-            activeProjectId={documentData?.project_id} 
+          <Sidebar
+            activeProjectId={documentData?.project_id}
             onSelectProject={handleSelectProject}
           />
         )}
-        
+
         <main className="main-content">
           <Routes>
             <Route path="/" element={<Dashboard onSelectProject={handleSelectProject} />} />
@@ -199,7 +199,7 @@ function AppContent() {
             <Route path="/project/:projectId/task/:taskId" element={<TaskDetailPage />} />
             <Route path="/project/:projectId/generating-tasks" element={<TaskGenerationLoading />} />
             <Route path="/editor/:id" element={
-              <EditorPage 
+              <EditorPage
                 docId={docId}
                 setDocId={setDocId}
                 loadDocument={loadDocument}
