@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import asyncio
 
 from langchain_openai import ChatOpenAI
 
@@ -11,7 +12,7 @@ from .schemas import MeetingAnalysis
 from src.backend.services.meeting.analysis import add_action_items, save_summary
 from sqlalchemy import text
 from src.backend.services.meeting.session import get_db_session
-from src.backend.services.meeting.session import get_db_session
+from src.backend.services.slack_notification import post_task_mapping_notification
 # from src.backend.services.llm.task_mapper_agent import run_task_mapping_agent # Removed due to circular import
 
 logger = logging.getLogger(__name__)
@@ -71,6 +72,12 @@ def _trigger_task_mapper_pipeline(bot_session_id: str, summary_text: str, risks_
             from src.backend.services.llm.task_mapper_agent import run_task_mapping_agent
             response_json = run_task_mapping_agent(map_context)
             logger.info("Task Mapper Agent completed successfully for session %s", bot_session_id)
+
+            # ── 6. Dispatch Slack Notification ────────────────────────────────
+            try:
+                asyncio.run(post_task_mapping_notification(str(project_id), response_json))
+            except Exception as slack_err:
+                logger.warning("Non-blocking Slack notification failed for session %s: %s", bot_session_id, slack_err)
 
 
     except Exception as e:
