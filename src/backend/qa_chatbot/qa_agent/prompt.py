@@ -81,11 +81,11 @@ You are AIPM Bot, an AI project manager assistant embedded in a Slack workspace.
 | description       | VARCHAR            | detailed task description (nullable)      |
 | label             | INTEGER            | sequential unique ID (e.g. Task 1)        |
 | project_id        | UUID FK → projects.id                                    |
-| category          | task_category_enum | BACKEND, FRONTEND, DATABASE, AI_ML, etc.  |
-| priority          | task_priority_enum | HIGH, MEDIUM, LOW                         |
-| complexity        | task_complexity_enum | HIGH, MEDIUM, LOW                       |
+| category          | task_category_enum | backend, frontend, database, ai_ml, etc.  |
+| priority          | task_priority_enum | high, medium, low                         |
+| complexity        | task_complexity_enum | high, medium, low                       |
 | deadline          | TIMESTAMPTZ        |                                           |
-| status            | task_status_enum   | TODO, IN_PROGRESS, COMPLETED, BLOCKED     |
+| status            | task_status_enum   | todo, in_progress, completed, blocked     |
 | project_member_id | UUID FK → project_members.id (assigned member)          |
 | created_at        | TIMESTAMPTZ        |                                           |
 | updated_at        | TIMESTAMPTZ        |                                           |
@@ -247,13 +247,13 @@ WHERE t.project_id = :project_id
   AND t.deleted_at IS NULL;
 ```
 
-### "Show my tasks with status X" (e.g. BLOCKED, IN_PROGRESS, TODO)
+### "Show my tasks with status X" (e.g. blocked, in_progress, todo)
 ```sql
 SELECT t.label, t.title, t.status, t.complexity, t.deadline
 FROM tasks t
 WHERE t.project_id        = :project_id
   AND t.project_member_id = :project_member_id
-  AND t.status::text      = 'IN_PROGRESS'
+  AND t.status::text      = 'in_progress'
   AND t.deleted_at IS NULL;
 ```
 
@@ -312,7 +312,7 @@ LIMIT 1;
 
 ### "What did [Name] say in the standup?" / "Show me Akshita's latest update"
 ```sql
-SELECT su.reply_text, su.created_at
+SELECT u.name, su.reply_text, su.created_at
 FROM standup_updates su
 JOIN users u ON u.id = su.user_id AND u.deleted_at IS NULL
 JOIN standups s ON s.id = su.standup_id AND s.deleted_at IS NULL
@@ -321,6 +321,20 @@ WHERE s.project_id = :project_id
   AND su.deleted_at IS NULL
 ORDER BY su.created_at DESC
 LIMIT 1;
+```
+
+### "What are the latest standup updates?" / "Show me all updates from the last standup"
+```sql
+SELECT u.name, su.reply_text, su.created_at
+FROM standup_updates su
+JOIN users u ON u.id = su.user_id AND u.deleted_at IS NULL
+WHERE su.standup_id = (
+    SELECT id FROM standups 
+    WHERE project_id = :project_id AND deleted_at IS NULL 
+    ORDER BY created_at DESC LIMIT 1
+)
+  AND su.deleted_at IS NULL
+ORDER BY su.created_at DESC;
 ```
 
 ### "What actions were taken in today's standup?"

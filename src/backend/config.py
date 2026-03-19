@@ -30,7 +30,7 @@ class Settings(BaseSettings):
 
     # ── Database ─────────────────────────────────────────────────────────────
     DATABASE_URL: str
-
+    STANDUP_DATABASE_URL: str = "sqlite:///./standup.db"
     # ── Auth ─────────────────────────────────────────────────────────────────
     ALGORITHM: str = "HS256"
     ACCESS_SECRET_KEY: str

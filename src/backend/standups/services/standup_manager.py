@@ -1211,7 +1211,20 @@ class StandupManager:
                 self.finalize_standup(str(standup.id))
                 results.append(str(standup.id))
             except Exception as e:
-                logger.error(f"Failed to auto-finalize standup {standup.id}: {e}")
+                error_str = str(e).lower()
+                # Slack thread no longer exists — tombstone this record so it's never retried
+                if "invalid_thread_ts" in error_str or "thread_not_found" in error_str:
+                    logger.warning(
+                        f"Standup {standup.id} Slack thread no longer exists. Marking as orphaned to stop retrying."
+                    )
+                    try:
+                        standup.summary = "[ORPHANED] Slack thread no longer exists."
+                        self.db.commit()
+                    except Exception as db_err:
+                        logger.error(f"Failed to tombstone orphaned standup {standup.id}: {db_err}")
+                        self.db.rollback()
+                else:
+                    logger.error(f"Failed to auto-finalize standup {standup.id}: {e}")
         
         return results
 
