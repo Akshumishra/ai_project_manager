@@ -20,7 +20,12 @@ class QAAgentConstants:
         "label", "category", "priority",
         "total_tasks", "assigned_to", "count", "num_tasks",
         "slack_channel_id", "message_ts", "prompt", "summary",
-        "reply_text", "slack_ts", "action_taken", "update_id", "standup_id"
+        "reply_text", "slack_ts", "action_taken", "update_id", "standup_id",
+        "meet_url", "bot_session_id", "meeting_type", "agenda", "scheduled_at",
+        "started_at", "ended_at", "meeting_id", "invite_source", "invite_reason",
+        "role_in_meeting", "joined_at", "left_at", "raw_text", "segments",
+        "word_count", "summary_text", "key_decisions", "risks_and_blockers",
+        "ai_model", "generated_at", "source_quote", "assigned_to_member_id", "due_date"
     }
 
 class QAQueries:

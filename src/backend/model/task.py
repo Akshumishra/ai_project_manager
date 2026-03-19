@@ -110,35 +110,7 @@ class Task(BaseModel):
         back_populates="task",
         cascade="all, delete-orphan"
     )
-
-
-from sqlalchemy import event, func
-
-
-@event.listens_for(Task, "before_insert")
-def set_next_label(mapper, connection, target):
-    """
-    Automatically sets the next sequential label for a project before inserting a new task.
-    This ensures that labels are always sequential per project, regardless of how they are created.
-    """
-    if target.label is not None and target.label > 0:
-        return
-
-    # Using the connection to execute a raw SQL query to get the max label for the project.
-    from src.backend.model.task import Task as TaskModel
-    from sqlalchemy.orm import object_session
-    
-    table = TaskModel.__table__
-    query = table.select().with_only_columns(func.max(table.c.label)).where(table.c.project_id == target.project_id)
-    
-    db_max = connection.execute(query).scalar() or 0
-    
-    session = object_session(target)
-    session_max = 0
-    if session:
-        for obj in session.new:
-            if isinstance(obj, TaskModel) and obj.project_id == target.project_id and obj != target:
-                if obj.label and obj.label > session_max:
-                    session_max = obj.label
-    
-    target.label = max(db_max, session_max) + 1
+# Register SQLAlchemy event listeners
+from sqlalchemy import event
+from src.backend.db.listeners.task_listeners import set_next_label
+event.listen(Task, "before_insert", set_next_label)

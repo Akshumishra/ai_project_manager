@@ -40,12 +40,12 @@ async def slack_events(request: Request, background_tasks: BackgroundTasks):
 
     return {"status": "ok"}
 
-def process_reply(standup_id: str):
+async def process_reply(standup_id: str):
     """Background task to process standup replies."""
     db = SessionStandup()
     try:
         manager = StandupManager(db)
-        manager.process_new_replies(standup_id)
+        await manager.process_new_replies(standup_id)
     except Exception as e:
         logger.error(f"Error processing background standup reply: {e}")
     finally:

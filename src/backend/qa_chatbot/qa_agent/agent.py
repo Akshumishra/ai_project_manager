@@ -51,9 +51,9 @@ class ProjectAwareAgent:
             system_prompt=SYSTEM_PROMPT,
         )
 
-    def run(self, messages: List[BaseMessage]) -> str:
+    async def arun(self, messages: List[BaseMessage]) -> str:
         logger.info(f"Agent invoked with {len(messages)} messages")
-        response = self.agent.invoke({"messages": messages})
+        response = await self.agent.ainvoke({"messages": messages})
         final_response = response["messages"][-1].content
         logger.info("Agent execution completed successfully")
         return final_response

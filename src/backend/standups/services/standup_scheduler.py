@@ -14,29 +14,29 @@ class StandupScheduler:
         db = SessionStandup()
         return StandupManager(db), db
 
-    def morning_job(self):
+    async def morning_job(self):
         logger.info("CRON: Starting morning standup initiation...")
         manager, db = self._get_manager()
         try:
-            results = manager.initiate_all_standups()
+            results = await manager.initiate_all_standups()
             logger.info(f"CRON: Morning standups initiated for {len(results)} projects.")
         except Exception as e:
             logger.error(f"CRON: Error in morning job: {e}")
         finally:
             db.close()
 
-    def evening_job(self):
+    async def evening_job(self):
         logger.info("CRON: Starting evening standup finalization...")
         manager, db = self._get_manager()
         try:
-            results = manager.finalize_all_active_standups()
+            results = await manager.finalize_all_active_standups()
             logger.info(f"CRON: Evening standups finalized: {results}")
         except Exception as e:
             logger.error(f"CRON: Error in evening job: {e}")
         finally:
             db.close()
 
-    def startup_finalize_job(self):
+    async def startup_finalize_job(self):
         """
         Runs once on startup. Finalizes any standups that were created today but
         not yet summarized — handles cases where the evening cron was missed.
@@ -44,7 +44,7 @@ class StandupScheduler:
         logger.info("STARTUP: Checking for any unfinalized standups...")
         manager, db = self._get_manager()
         try:
-            results = manager.finalize_all_active_standups()
+            results = await manager.finalize_all_active_standups()
             if results:
                 logger.info(f"STARTUP: Finalized {len(results)} pending standup(s): {results}")
             else:
@@ -55,20 +55,19 @@ class StandupScheduler:
             db.close()
 
     def start(self):
-        # Morning standup Mon-Fri IST
-        # misfire_grace_time=3600 → fires even if server starts up to 1 hour late
+        # Morning standup Mon-Fri IST (9:00 AM)
         self.scheduler.add_job(
             self.morning_job,
-            CronTrigger(day_of_week='mon-fri', hour=14, minute=54, timezone='Asia/Kolkata'),
+            CronTrigger(day_of_week='mon-fri', hour=2, minute=26, timezone='Asia/Kolkata'),
             id='morning_standup',
             replace_existing=True,
             misfire_grace_time=3600
         )
         
-        # Evening finalization Mon-Fri IST
+        # Evening finalization Mon-Fri IST (6:00 PM)
         self.scheduler.add_job(
             self.evening_job,
-            CronTrigger(day_of_week='mon-fri', hour=13, minute=53, timezone='Asia/Kolkata'),
+            CronTrigger(day_of_week='mon-fri', hour=2, minute=28, timezone='Asia/Kolkata'),
             id='evening_standup',
             replace_existing=True,
             misfire_grace_time=3600

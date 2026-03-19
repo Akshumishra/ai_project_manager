@@ -116,7 +116,7 @@ app.include_router(api_router)
 app.include_router(merged_slack_events.router, tags=["Slack Events"])
 
 # Standup Management API
-app.include_router(standup_routes.router, prefix="/api/standup", tags=["Standup API"])
+app.include_router(standup_routes.router)
 
 @app.get("/")
 def home():

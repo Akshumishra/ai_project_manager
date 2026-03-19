@@ -77,7 +77,7 @@ class StandupReplyAgent:
         self.structured_llm = self.llm.with_structured_output(StandupParsedResponse)
         self.blocker_llm = self.llm.with_structured_output(IntelligentBlockerResult)
 
-    def parse_reply(self, user_name: str, reply_text: str, active_tasks: List[dict], active_blockers: List[dict] = None, team_members: List[str] = None, message_date: Optional[datetime] = None, has_in_progress_tasks: bool = True) -> StandupParsedResponse:
+    async def parse_reply(self, user_name: str, reply_text: str, active_tasks: List[dict], active_blockers: List[dict] = None, team_members: List[str] = None, message_date: Optional[datetime] = None, has_in_progress_tasks: bool = True) -> StandupParsedResponse:
         """
         Parses a natural language standup reply into structured data using LangChain.
         """
@@ -97,7 +97,7 @@ class StandupReplyAgent:
 
         try:
             chain = prompt | self.structured_llm
-            result = chain.invoke({
+            result = await chain.ainvoke({
                 "user_name": user_name,
                 "has_in_progress_state": in_progress_state,
                 "reply_text": reply_text,
@@ -118,7 +118,7 @@ class StandupReplyAgent:
                 sentiment="unknown"
             )
 
-    def identify_blocker(self, standup_message: str, members_with_active_tasks: str, standup_summaries: str, todo_tasks: str) -> IntelligentBlockerResult:
+    async def identify_blocker(self, standup_message: str, members_with_active_tasks: str, standup_summaries: str, todo_tasks: str) -> IntelligentBlockerResult:
         """
         Uses an intelligent prompt to analyze a standup message for explicit and inferred blockers.
         """
@@ -129,7 +129,7 @@ class StandupReplyAgent:
 
         try:
             chain = prompt | self.blocker_llm
-            result = chain.invoke({
+            result = await chain.ainvoke({
                 "members_with_active_tasks": members_with_active_tasks,
                 "standup_summaries": standup_summaries,
                 "todo_tasks": todo_tasks,
@@ -141,7 +141,7 @@ class StandupReplyAgent:
             logger.error(f"Error identifying blocker: {e}")
             return IntelligentBlockerResult(blocker_detected=False)
 
-    def summarize_update(self, user_name: str, reply_text: str, action_logs: List[str]) -> str:
+    async def summarize_update(self, user_name: str, reply_text: str, action_logs: List[str]) -> str:
         """
         Generates a professional, one-sentence insight summary of a developer's update.
         """
@@ -153,7 +153,7 @@ class StandupReplyAgent:
         try:
             actions_list = "\n".join([f"- {a}" for a in action_logs])
             chain = prompt | self.llm
-            result = chain.invoke({
+            result = await chain.ainvoke({
                 "user_name": user_name,
                 "reply_text": reply_text,
                 "actions_list": actions_list
@@ -168,7 +168,7 @@ class StandupReplyAgent:
             # Fallback to first sentence
             return reply_text.split(".", 1)[0] + "."
 
-    def refine_standup_prompt(self, project_name: str, raw_prompt: str) -> str:
+    async def refine_standup_prompt(self, project_name: str, raw_prompt: str) -> str:
         """
         Refines the final standup prompt to remove redundancies and ensure peak professionalism.
         """
@@ -179,7 +179,7 @@ class StandupReplyAgent:
 
         try:
             chain = prompt | self.llm
-            result = chain.invoke({
+            result = await chain.ainvoke({
                 "project_name": project_name,
                 "raw_prompt": raw_prompt
             })

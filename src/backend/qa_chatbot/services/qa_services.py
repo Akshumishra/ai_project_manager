@@ -1,5 +1,4 @@
 import httpx
-import uuid
 from sqlalchemy import text
 from typing import Optional, Dict, Any
 from src.backend.config import settings
@@ -61,12 +60,17 @@ def get_project_id_from_channel(channel_id: str) -> Optional[str]:
             text(QAQueries.GET_PROJECT_ID_BY_CHANNEL), 
             {"channel_id": channel_id}
         ).fetchone()
-        project_id = str(row[0]) if row else None
-        if project_id:
-            logger.debug(f"Found project_id: {project_id} for channel: {channel_id}")
+        
+        if not row:
+            logger.warning(f"No project mapped to channel {channel_id}")
+            return None
+            
+        project_id = str(row[0])
+        logger.debug(f"Found project_id: {project_id} for channel: {channel_id}")
         return project_id
     except Exception as e:
-        logger.error(f"Error looking up project for channel {channel_id}: {e}", exc_info=True)
+        logger.error(f"Database error looking up project for channel {channel_id}: {e}", exc_info=True)
+        # We return None but log the error
         return None
     finally:
         session.close()
@@ -87,12 +91,16 @@ def get_project_member_id(project_id: str, slack_user_id: str) -> Optional[str]:
             text(QAQueries.GET_PROJECT_MEMBER_ID),
             {"project_id": project_id, "slack_id": slack_user_id}
         ).fetchone()
-        member_id = str(row[0]) if row else None
-        if member_id:
-            logger.debug(f"Found member_id: {member_id} for user: {slack_user_id}")
+        
+        if not row:
+            logger.warning(f"User {slack_user_id} is not a member of project {project_id}")
+            return None
+            
+        member_id = str(row[0])
+        logger.debug(f"Found member_id: {member_id} for user: {slack_user_id}")
         return member_id
     except Exception as e:
-        logger.error(f"Error looking up member {slack_user_id}: {e}", exc_info=True)
+        logger.error(f"Database error looking up member {slack_user_id} in {project_id}: {e}", exc_info=True)
         return None
     finally:
         session.close()

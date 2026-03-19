@@ -90,3 +90,4 @@ def create_tables() -> None:
     """Create all registered tables.  Use Alembic migrations in production."""
     factory = _get_session_local()
     Base.metadata.create_all(bind=factory.kw["bind"])
+

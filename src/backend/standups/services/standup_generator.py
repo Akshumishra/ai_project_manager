@@ -7,7 +7,6 @@ from src.backend.model.task import Task, TaskStatus
 from src.backend.model.project import ProjectMember, Project
 from src.backend.model.user import User
 from src.backend.model.blocker import Blocker
-from src.backend.model.task_log import TaskLog
 from datetime import datetime, timezone
 from src.backend.config import settings
 
@@ -78,7 +77,7 @@ class StandupGenerator:
             
         return f"<{url}|Task {label}>"
 
-    def _get_link_from_label(self, label: int, project_id: str) -> str:
+    async def _get_link_from_label(self, label: int, project_id: str) -> str:
         """Helper to resolve a task link when only the label and project_id are known."""
         task = self.db.query(Task).filter(
             Task.project_id == project_id,
@@ -90,7 +89,7 @@ class StandupGenerator:
             return self._format_task_link(label, str(task.id), str(project_id))
         return self._format_task_link(label)
     
-    def get_idle_member_suggestions(self, project_id: str) -> Dict[str, List[Dict[str, Any]]]:
+    async def get_idle_member_suggestions(self, project_id: str) -> Dict[str, List[Dict[str, Any]]]:
         """
         Identifies members with no active tasks and finds potential TODO tasks to suggest.
         
@@ -149,7 +148,7 @@ class StandupGenerator:
         
         return suggestions
 
-    def fetch_active_tasks(self, project_id: str) -> tuple[Dict[str, List[Dict[str, Any]]], List[Dict[str, Any]]]:
+    async def fetch_active_tasks(self, project_id: str) -> tuple[Dict[str, List[Dict[str, Any]]], List[Dict[str, Any]]]:
         """
         Fetches active tasks for a project and groups them by developer.
         Also identifies suggestions for idle members.
@@ -209,12 +208,12 @@ class StandupGenerator:
             
             grouped_tasks[member_name].append(task_info)
             
-        suggestions = self.get_idle_member_suggestions(project_id)
+        suggestions = await self.get_idle_member_suggestions(project_id)
         
         return grouped_tasks, overdue_tasks, suggestions
 
 
-    def fetch_active_blockers(self, project_id: str) -> Dict[str, List[Dict[str, Any]]]:
+    async def fetch_active_blockers(self, project_id: str) -> Dict[str, List[Dict[str, Any]]]:
         """
         Fetches all unresolved blockers for a project, grouped by user.
         """
@@ -242,7 +241,7 @@ class StandupGenerator:
             })
         return grouped
 
-    def generate_standup_prompt(
+    async def generate_standup_prompt(
         self, 
         project_id: str,
         project_name: str, 
@@ -310,11 +309,10 @@ class StandupGenerator:
                 # Filter out "No progress updates reported." and empty summaries
                 if summary and summary not in ["No key update was reported.", "No progress updates reported."]:
                     # Format task links in summary
-                    summary = re.sub(
-                        r"(?i)\[?Task (\d+)\]?",
-                        lambda m: self._get_link_from_label(int(m.group(1)), project_id),
-                        summary
-                    )
+                    found_labels = re.findall(r"(?i)\[?Task (\d+)\]?", summary)
+                    for label_num in found_labels:
+                        link = await self._get_link_from_label(int(label_num), project_id)
+                        summary = re.sub(rf"(?i)\[?Task {label_num}\]?", link, summary)
                     insight_content += f"• *{member}*: {summary}\n"
 
             if insight_content:
@@ -335,11 +333,10 @@ class StandupGenerator:
                 message += "🆕 *Tasks Added Last Standup:*\n"
                 for member, task_name in new_task_entries:
                     task_name_clean = self._strip_to_self(task_name) or task_name
-                    task_name_clean = re.sub(
-                        r"\[Task (\d+)\]",
-                        lambda m: self._get_link_from_label(int(m.group(1)), project_id),
-                        task_name_clean,
-                    )
+                    found_labels = re.findall(r"\[Task (\d+)\]", task_name_clean)
+                    for label_num in found_labels:
+                        link = await self._get_link_from_label(int(label_num), project_id)
+                        task_name_clean = task_name_clean.replace(f"[Task {label_num}]", link)
                     message += f"• *{member}*: {task_name_clean}\n"
                 message += "\n"
 
@@ -348,11 +345,10 @@ class StandupGenerator:
             for insight in summary_insights:
                 insight_clean = self._strip_to_self(insight)
                 # Format task links in insight
-                insight_clean = re.sub(
-                    r"(?i)\[?Task (\d+)\]?",
-                    lambda m: self._get_link_from_label(int(m.group(1)), project_id),
-                    insight_clean
-                )
+                found_labels = re.findall(r"(?i)\[?Task (\d+)\]?", insight_clean)
+                for label_num in found_labels:
+                    link = await self._get_link_from_label(int(label_num), project_id)
+                    insight_clean = re.sub(rf"(?i)\[?Task {label_num}\]?", link, insight_clean)
                 message += f"• {insight_clean}\n"
             message += "\n"
 
@@ -456,7 +452,7 @@ class StandupGenerator:
         return blocked
 
 
-    def generate_standup_summary(self, project_id: str, project_name: str, updates: List[Dict[str, Any]], session_blockers: List[str], all_active_blockers: List[Dict[str, Any]] = None, insights: List[str] = None) -> str:
+    async def generate_standup_summary(self, project_id: str, project_name: str, updates: List[Dict[str, Any]], session_blockers: List[str], all_active_blockers: List[Dict[str, Any]] = None, insights: List[str] = None) -> str:
         """
         Generates a summary message of all processed updates.
         """
@@ -546,11 +542,9 @@ class StandupGenerator:
         for line in message.splitlines(keepends=True):
             clean_line = line
             # Find all [Task X] matches
-            matches = re.finditer(r"\[Task (\d+)\]", clean_line)
-            for m in matches:
-                label_num = m.group(1)
-                link = self._get_link_from_label(int(label_num), project_id)
-                # Only replace the specific matched text
+            found_labels = re.findall(r"\[Task (\d+)\]", clean_line)
+            for label_num in found_labels:
+                link = await self._get_link_from_label(int(label_num), project_id)
                 clean_line = clean_line.replace(f"[Task {label_num}]", link)
             final_message += clean_line
 

@@ -5,7 +5,7 @@ import httpx
 import json
 from typing import Optional, Set, List, Dict, Any, Union
 from fastapi import APIRouter, Request, HTTPException, status, BackgroundTasks
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from src.backend.config import settings
 from src.backend.qa_chatbot.constants import SlackConstants
@@ -121,61 +121,79 @@ async def _orchestrate_agent(event_data: Dict[str, Any]) -> GenericResponse:
     channel_id = event_data.get("channel")
     thread_ts = event_data.get("thread_ts", ts)
 
-    if dispatch_type == "standup":
-        from src.backend.db.database_standup import SessionStandup
-        from src.backend.model.standup import Standup
-        from src.backend.standups.services.standup_manager import StandupManager
-        
-        db = SessionStandup()
-        try:
-            standup = db.query(Standup).filter(
-                Standup.message_ts == thread_ts,
-                Standup.slack_channel_id == channel_id
-            ).first()
-            
-            if standup:
-                logger.info(f"Detected reply in standup thread: {thread_ts}")
-                manager = StandupManager(db)
-                manager.process_new_replies(str(standup.id))
-                return GenericResponse(status="success", detail="Standup reply processed")
-            else:
-                return GenericResponse(status="ignored", detail="Thread is not a standup")
-        except Exception as e:
-            logger.error(f"Standup reply processing failed: {e}")
-            return GenericResponse(status="error", detail=str(e))
-        finally:
-            db.close()
-
-    # Default to QA logic
-    mention_str = f"<@{settings.BOT_USER_ID}>"
     try:
+        if dispatch_type == "standup":
+            from src.backend.db.database_standup import SessionStandup
+            from src.backend.model.standup import Standup
+            from src.backend.standups.services.standup_manager import StandupManager
+            
+            db = SessionStandup()
+            try:
+                # Log the search parameters
+                logger.info(f"Searching for standup with message_ts={thread_ts} in channel={channel_id}")
+                
+                standup = db.query(Standup).filter(
+                    Standup.message_ts == thread_ts,
+                    Standup.slack_channel_id == channel_id
+                ).first()
+                
+                if standup:
+                    logger.info(f"FOUND standup {standup.id}. Processing reply from {slack_user_id}")
+                    manager = StandupManager(db)
+                    await manager.handle_reply_event(str(standup.id), slack_user_id, user_text, ts)
+                    return GenericResponse(status="success", detail="Standup reply processed")
+                else:
+                    logger.warning(f"Thread {thread_ts} in channel {channel_id} is NOT a known standup. Ignoring.")
+                    return GenericResponse(status="ignored", detail="Thread is not a standup")
+            except Exception as e:
+                logger.error(f"Standup reply processing failed for thread {thread_ts}: {e}", exc_info=True)
+                return GenericResponse(status="error", detail=str(e))
+            finally:
+                db.close()
+
+        # QA logic
+        mention_str = f"<@{settings.BOT_USER_ID}>"
         question = user_text.replace(mention_str, "").strip()
 
-        project_id = get_project_id_from_channel(channel_id)
-        if not project_id:
-            logger.warning(f"Project not found for channel {channel_id}")
-            await send_message(channel_id, "Sorry, I couldn't find a project linked to this channel.", thread_ts=thread_ts)
-            return GenericResponse(status="error", detail="No project found")
+        # Context Resolution
+        try:
+            project_id = get_project_id_from_channel(channel_id)
+            if not project_id:
+                logger.warning(f"Project not found for channel {channel_id}")
+                await send_message(channel_id, "⚠️ *Error*: I couldn't find a project linked to this channel. Please contact your administrator.", thread_ts=thread_ts)
+                return GenericResponse(status="error", detail="No project found")
 
-        member_id = get_project_member_id(project_id, slack_user_id)
-        if not member_id:
-            logger.warning(f"User {slack_user_id} not in project {project_id}")
-            await send_message(channel_id, "Sorry, you don't appear to be a member of the project assigned to this channel.", thread_ts=thread_ts)
-            return GenericResponse(status="error", detail="User not project member")
+            member_id = get_project_member_id(project_id, slack_user_id)
+            if not member_id:
+                logger.warning(f"User {slack_user_id} not in project {project_id}")
+                await send_message(channel_id, "⚠️ *Access Denied*: You don't appear to be a member of the project assigned to this channel.", thread_ts=thread_ts)
+                return GenericResponse(status="error", detail="User not project member")
+        except Exception as e:
+            logger.error(f"Context resolution failed: {e}")
+            await send_message(channel_id, "⚠️ *Error*: I encountered a database problem while looking up your project details.", thread_ts=thread_ts)
+            return GenericResponse(status="error", detail="Context resolution error")
 
-        history = await get_thread_history(channel_id, thread_ts)
-        history.append(HumanMessage(content=question))
-        
-        agent = ProjectAwareAgent(project_id, slack_user_id, member_id)
-        answer = agent.run(history)
-        
-        await send_message(channel_id, answer, thread_ts=thread_ts)
-        return GenericResponse(status="success", message_sent=True)
+        # Agent Execution
+        try:
+            history = await get_thread_history(channel_id, thread_ts)
+            history.append(HumanMessage(content=question))
+            
+            agent = ProjectAwareAgent(project_id, slack_user_id, member_id)
+            answer = await agent.arun(history)
+            
+            await send_message(channel_id, answer, thread_ts=thread_ts)
+            return GenericResponse(status="success", message_sent=True)
+        except Exception as e:
+            logger.error(f"Agent execution failed for user {slack_user_id}: {e}", exc_info=True)
+            error_msg = "Sorry, I encountered an internal error while thinking about your question. Please try again in a moment."
+            if "rate limit" in str(e).lower():
+                error_msg = "I'm receiving too many requests right now. Please wait a minute before asking again."
+            await send_message(channel_id, f"❌ {error_msg}", thread_ts=thread_ts)
+            return GenericResponse(status="error", detail=str(e))
 
     except Exception as e:
-        logger.error(f"Error processing Slack QA event: {e}", exc_info=True)
-        await send_message(channel_id, "I encountered an error while processing your request. Please try again later.", thread_ts=thread_ts)
-        return GenericResponse(status="error", detail=str(e))
+        logger.critical(f"Unhandled exception in agent orchestration: {e}", exc_info=True)
+        return GenericResponse(status="critical_error", detail=str(e))
 
 
 async def get_thread_history(channel_id: str, thread_ts: str) -> List[Any]:
@@ -255,11 +273,18 @@ async def slack_events(request: Request, background_tasks: BackgroundTasks):
 
     body = await _get_validated_body(request)
 
+    with open("/tmp/slack_events.log", "a") as f:
+        f.write(f"\n[{time.ctime()}] Received Event: {json.dumps(body)}\n")
+
     result = _handle_filtering(body)
     
     if isinstance(result, (ChallengeResponse, GenericResponse)):
+        with open("/tmp/slack_events.log", "a") as f:
+            f.write(f"[{time.ctime()}] Filtered Result: {result}\n")
         return result
 
+    with open("/tmp/slack_events.log", "a") as f:
+        f.write(f"[{time.ctime()}] Dispatched: {result.get('dispatch_type')}\n")
     background_tasks.add_task(_orchestrate_agent, result)
     
     return GenericResponse(status="accepted", detail="Processing in background")
