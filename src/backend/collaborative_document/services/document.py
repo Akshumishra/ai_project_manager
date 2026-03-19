@@ -19,7 +19,7 @@ def create_document(data: schemas.DocumentCreate, db: Session, current_user: Use
     if not project:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, 
-            detail="Project not found"
+            detail="This page doesn't exist"
         )
 
     is_member = (
@@ -31,9 +31,9 @@ def create_document(data: schemas.DocumentCreate, db: Session, current_user: Use
         .first()
     )
 
-    if project.created_by != current_user.id and not is_member:
+    if not is_member:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="No access to create documents in this project"
+            status_code=status.HTTP_404_NOT_FOUND, detail="This page doesn't exist"
         )
 
     document = Document(
@@ -48,62 +48,14 @@ def create_document(data: schemas.DocumentCreate, db: Session, current_user: Use
     return {"document_id": str(document.id), "initial_block_id": str(block.id)}
 
 
-def save_document(
-    data: schemas.DocumentCreate,
-    markdown_content: str,
-    db: Session,
-    current_user: User,
-    auto_commit: bool = True,
-):
-    project = db.query(Project).filter(Project.id == data.project_id).first()
-    if not project:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, 
-            detail="Project not found"
-        )
-
-    is_member = (
-        db.query(ProjectMember)
-        .filter(
-            ProjectMember.project_id == data.project_id,
-            ProjectMember.user_id == current_user.id,
-        )
-        .first()
-    )
-
-    if project.created_by != current_user.id and not is_member:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, 
-            detail="No access to create documents in this project"
-        )
-
-    document = Document(
-        title=data.title, project_id=data.project_id, created_by=current_user.id
-    )
-    db.add(document)
-    db.flush()
-
-    helper_function.create_blocks_from_text(document.id, markdown_content, db)
-    if auto_commit:
-        db.commit()
-    return {"document_id": str(document.id)}
-
-
 def get_document(document_id: UUID, db: Session, current_user: User):
-    helper_function.verify_document_access(document_id, current_user.id, db)
+    document = helper_function.verify_document_access(document_id, current_user.id, db)
     redis_key = f"doc:{document_id}"
     cached = redis_client.get(redis_key)
     if cached:
         doc_data = json.loads(cached)
         if "title" in doc_data:
             return doc_data
-
-    document = db.query(Document).filter(Document.id == document_id).first()
-    if not document:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, 
-            detail="Document not found"
-        )
 
     blocks = (
         db.query(DocumentBlock)
@@ -130,6 +82,43 @@ def get_document(document_id: UUID, db: Session, current_user: User):
     redis_client.set(redis_key, json.dumps(response), ex=3000)
     return response
 
+def update_document(document_id: UUID, data: schemas.DocumentUpdate, db: Session, current_user: User):
+    helper_function.verify_document_access(document_id, current_user.id, db)
+    document = db.query(Document).filter(Document.id == document_id).first()
+    if not document:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Document not found"
+        )
+
+    document.title = data.title
+    db.commit()
+    db.refresh(document)
+    _sync_title_to_cache(document_id, document.title)
+    return document
+
+
+def delete_document(document_id: UUID, db: Session, current_user: User):
+    helper_function.verify_document_access(document_id, current_user.id, db)
+    document = db.query(Document).filter(Document.id == document_id, Document.deleted_at.is_(None)).first()
+    if not document:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Document not found"
+        )
+
+    # Soft-delete the document
+    document.deleted_at = func.now()
+    
+    # Cascade soft-delete to blocks
+    db.query(DocumentBlock).filter(
+        DocumentBlock.doc_id == document_id,
+        DocumentBlock.deleted_at.is_(None)
+    ).update({DocumentBlock.deleted_at: func.now()}, synchronize_session=False)
+
+    db.commit()
+    redis_client.delete(f"doc:{document_id}")
+    return {"message": "Document and blocks deleted successfully"}
 
 async def insert_block(
     document_id: UUID, data: schemas.BlockCreate, db: Session, current_user: User
@@ -160,7 +149,7 @@ async def insert_block(
     return {"block_id": str(new_id), "position_key": new_key, "client_id": data.client_id}
 
 
-async def edit_block(block_id: str, data: schemas.BlockUpdate, db: Session, current_user: User):
+def edit_block(block_id: str, data: schemas.BlockUpdate, db: Session, current_user: User):
     block = db.query(DocumentBlock).filter(DocumentBlock.id == block_id).first()
     if not block:
         raise HTTPException(
@@ -210,43 +199,6 @@ async def delete_block(block_id: str, db: Session, current_user: User):
     return {"message": "Block deleted"}
 
 
-def update_document(document_id: UUID, data: schemas.DocumentUpdate, db: Session, current_user: User):
-    helper_function.verify_document_access(document_id, current_user.id, db)
-    document = db.query(Document).filter(Document.id == document_id).first()
-    if not document:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, 
-            detail="Document not found"
-        )
-
-    document.title = data.title
-    db.commit()
-    db.refresh(document)
-    _sync_title_to_cache(document_id, document.title)
-    return document
-
-
-def delete_document(document_id: UUID, db: Session, current_user: User):
-    helper_function.verify_document_access(document_id, current_user.id, db)
-    document = db.query(Document).filter(Document.id == document_id, Document.deleted_at.is_(None)).first()
-    if not document:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, 
-            detail="Document not found"
-        )
-
-    # Soft-delete the document
-    document.deleted_at = func.now()
-    
-    # Cascade soft-delete to blocks
-    db.query(DocumentBlock).filter(
-        DocumentBlock.doc_id == document_id,
-        DocumentBlock.deleted_at.is_(None)
-    ).update({DocumentBlock.deleted_at: func.now()}, synchronize_session=False)
-
-    db.commit()
-    redis_client.delete(f"doc:{document_id}")
-    return {"message": "Document and blocks deleted successfully"}
 
 
 # --- Private Helpers ---
