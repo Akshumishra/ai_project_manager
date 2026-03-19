@@ -60,7 +60,8 @@ class Settings(BaseSettings):
     BOT_USER_ID: Optional[str] = None
     SLACK_API_BASE_URL: str = "https://slack.com/api"
     STANDUP_DATABASE_URL: str = "sqlite:///./standup.db"
-
+    REDIS_HOST: str = None
+    REDIS_PORT: int = 6379
     # ── Misc / Optional integrations ─────────────────────────────────────────
     FIREFLIES_API_KEY: Optional[str] = None
     GOOGLE_CREDENTIALS_PATH: Path = Field(
