@@ -11,8 +11,14 @@ from src.backend.meeting_bot.api.schemas import (
     ScheduleCalendarMeetingRequest,
     ScheduleCalendarMeetingResponse,
 )
-from src.backend.services.calendar_service import create_calendar_meet
-from src.backend.services.meeting import create_meeting
+from src.backend.meeting_bot.services.calendar_service import create_calendar_meet
+from src.backend.meeting_bot.services.meeting import create_meeting
+from src.backend.meeting_bot.constants import (
+    IST_TIMEZONE_OFFSET_HOURS,
+    IST_TIMEZONE_OFFSET_MINS,
+    SCHEDULE_MEETING_OFFSET_MINS,
+    BOT_SESSION_ID_PREFIX
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Sessions"])
@@ -40,8 +46,8 @@ async def schedule_meeting_calendar(
     invocation is required.
     """
     # ── 1. Calculate the scheduled datetime (5 mins from now in IST) ────────
-    ist = timezone(timedelta(hours=5, minutes=30))
-    scheduled_at_dt = datetime.now(ist) + timedelta(minutes=2)
+    ist = timezone(timedelta(hours=IST_TIMEZONE_OFFSET_HOURS, minutes=IST_TIMEZONE_OFFSET_MINS))
+    scheduled_at_dt = datetime.now(ist) + timedelta(minutes=SCHEDULE_MEETING_OFFSET_MINS)
 
     # ── 2. Generate Google Meet space via Calendar API ──────────────────────
     try:
@@ -65,7 +71,7 @@ async def schedule_meeting_calendar(
         )
 
     # ── 3. Persist Meeting to DB ───────────────────────────────────────────
-    bot_session_id = f"ffl-{uuid.uuid4().hex[:8]}"
+    bot_session_id = f"{BOT_SESSION_ID_PREFIX}{uuid.uuid4().hex[:8]}"
 
     try:
         meeting_id = await asyncio.to_thread(
