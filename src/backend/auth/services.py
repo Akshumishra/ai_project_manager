@@ -25,10 +25,15 @@ def register_user(request: schemas.UserCreate, db: Session):
     )
 
     if existing_user:
-        if existing_user.password_hash is not None:
+        if existing_user.status == user_model.UserStatus.ACTIVE:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT, 
                 detail="Email already registered"
+            )
+        if existing_user.status == user_model.UserStatus.DEACTIVATED:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT, 
+                detail="Account is deactivated, Please contact support"
             )
 
         # Claiming an invited account or updating an existing one
@@ -39,7 +44,7 @@ def register_user(request: schemas.UserCreate, db: Session):
         db.commit()
         db.refresh(existing_user)
         return {
-            "message": f"Account for {existing_user.name} activated successfully",
+            "message": f"User {existing_user.name} registered successfully",
             "user_id": existing_user.id,
         }
 
@@ -69,10 +74,15 @@ def send_otp(request: schemas.OTPRequest, db: Session):
     
     # Check if user already exists and is active
     existing_user = db.query(user_model.User).filter(func.lower(user_model.User.email) == email).first()
-    if existing_user and existing_user.status == user_model.UserStatus.ACTIVE and existing_user.password_hash is not None:
+    if existing_user and existing_user.status == user_model.UserStatus.ACTIVE:
          raise HTTPException(
              status_code=status.HTTP_409_CONFLICT, 
              detail="Email already registered and active"
+         )
+    if existing_user and existing_user.status == user_model.UserStatus.DEACTIVATED:
+         raise HTTPException(
+             status_code=status.HTTP_409_CONFLICT, 
+             detail="Account is deactivated, Please contact support"
          )
 
     # Rate limiting for resend (optional but good practice)
@@ -115,8 +125,8 @@ def verify_otp(request: schemas.OTPVerify):
             detail="Invalid verification code"
         )
         
-    # Mark as verified for 30 minutes in Redis
-    redis_client.setex(f"verified:{email}", 1800, "true")
+    # Mark as verified for 10 minutes in Redis
+    redis_client.setex(f"verified:{email}", 600, "true")
     redis_client.delete(f"otp:{email}")
     redis_client.delete(f"otp_lock:{email}") # Clear resend lock on success
     

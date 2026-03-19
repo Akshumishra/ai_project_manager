@@ -1,6 +1,3 @@
-
-# Auth constants
-
 OTP_EXPIRY_SECONDS = 600  # 10 minutes
 OTP_RESEND_DELAY = 60    # 1 minute
 

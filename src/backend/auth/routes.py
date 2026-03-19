@@ -1,17 +1,13 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, status, HTTPException
 from sqlalchemy.orm import Session
+import logging
 from src.backend.db.database import get_db
 from . import schemas, services, utils
 import src.backend.model.user as user_model
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/api/users", tags=["Users"])
-
-
-@router.get("/", response_model=list[schemas.UserRead])
-def get_all_users(
-    db: Session = Depends(get_db), user: user_model.User = Depends(utils.get_current_user)
-):
-    return db.query(user_model.User).all()
 
 
 @router.post(
@@ -20,30 +16,68 @@ def get_all_users(
     status_code=status.HTTP_201_CREATED,
 )
 def register_user(request: schemas.UserCreate, db: Session = Depends(get_db)):
-    return services.register_user(request, db)
+    try:
+        return services.register_user(request, db)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error registering user: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An unexpected error occurred: {str(e)}"
+        )
 
 
 @router.post("/login", response_model=schemas.Token)
 def login_user(request: schemas.UserLogin, db: Session = Depends(get_db)):
-    return services.login_user(request, db)
+    try:
+        return services.login_user(request, db)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error logging in user: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An unexpected error occurred: {str(e)}"
+        )
 
 
 @router.post("/refresh", response_model=schemas.Token)
 def refresh_token(request: schemas.TokenRefresh, db: Session = Depends(get_db)):
-    return services.refresh_token(request, db)
+    try:
+        return services.refresh_token(request, db)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error refreshing token: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An unexpected error occurred: {str(e)}"
+        )
 
 
 @router.post("/send-otp", response_model=schemas.MessageResponse)
 def send_otp(request: schemas.OTPRequest, db: Session = Depends(get_db)):
-    return services.send_otp(request, db)
-
-
-@router.post("/resend-otp", response_model=schemas.MessageResponse)
-def resend_otp(request: schemas.OTPRequest, db: Session = Depends(get_db)):
-    """Explicit endpoint for resending OTP, reuses send_otp logic with rate limiting."""
-    return services.send_otp(request, db)
-
+    try:
+        return services.send_otp(request, db)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error sending OTP: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An unexpected error occurred: {str(e)}"
+        )
 
 @router.post("/verify-otp", response_model=schemas.MessageResponse)
 def verify_otp(request: schemas.OTPVerify):
-    return services.verify_otp(request)
+    try:
+        return services.verify_otp(request)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error verifying OTP: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An unexpected error occurred: {str(e)}"
+        )
