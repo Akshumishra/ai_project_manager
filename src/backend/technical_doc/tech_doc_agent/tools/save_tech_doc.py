@@ -2,7 +2,7 @@ from langchain_core.tools import tool
 from sqlalchemy.orm import Session
 from uuid import UUID
 
-from src.backend.db.database import SessionLocal
+from src.backend.db.database import get_session_local
 from src.backend.technical_doc.document_sections import (
     build_project_document_title,
 )
@@ -14,7 +14,7 @@ def make_save_tech_doc_tool(user_id: UUID, project_id: UUID):
         Use this tool ONLY when the user explicitly confirms and approves the final technical document.
         This saves the technical document definitively to the database as discrete blocks.
         """
-        db: Session = SessionLocal()
+        db: Session = get_session_local()()
         try:
             from src.backend.technical_doc.services.save_tech_doc import save_technical_spec_in_db
             

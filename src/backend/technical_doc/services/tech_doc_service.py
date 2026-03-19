@@ -64,7 +64,8 @@ def fetch_document_text_by_label(db: Session, project_id: UUID, label: str) -> s
     """Generic helper to fetch document text by its label."""
     try:
         doc_title = build_project_document_title(db, project_id, label)
-        project_title = get_project_detail(db, project_id).get("project_title", "")
+        project_detail = get_project_detail(db, project_id)
+        project_title = project_detail.get("name", "") if project_detail else ""
         
         possible_titles = [
             doc_title,
@@ -74,10 +75,21 @@ def fetch_document_text_by_label(db: Session, project_id: UUID, label: str) -> s
             f"{label} Specification"
         ]
 
-        doc = db.query(Document).filter(
-            Document.project_id == project_id,
-            Document.title.in_(possible_titles),
-        ).first()
+        all_docs = db.query(Document).filter(Document.project_id == project_id).all()
+        
+        doc = None
+        # Priority 1: Exact / Possible Title matches
+        for d in all_docs:
+            if d.title in possible_titles:
+                doc = d
+                break
+        
+        # Priority 2: Partial matches (label is in title)
+        if not doc:
+            for d in all_docs:
+                if label.lower() in (d.title or "").lower():
+                    doc = d
+                    break
 
         if not doc:
             return ""
@@ -103,7 +115,7 @@ def fetch_technical_specification_text(db: Session, project_id: UUID) -> str:
 def build_initial_user_prompt(db: Session, project_id: UUID) -> str:
     """Constructs the starting context for the TechDoc agent."""
     project_detail = get_project_detail(db, project_id)
-    project_title = project_detail.get("project_title", "Untitled Project")
+    project_title = project_detail.get("name", "Untitled Project") if project_detail else "Untitled Project"
     requirements_text = fetch_requirement_specification_text(db, project_id)
 
     return (
@@ -186,7 +198,12 @@ def run_tech_doc_agent(
     if is_start:
         is_interrupted = history and history[-1]["role"] == "user"
         if is_interrupted and handle_thinking_lock(db, project_id, AgentConstants.WORKFLOW_NAME):
-            return {"messages": history, "status": "resumed", "thinking": True}
+            return {
+                "messages": history, 
+                "status": "resumed", 
+                "thinking": True,
+                "document": fetch_technical_specification_text(db, project_id)
+            }
         
         if history and not is_interrupted:
             return {

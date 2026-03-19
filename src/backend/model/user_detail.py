@@ -12,7 +12,7 @@ class UserDetail(BaseModel):
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, unique=True
     )
     skills = Column(Text, nullable=True)
-    experience = Column(Text, nullable=True)
+    experience_years = Column(String, nullable=True)
     designation = Column(String, nullable=True)
     slack_id = Column(String, nullable=True)
 

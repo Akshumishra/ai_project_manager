@@ -3,8 +3,7 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from src.backend.config import settings
-
-from . import constants
+from .constants import INVITATION_EMAIL_SUBJECT, INVITATION_EMAIL_HTML_TEMPLATE
 
 logger = logging.getLogger(__name__)
 
@@ -14,12 +13,13 @@ async def send_invitation_email(to_email: str, project_name: str, inviter_name: 
     Main entry point for sending invitation emails.
     Tries SMTP (primary) then Resend (fallback).
     """
-    subject = constants.INVITATION_EMAIL_SUBJECT.format(project_name=project_name)
-    html_content = constants.INVITATION_EMAIL_HTML_TEMPLATE.format(
+    subject = INVITATION_EMAIL_SUBJECT.format(project_name=project_name)
+    html_content = INVITATION_EMAIL_HTML_TEMPLATE.format(
         inviter_name=inviter_name,
         project_name=project_name,
         frontend_url=settings.FRONTEND_URL,
-        to_email=to_email
+        to_email=to_email,
+        slack_workspace_invite_url=settings.SLACK_WORKSPACE_INVITE_URL
     )
 
     result = _send_via_smtp(to_email, subject, html_content)

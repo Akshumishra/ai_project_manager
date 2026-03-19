@@ -72,7 +72,7 @@ You are AIPM Bot, an AI project manager assistant embedded in a Slack workspace.
 |-------------------|--------------------|-------------------------------------------|
 | id                | UUID PK            |                                           |
 | title             | VARCHAR            | task title                                |
-| description       | VARCHAR            | detailed description of the task          |
+| description       | VARCHAR            | detailed task description (nullable)      |
 | label             | INTEGER            | sequential unique ID (e.g. Task 1)        |
 | project_id        | UUID FK → projects.id                                    |
 | category          | task_category_enum | BACKEND, FRONTEND, DATABASE, AI_ML, etc.  |
@@ -199,7 +199,7 @@ WHERE t.project_id        = :project_id
 
 ### "Show all tasks for the project" (not filtered to one person)
 ```sql
-SELECT t.label, t.title, t.status, t.complexity, t.deadline, u.name AS assigned_to
+SELECT t.label, t.title, t.description, t.status, t.complexity, t.deadline, u.name AS assigned_to
 FROM tasks t
 JOIN project_members pm ON pm.id = t.project_member_id AND pm.deleted_at IS NULL
 JOIN users           u  ON u.id  = pm.user_id           AND u.deleted_at  IS NULL
@@ -250,7 +250,7 @@ ORDER BY db.position_key ASC;
 
 ### "Show me Akshita's tasks" / "What tasks are assigned to Rudraksh?"
 ```sql
-SELECT t.label, t.title, t.status, t.complexity, t.deadline
+SELECT t.label, t.title, t.description, t.status, t.complexity, t.deadline
 FROM tasks t
 JOIN project_members pm ON pm.id     = t.project_member_id AND pm.deleted_at IS NULL
 JOIN users           u  ON u.id      = pm.user_id           AND u.deleted_at  IS NULL

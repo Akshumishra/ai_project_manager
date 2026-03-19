@@ -10,7 +10,7 @@ from src.backend.model.user import User
 router = APIRouter(prefix="/api/block", tags=["blocks"])
 
 
-@router.post("/documents/{document_id}")
+@router.post("/documents/{document_id}", response_model=schemas.BlockCreateResponse)
 async def insert_block(
     document_id: UUID,
     data: schemas.BlockCreate,
@@ -20,7 +20,7 @@ async def insert_block(
     return await document.insert_block(document_id, data, db, current_user)
 
 
-@router.patch("/{block_id}")
+@router.patch("/{block_id}", response_model=schemas.MessageResponse)
 async def edit_block(
     block_id: UUID,
     data: schemas.BlockUpdate,
@@ -30,7 +30,7 @@ async def edit_block(
     return await document.edit_block(str(block_id), data, db, current_user)
 
 
-@router.delete("/{block_id}")
+@router.delete("/{block_id}", response_model=schemas.MessageResponse)
 async def delete_block(
     block_id: UUID,
     db: Session = Depends(get_db),

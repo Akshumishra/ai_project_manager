@@ -1,8 +1,9 @@
-from src.backend.constants import DefaultConstants
-
-class RequirementAgentConstants(DefaultConstants):
-    MODEL = "gpt-5-mini"
-    TEMPERATURE = 0.2
+class RequirementAgentConstants:
+    """
+    Constants for the Requirement Gathering Agent.
+    """
+    REQ_DOC_LABEL = "Requirement Specification"
     WORKFLOW_NAME = "requirement_gathering"
-    REDIRECT_PATH = "/tech-doc"
-    REQ_DOC_LABEL = "Requirements"
+    REDIRECT_PATH = "/project"
+    MODEL = "gpt-5-mini"
+    TEMPERATURE = 0

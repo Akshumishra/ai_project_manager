@@ -5,7 +5,7 @@ import logging
 
 from fastapi import APIRouter, HTTPException, status
 
-from meeting_bot.api.schemas import FirefliesWebhookPayload
+from src.backend.meeting_bot.api.schemas import FirefliesWebhookPayload
 from src.backend.services.fireflies_client import FirefliesClient
 from src.backend.services.meeting import mark_meeting_ended, upsert_transcript
 

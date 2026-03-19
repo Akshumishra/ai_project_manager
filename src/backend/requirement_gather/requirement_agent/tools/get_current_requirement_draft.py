@@ -14,8 +14,7 @@ def get_requirement_draft_tool(project_id: UUID):
         Retrieves the current saved draft of the Requirement Specification for this project.
         Use this to see what has been already documented and saved.
         """
-        factory = get_session_local()
-        db: Session = factory()
+        db = get_session_local()()
         try:
             doc = db.query(Document).filter(
                 Document.project_id == project_id,

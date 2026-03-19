@@ -13,10 +13,13 @@ class SaveTechDocRequest(BaseModel):
 
 class TechDocResponseSchema(BaseModel):
     status: str
+    content: Optional[str] = None
     message: Optional[str] = None
     document: Optional[str] = None
+    doc: Optional[str] = None # For backward compatibility
     messages: Optional[list] = None
     thinking: Optional[bool] = False
+    saved: Optional[bool] = False
     redirect: Optional[str] = None
 
 class TechDocSaveResponseSchema(BaseModel):

@@ -16,33 +16,23 @@ def save_requirement_spec_tool(user_id: UUID, project_id: UUID):
         Save the final requirement specification in markdown format. 
         The system will automatically organize it into documents and blocks.
         """
-        factory = get_session_local()
-        db: Session = factory()
+        db = get_session_local()()
 
         try:
-            success, message = save_requirement_spec_document(
+            result = save_requirement_spec_document(
                 db=db,
                 user_id=user_id,
                 project_id=project_id,
                 markdown_content=markdown_content
             )
 
-            if success:
-                return {
-                    "status": "success",
-                    "result": message
-                }
+            if result.get("status") == "success":
+                return f"Requirement specification saved successfully. Document ID: {result.get('document_id', 'N/A')}"
             else:
-                return {
-                    "status": "error",
-                    "message": message
-                }
+                return f"Save failed: {result.get('message', 'Unknown error')}"
 
         except Exception as e:
-            return {
-                "status": "error",
-                "message": str(e)
-            }
+            return f"Save failed: {str(e)}"
 
         finally:
             db.close()

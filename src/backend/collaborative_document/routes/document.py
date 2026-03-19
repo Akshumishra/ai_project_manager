@@ -10,7 +10,7 @@ from src.backend.model.user import User
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 
 
-@router.post("/")
+@router.post("/", response_model=schemas.DocumentCreateResponse)
 def create_document(
     data: schemas.DocumentCreate,
     db: Session = Depends(get_db),
@@ -19,7 +19,7 @@ def create_document(
     return document.create_document(data, db, current_user)
 
 
-@router.get("/{document_id}")
+@router.get("/{document_id}", response_model=schemas.DocumentDetailResponse)
 def get_document(
     document_id: UUID,
     db: Session = Depends(get_db),
@@ -28,7 +28,7 @@ def get_document(
     return document.get_document(document_id, db, current_user)
 
 
-@router.patch("/{document_id}")
+@router.patch("/{document_id}", response_model=schemas.DocumentResponse)
 def update_document(
     document_id: UUID, 
     data: schemas.DocumentUpdate, 
@@ -38,7 +38,7 @@ def update_document(
     return document.update_document(document_id, data, db, current_user)
 
 
-@router.delete("/{document_id}")
+@router.delete("/{document_id}", response_model=schemas.MessageResponse)
 def delete_document(
     document_id: UUID, 
     db: Session = Depends(get_db),
