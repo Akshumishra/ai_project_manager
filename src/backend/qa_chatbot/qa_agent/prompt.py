@@ -156,6 +156,70 @@ You are AIPM Bot, an AI project manager assistant embedded in a Slack workspace.
 | action_taken | VARCHAR   | Description of the action taken (e.g. task update) |
 | created_at   | TIMESTAMPTZ |                                            |
 
+### meetings
+| column        | type      | description                                  |
+|---------------|-----------|----------------------------------------------|
+| id            | UUID PK   |                                              |
+| project_id    | UUID FK → projects.id                        |
+| created_by    | UUID FK → users.id                           |
+| task_id       | UUID FK → tasks.id (nullable)                |
+| title         | VARCHAR   |                                              |
+| meet_url      | VARCHAR   |                                              |
+| bot_session_id| VARCHAR   | ID for runtime session correlation           |
+| meeting_type  | ENUM      | scheduled, escalation, standup, ad_hoc       |
+| status        | ENUM      | scheduled, in_progress, completed, cancelled |
+| agenda        | TEXT      |                                              |
+| scheduled_at  | TIMESTAMPTZ |                                            |
+| started_at    | TIMESTAMPTZ |                                            |
+| ended_at      | TIMESTAMPTZ |                                            |
+| created_at    | TIMESTAMPTZ |                                            |
+
+### meeting_participants
+| column            | type      | description                                  |
+|-------------------|-----------|----------------------------------------------|
+| id                | UUID PK   |                                              |
+| meeting_id        | UUID FK → meetings.id                        |
+| project_member_id | UUID FK → project_members.id                 |
+| invite_source     | ENUM      | ai_suggested, manually_added                 |
+| invite_reason     | TEXT      | AI-generated rationale                       |
+| role_in_meeting   | ENUM      | host, presenter, attendee                    |
+| joined_at         | TIMESTAMPTZ |                                            |
+| left_at           | TIMESTAMPTZ |                                            |
+
+### meeting_transcripts
+| column     | type      | description                                  |
+|------------|-----------|----------------------------------------------|
+| id         | UUID PK   |                                              |
+| meeting_id | UUID FK → meetings.id (unique)                |
+| status     | ENUM      | pending, processing, completed, failed        |
+| language   | VARCHAR   | e.g. 'en'                                    |
+| provider   | VARCHAR   | e.g. 'whisper'                               |
+| raw_text   | TEXT      | Full text transcript                         |
+| segments   | JSONB     | Speaker-attributed chunks                    |
+| word_count | INTEGER   |                                              |
+
+### meeting_summaries
+| column            | type      | description                                  |
+|-------------------|-----------|----------------------------------------------|
+| id                | UUID PK   |                                              |
+| meeting_id        | UUID FK → meetings.id (unique)                |
+| summary_text      | TEXT      | AI-generated summary                         |
+| key_decisions     | JSONB     | list of [{"description", "decided_by_name"}] |
+| risks_and_blockers| JSONB     | list of [{"description", "severity"}]         |
+| ai_model          | VARCHAR   |                                              |
+| generated_at      | TIMESTAMPTZ |                                            |
+
+### meeting_action_items
+| column               | type      | description                                  |
+|----------------------|-----------|----------------------------------------------|
+| id                   | UUID PK   |                                              |
+| meeting_id           | UUID FK → meetings.id                        |
+| description          | TEXT      |                                              |
+| source_quote         | TEXT      | Quote from transcript                        |
+| assigned_to_member_id| UUID FK → project_members.id (nullable)         |
+| due_date             | TIMESTAMPTZ |                                            |
+| status               | ENUM      | pending, converted_to_task, dismissed        |
+
 ## Key Relationships
 - `project_members.user_id` → `users.id`
 - `project_members.slack_id` = `user_details.slack_id`
@@ -167,6 +231,14 @@ You are AIPM Bot, an AI project manager assistant embedded in a Slack workspace.
 - `standup_updates.standup_id` → `standups.id`
 - `standup_updates.user_id` → `users.id`
 - `standup_action_logs.update_id` → `standup_updates.id`
+- `meetings.project_id` → `projects.id`
+- `meetings.created_by` → `users.id`
+- `meeting_participants.meeting_id` → `meetings.id`
+- `meeting_participants.project_member_id` → `project_members.id`
+- `meeting_transcripts.meeting_id` → `meetings.id`
+- `meeting_summaries.meeting_id` → `meetings.id`
+- `meeting_action_items.meeting_id` → `meetings.id`
+- `meeting_action_items.assigned_to_member_id` → `project_members.id`
 
 ## Rules you MUST follow
 
@@ -348,6 +420,52 @@ WHERE s.project_id = :project_id
   AND su.created_at >= CURRENT_DATE
   AND sal.deleted_at IS NULL
 ORDER BY sal.created_at DESC;
+```
+
+### "What happened in the last meeting?" / "Show latest meeting summary"
+```sql
+SELECT m.title, ms.summary_text, ms.generated_at
+FROM meetings m
+JOIN meeting_summaries ms ON ms.meeting_id = m.id AND ms.deleted_at IS NULL
+WHERE m.project_id = :project_id
+  AND m.deleted_at IS NULL
+ORDER BY m.created_at DESC
+LIMIT 1;
+```
+
+### "What were the action items from the last meeting?"
+```sql
+SELECT mai.description, mai.due_date, u.name AS assigned_to
+FROM meeting_action_items mai
+JOIN meetings m ON m.id = mai.meeting_id AND m.deleted_at IS NULL
+LEFT JOIN project_members pm ON pm.id = mai.assigned_to_member_id AND pm.deleted_at IS NULL
+LEFT JOIN users u ON u.id = pm.user_id AND u.deleted_at IS NULL
+WHERE m.project_id = :project_id
+  AND m.deleted_at IS NULL
+ORDER BY m.created_at DESC;
+```
+
+### "Who attended the last meeting?"
+```sql
+SELECT u.name, mp.role_in_meeting, mp.joined_at, mp.left_at
+FROM meeting_participants mp
+JOIN meetings m ON m.id = mp.meeting_id AND m.deleted_at IS NULL
+JOIN project_members pm ON pm.id = mp.project_member_id AND pm.deleted_at IS NULL
+JOIN users u ON u.id = pm.user_id AND u.deleted_at IS NULL
+WHERE m.project_id = :project_id
+  AND m.deleted_at IS NULL
+ORDER BY m.created_at DESC;
+```
+
+### "What decisions were made in the last meeting?"
+```sql
+SELECT m.title, ms.key_decisions
+FROM meeting_summaries ms
+JOIN meetings m ON m.id = ms.meeting_id AND m.deleted_at IS NULL
+WHERE m.project_id = :project_id
+  AND m.deleted_at IS NULL
+ORDER BY m.created_at DESC
+LIMIT 1;
 ```
 
 
