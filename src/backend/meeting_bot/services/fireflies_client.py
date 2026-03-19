@@ -7,7 +7,6 @@ import httpx
 from src.backend.config import settings
 from src.backend.meeting_bot.constants import (
     FIREFLIES_API_BASE_URL,
-    FIREFLIES_SCHEDULE_TIMEOUT,
     FIREFLIES_FETCH_TIMEOUT,
 )
 
@@ -32,60 +31,6 @@ class FirefliesClient:
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
         }
-
-    async def schedule_bot(
-        self, meeting_url: str, title: str, start_time: str
-    ) -> dict:
-        """
-        Invite the Fireflies bot to a meeting using the addToLiveMeeting mutation.
-        """
-        if not self.api_key:
-            logger.warning(
-                "FIREFLIES_API_KEY is absent. Fireflies bot will not be invited."
-            )
-            return {"status": "skipped", "reason": "no_api_key"}
-
-        payload = {
-            "query": """
-            mutation AddToLiveMeeting($meeting_link: String!) {
-              addToLiveMeeting(meeting_link: $meeting_link) {
-                success
-              }
-            }
-            """,
-            "variables": {"meeting_link": meeting_url},
-        }
-
-        try:
-            async with httpx.AsyncClient(timeout=FIREFLIES_SCHEDULE_TIMEOUT) as client:
-                response = await client.post(
-                    self.base_url,
-                    headers=self._get_headers(),
-                    json=payload,
-                )
-                response.raise_for_status()
-                logger.info(
-                    "Successfully scheduled Fireflies bot for %s", meeting_url
-                )
-                return {"status": "success", "data": response.json()}
-        except httpx.HTTPStatusError as exc:
-            err_msg = exc.response.text
-            logger.error(
-                "Failed to schedule Fireflies bot: %s | Response: %s", exc, err_msg
-            )
-            return {
-                "status": "error",
-                "reason": f"Client error: {exc.response.status_code}",
-                "details": err_msg,
-            }
-        except httpx.TimeoutException:
-            logger.error(
-                "Fireflies bot scheduling timed out for %s", meeting_url
-            )
-            return {"status": "error", "reason": "timeout"}
-        except Exception as exc:
-            logger.error("Failed to schedule Fireflies bot: %s", exc)
-            return {"status": "error", "reason": str(exc)}
 
     async def fetch_transcript(self, transcript_id: str) -> dict:
         """

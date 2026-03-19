@@ -2,7 +2,6 @@ from typing import Dict, List
 
 # ── API & Network Constants ──────────────────────────────────────────────────
 FIREFLIES_API_BASE_URL: str = "https://api.fireflies.ai/graphql"
-FIREFLIES_SCHEDULE_TIMEOUT: float = 10.0
 FIREFLIES_FETCH_TIMEOUT: float = 30.0
 
 SLACK_MEET_EPHEMERAL_SCHEDULING_MSG: str = "⏳  **Scheduling meeting, please hold...**"
