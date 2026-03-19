@@ -2,6 +2,7 @@ from .user import User
 from .user_detail import UserDetail
 from .project import Project, ProjectSlackDetail, ProjectMember, ProjectWorkflowStatus
 from .task import Task
+from .task_log import TaskLog
 from .document import Document, DocumentBlock
 from .requirement_chat import RequirementChat
 from .meeting import (
@@ -20,6 +21,7 @@ __all__ = [
     "ProjectSlackDetail",
     "ProjectMember",
     "Task",
+    "TaskLog",
     "Document",
     "DocumentBlock",
     "RequirementChat",
