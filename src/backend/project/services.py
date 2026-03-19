@@ -120,7 +120,7 @@ def _ensure_project_access(project_id: UUID, db: Session, current_user: User) ->
 def get_project_documents(project_id: UUID, db: Session, current_user: User):
     _ensure_project_access(project_id, db, current_user)
 
-    documents = db.query(Document).filter(Document.project_id == project_id).all()
+    documents = db.query(Document).filter(Document.project_id == project_id, Document.deleted_at.is_(None)).all()
     return [
         {"id": str(d.id), "title": d.title, "created_at": d.created_at}
         for d in documents

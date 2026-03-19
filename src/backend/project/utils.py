@@ -19,7 +19,7 @@ async def send_invitation_email(to_email: str, project_name: str, inviter_name: 
         project_name=project_name,
         frontend_url=settings.FRONTEND_URL,
         to_email=to_email,
-        slack_invite_url=settings.SLACK_INVITE_URL
+        slack_workspace_invite_url=settings.SLACK_WORKSPACE_INVITE_URL
     )
 
     result = _send_via_smtp(to_email, subject, html_content)

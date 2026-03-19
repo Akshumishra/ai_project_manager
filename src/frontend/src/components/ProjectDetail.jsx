@@ -50,13 +50,15 @@ export default function ProjectDetail({ projectId, onSelectDocument, onBack }) {
         if (currentStatus === 'generating' || currentStatus === 'started') {
           setTaskGenStatus(currentStatus);
         } else if (currentStatus === 'completed') {
-          // If it just transitioned from generating to completed:
-          setTaskGenStatus('completed');
+          setTaskGenStatus(prev => {
+            if (prev === 'generating' || prev === 'started') {
+              setTimeout(() => setTaskGenStatus(null), 4000);
+              return 'completed';
+            }
+            return null;
+          });
           refreshTasks();
           clearInterval(pollInterval);
-          setTimeout(() => {
-            setTaskGenStatus(null);
-          }, 4000);
         } else if (currentStatus === 'failed' || currentStatus === 'not_started' || currentStatus === 'failed_missing_docs') {
           setTaskGenStatus(null);
           clearInterval(pollInterval);
