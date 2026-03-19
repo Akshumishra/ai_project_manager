@@ -1,6 +1,6 @@
 import pdfplumber
 import docx
-import tempfile
+from io import BytesIO
 from fastapi import HTTPException
 from langchain_openai import ChatOpenAI
 
@@ -8,7 +8,7 @@ from src.backend.config import settings
 from . import schemas, prompts, constants
 
 
-async def extract_resume_data(resume_text: str) -> schemas.ResumeExtraction:
+def extract_resume_data(resume_text: str) -> schemas.ResumeExtraction:
     try:
         llm = ChatOpenAI(
             model=constants.MODEL_NAME,
@@ -18,30 +18,29 @@ async def extract_resume_data(resume_text: str) -> schemas.ResumeExtraction:
 
         prompt = prompts.PROMPT_TEMPLATE.format(resume=resume_text)
 
-        response = await llm.ainvoke(prompt)
+        response =  llm.invoke(prompt)
 
         return response
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"LLM extraction failed: {str(e)}")
 
-
-def parse_pdf(file_bytes):
+def parse_file(file_bytes: bytes, filename: str) -> str:
     try:
-        with tempfile.NamedTemporaryFile(delete=True, suffix=".pdf") as tmp:
-            tmp.write(file_bytes)
-            tmp.flush()
-            with pdfplumber.open(tmp.name) as pdf:
-                return "".join(p.extract_text() or "" for p in pdf.pages)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"PDF parsing failed: {str(e)}")
+        filename = filename.lower()
 
+        if filename.endswith(".pdf"):
+            with pdfplumber.open(BytesIO(file_bytes)) as pdf:
+                return "\n".join(p.extract_text() or "" for p in pdf.pages)
 
-def parse_docx(file_bytes):
-    try:
-        with tempfile.NamedTemporaryFile(delete=True, suffix=".docx") as tmp:
-            tmp.write(file_bytes)
-            tmp.flush()
-            doc = docx.Document(tmp.name)
+        elif filename.endswith(".docx"):
+            doc = docx.Document(BytesIO(file_bytes))
             return "\n".join(p.text for p in doc.paragraphs)
+
+        elif filename.endswith(".txt"):
+            return file_bytes.decode("utf-8")
+
+        else:
+            raise HTTPException(status_code=400, detail="Unsupported file type")
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"DOCX parsing failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"File parsing failed: {str(e)}")
