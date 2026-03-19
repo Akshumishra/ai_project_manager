@@ -93,40 +93,42 @@ def upsert_transcript(
             transcript = MeetingTranscript(meeting_id=meeting.id)
             db.add(transcript)
 
-        # ── Resolve Speaker Member IDs from Email Matching ──────────────────
-        if meeting_attendees and meeting:
-            # Build name->email map from Fireflies attendees
-            attendee_email_map = {
-                a.get("name"): a.get("email")
-                for a in meeting_attendees
-                if a.get("email")
-            }
-
-            # Map project member IDs by their associated user emails
+        # ── Resolve and Sync Participants ────────────────────────────────────
+        if meeting:
+            # 1. Fetch all project members and their emails for matching
             from src.backend.model.project import ProjectMember
             from src.backend.model.user import User
+            from src.backend.model.meeting import MeetingParticipant
 
-            member_emails = (
+            member_info = (
                 db.query(ProjectMember.id, User.email)
                 .join(User, ProjectMember.user_id == User.id)
                 .filter(ProjectMember.project_id == meeting.project_id)
                 .all()
             )
-            email_to_member_id = {email: str(mid) for mid, email in member_emails}
+            email_to_member_id = {email.lower(): str(mid) for mid, email in member_info}
 
+            # 2. Resolve Fireflies attendees to internal member IDs
+            attendees = meeting_attendees or []
+            logger.info("Syncing %d attendees for meeting %s", len(attendees), meeting.id)
+            
+            # attendee_name_to_id is used for speaker segment mapping
+            attendee_name_to_id = {}
             resolved_member_ids = set()
-            for seg in segments:
-                label = seg.get("speaker_label")
-                email = attendee_email_map.get(label)
-                if email and email in email_to_member_id:
+
+            for a in attendees:
+                name = a.get("name")
+                email = (a.get("email") or "").lower()
+                
+                if email in email_to_member_id:
                     member_id = email_to_member_id[email]
-                    seg["speaker_member_id"] = member_id
                     resolved_member_ids.add(member_id)
+                    if name:
+                        attendee_name_to_id[name] = member_id
+                    logger.debug("Resolved attendee %s to member %s", email, member_id)
 
-            # ── Sync meeting_participants table ──────────────────────────────
-            from src.backend.model.meeting import MeetingParticipant
-
-            existing_member_ids = {
+            # 3. Batch sync to meeting_participants table
+            existing_participants = {
                 str(p.project_member_id)
                 for p in db.query(MeetingParticipant.project_member_id)
                 .filter(MeetingParticipant.meeting_id == meeting.id)
@@ -134,14 +136,22 @@ def upsert_transcript(
             }
 
             for member_id_str in resolved_member_ids:
-                if member_id_str not in existing_member_ids:
+                if member_id_str not in existing_participants:
                     db.add(
                         MeetingParticipant(
                             meeting_id=meeting.id,
                             project_member_id=UUID(member_id_str),
                         )
                     )
+            
+            # 4. Map speakers in segments for AI Agent context
+            for seg in segments:
+                label = seg.get("speaker_label")
+                if label in attendee_name_to_id:
+                    seg["speaker_member_id"] = attendee_name_to_id[label]
+
             db.flush()
+            logger.info("Successfully synced %d participants to DB", len(resolved_member_ids))
 
         transcript.status = TranscriptStatus.COMPLETED
         transcript.raw_text = raw_text
