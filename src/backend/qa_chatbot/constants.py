@@ -7,7 +7,7 @@ class SlackConstants:
     API_TIMEOUT = 10
 
 class QAAgentConstants:
-    MODEL = "gpt-4.1-mini"
+    MODEL = "gpt-4o-mini"
     TEMPERATURE = 0.7
     
     SAFE_COLUMNS = {
@@ -18,7 +18,9 @@ class QAAgentConstants:
         "doc_id", "title", "content", "position_key", "type",
         "complexity", "deadline", "project_member_id", "role",
         "label", "category", "priority",
-        "total_tasks", "assigned_to", "count", "num_tasks"
+        "total_tasks", "assigned_to", "count", "num_tasks",
+        "slack_channel_id", "message_ts", "prompt", "summary",
+        "reply_text", "slack_ts", "action_taken", "update_id", "standup_id"
     }
 
 class QAQueries:
