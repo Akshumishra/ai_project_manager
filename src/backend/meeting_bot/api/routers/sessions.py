@@ -7,7 +7,7 @@ from datetime import datetime, timezone, timedelta
 
 from fastapi import APIRouter, HTTPException, status
 
-from meeting_bot.api.schemas import (
+from src.backend.meeting_bot.api.schemas import (
     ScheduleCalendarMeetingRequest,
     ScheduleCalendarMeetingResponse,
 )

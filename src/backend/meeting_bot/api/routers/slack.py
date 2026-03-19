@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from src.backend.db.database import get_db
 from src.backend.model.project import ProjectSlackDetail, ProjectMember
-from meeting_bot.api.schemas import ScheduleCalendarMeetingRequest
+from src.backend.meeting_bot.api.schemas import ScheduleCalendarMeetingRequest
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Slack"])

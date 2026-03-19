@@ -5,7 +5,7 @@ import logging
 
 from fastapi import APIRouter, HTTPException, status
 
-from meeting_bot.api.schemas import FirefliesWebhookPayload
+from src.backend.meeting_bot.api.schemas import FirefliesWebhookPayload
 from src.backend.services.fireflies_client import FirefliesClient
 from src.backend.services.meeting import mark_meeting_ended, upsert_transcript
 
@@ -83,6 +83,7 @@ async def fireflies_transcript_webhook(
 
     # ── 3. Upsert into DB ──────────────────────────────────────────────────
     meet_url = raw_data.get("meeting_link")
+    meeting_attendees = raw_data.get("meeting_attendees", [])
 
     try:
         resolved_bot_session_id = await asyncio.to_thread(
@@ -92,6 +93,7 @@ async def fireflies_transcript_webhook(
             segments=mapped_segments,
             provider="fireflies",
             meet_url=meet_url,
+            meeting_attendees=meeting_attendees,
         )
 
         if resolved_bot_session_id:
