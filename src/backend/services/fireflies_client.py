@@ -102,6 +102,10 @@ class FirefliesClient:
                 host_email
                 video_url
                 meeting_link
+                meeting_attendees {
+                    name
+                    email
+                }
                 sentences {
                     index
                     start_time

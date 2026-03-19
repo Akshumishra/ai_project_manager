@@ -47,6 +47,7 @@ def upsert_transcript(
     language: str = "en",
     provider: str | None = None,
     meet_url: str | None = None,
+    meeting_attendees: list[dict] | None = None,
 ) -> str | None:
     """
     Write (or overwrite) transcript content and flip status → COMPLETED.
@@ -92,6 +93,56 @@ def upsert_transcript(
             transcript = MeetingTranscript(meeting_id=meeting.id)
             db.add(transcript)
 
+        # ── Resolve Speaker Member IDs from Email Matching ──────────────────
+        if meeting_attendees and meeting:
+            # Build name->email map from Fireflies attendees
+            attendee_email_map = {
+                a.get("name"): a.get("email")
+                for a in meeting_attendees
+                if a.get("email")
+            }
+
+            # Map project member IDs by their associated user emails
+            from src.backend.model.project import ProjectMember
+            from src.backend.model.user import User
+
+            member_emails = (
+                db.query(ProjectMember.id, User.email)
+                .join(User, ProjectMember.user_id == User.id)
+                .filter(ProjectMember.project_id == meeting.project_id)
+                .all()
+            )
+            email_to_member_id = {email: str(mid) for mid, email in member_emails}
+
+            resolved_member_ids = set()
+            for seg in segments:
+                label = seg.get("speaker_label")
+                email = attendee_email_map.get(label)
+                if email and email in email_to_member_id:
+                    member_id = email_to_member_id[email]
+                    seg["speaker_member_id"] = member_id
+                    resolved_member_ids.add(member_id)
+
+            # ── Sync meeting_participants table ──────────────────────────────
+            from src.backend.model.meeting import MeetingParticipant
+
+            existing_member_ids = {
+                str(p.project_member_id)
+                for p in db.query(MeetingParticipant.project_member_id)
+                .filter(MeetingParticipant.meeting_id == meeting.id)
+                .all()
+            }
+
+            for member_id_str in resolved_member_ids:
+                if member_id_str not in existing_member_ids:
+                    db.add(
+                        MeetingParticipant(
+                            meeting_id=meeting.id,
+                            project_member_id=UUID(member_id_str),
+                        )
+                    )
+            db.flush()
+
         transcript.status = TranscriptStatus.COMPLETED
         transcript.raw_text = raw_text
         transcript.segments = segments
@@ -119,8 +170,7 @@ def _trigger_ai_analysis(bot_session_id: str | None, raw_text: str) -> None:
 
     def _run_processor() -> None:
         try:
-            from src.backend.services.llm.processor import process_meeting_transcript
-
+            from src.backend.services.llm.meeting_analysis import process_meeting_transcript
             process_meeting_transcript(bot_session_id, raw_text)
         except Exception:
             logger.exception(
