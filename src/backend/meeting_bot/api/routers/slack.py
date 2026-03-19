@@ -33,28 +33,20 @@ async def _send_slack_ephemeral_message(response_url: str, text_msg: str) -> Non
         )
 
 def _parse_slack_command_text(text_input: Optional[str]) -> tuple[int, str, str]:
-    """Parse duration, title, and agenda from the slack command string."""
-    duration_minutes = DEFAULT_MEETING_DURATION_MINS
-    title = "Scheduled Meeting"
-    agenda = ""
-
-    if not text_input or not text_input.strip():
-        return duration_minutes, title, agenda
-
-    parts = text_input.strip().split(" ", 2)
+    """Parse duration, title, and agenda with direct partitioning and indexing."""
+    parts = (text_input or "").strip().split(None, 2)
     
-    try:
-        duration_minutes = int(parts[0])
-        title = parts[1] if len(parts) > 1 else title
-        agenda = parts[2] if len(parts) > 2 else agenda
-    except ValueError:
-        # First part is not a number, so treat it as part of the title
-        split_text = text_input.strip().split(" ", 1)
-        title = split_text[0]
-        agenda = split_text[1] if len(split_text) > 1 else ""
+    # 1. Provide safe defaults for missing parts
+    duration_raw = parts[0] if len(parts) > 0 else str(DEFAULT_MEETING_DURATION_MINS)
+    title = parts[1] if len(parts) > 1 else "Scheduled Meeting"
+    agenda = parts[2] if len(parts) > 2 else ""
 
-    duration_minutes = max(MIN_MEETING_DURATION_MINS, min(duration_minutes, MAX_MEETING_DURATION_MINS))
-    return duration_minutes, title, agenda
+    # 2. Strict duration conversion with fallback
+    duration = int(duration_raw) if duration_raw.isdigit() else DEFAULT_MEETING_DURATION_MINS
+
+    # 3. Apply bounding limits from constants
+    duration = max(MIN_MEETING_DURATION_MINS, min(duration, MAX_MEETING_DURATION_MINS))
+    return duration, title, agenda
 
 async def schedule_and_notify_slack(
     channel_id: str,
