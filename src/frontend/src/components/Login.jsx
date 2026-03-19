@@ -17,7 +17,7 @@ export default function Login({ onToggle }) {
     } catch (err) {
       const detail = err.response?.data?.detail;
       if (err.response?.status === 401) {
-        setError('Invalid email or password. If you were invited to a project, please Register your account first!');
+        setError('Invalid email or password ');
       } else if (Array.isArray(detail)) {
         setError(detail.map(d => d.msg).join(', '));
       } else if (typeof detail === 'string') {

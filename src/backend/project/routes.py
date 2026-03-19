@@ -6,6 +6,8 @@ from . import schemas, services
 from src.backend.db.database import get_db
 from src.backend.auth.utils import get_current_user
 from src.backend.model.user import User
+from src.backend.model.project import Project as ProjectModel
+from src.backend.slack.slack_service import setup_slack_channel_for_project
 import logging
 
 logger = logging.getLogger(__name__)
@@ -362,8 +364,6 @@ def slack_setup(
 ):
     """Manually trigger Slack channel creation + bot join for a project."""
     try:
-        from src.backend.model.project import Project as ProjectModel
-        from src.backend.slack.slack_service import setup_slack_channel_for_project
 
         project = db.query(ProjectModel).filter(ProjectModel.id == project_id).first()
         if not project:

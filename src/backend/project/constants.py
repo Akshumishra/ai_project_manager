@@ -1,6 +1,3 @@
-
-# Project constants
-
 INVITATION_EMAIL_SUBJECT = "Invitation to collaborate on {project_name}"
 
 INVITATION_EMAIL_HTML_TEMPLATE = """

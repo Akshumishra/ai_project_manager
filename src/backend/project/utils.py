@@ -8,7 +8,7 @@ from .constants import INVITATION_EMAIL_SUBJECT, INVITATION_EMAIL_HTML_TEMPLATE
 logger = logging.getLogger(__name__)
 
 
-async def send_invitation_email(to_email: str, project_name: str, inviter_name: str):
+def send_invitation_email(to_email: str, project_name: str, inviter_name: str):
     """
     Main entry point for sending invitation emails.
     Tries SMTP (primary) then Resend (fallback).

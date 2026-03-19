@@ -17,49 +17,26 @@ from src.backend.model.task import (
 from src.backend.model.task_log import TaskLog
 from src.backend.model.standup import Standup
 from src.backend.slack.slack_service import lookup_user_by_email
-from typing import List
 
 
 def get_projects(db: Session, current_user: User):
     projects = (
         db.query(Project)
-        .outerjoin(ProjectMember)
+        .join(ProjectMember, ProjectMember.project_id == Project.id)
         .filter(
-            (Project.created_by == current_user.id)
-            | (ProjectMember.user_id == current_user.id),
+            ProjectMember.user_id == current_user.id,
             Project.deleted_at.is_(None)
         )
         .all()
     )
     for p in projects:
         p.status = p.status.value if p.status else "active"
+
     return projects
 
 
 def get_project(project_id: UUID, db: Session, current_user: User):
-    project = db.query(Project).filter(Project.id == project_id, Project.deleted_at.is_(None)).first()
-    if not project:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, 
-            detail="Project not found"
-        )
-
-    is_member = (
-        db.query(ProjectMember)
-        .filter(
-            ProjectMember.project_id == project_id,
-            ProjectMember.user_id == current_user.id,
-        )
-        .first()
-    )
-
-    if project.created_by != current_user.id and not is_member:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, 
-            detail="Access denied to this project"
-        )
-
-    return project
+    return _ensure_project_access(project_id ,db ,current_user)
 
 
 def get_project_status(project_id: UUID, db: Session, current_user: User):
@@ -71,6 +48,34 @@ def get_project_status(project_id: UUID, db: Session, current_user: User):
     )
     return {"project_id": project_id, "workflows": statuses}
 
+
+def update_project_status(project_id: UUID, data: schemas.ProjectStatusUpdate, db: Session, current_user: User):
+    project = db.query(Project).filter(Project.id == project_id, Project.deleted_at.is_(None)).first()
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Project not found"
+        )
+
+    if project.created_by != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="Only the project creator can update the status"
+        )
+
+    try:
+        new_status = ProjectStatus(data.status.lower())
+        project.status = new_status
+        db.commit()
+        db.refresh(project)
+        # Convert enum to string for the response
+        project.status = project.status.value
+        return project
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid status. Must be one of: {[e.value for e in ProjectStatus]}"
+        )
 
 def create_project(data: schemas.ProjectCreateRequest, db: Session, current_user: User):
     new_project = Project(
@@ -90,110 +95,6 @@ def create_project(data: schemas.ProjectCreateRequest, db: Session, current_user
     db.commit()
     db.refresh(new_project)
     return new_project
-
-
-def _ensure_project_access(project_id: UUID, db: Session, current_user: User) -> Project:
-    project = db.query(Project).filter(Project.id == project_id, Project.deleted_at.is_(None)).first()
-    if not project:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, 
-            detail="Project not found"
-        )
-
-    is_member = (
-        db.query(ProjectMember)
-        .filter(
-            ProjectMember.project_id == project_id,
-            ProjectMember.user_id == current_user.id,
-        )
-        .first()
-    )
-
-    if project.created_by != current_user.id and not is_member:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, 
-            detail="Access denied to this project"
-        )
-
-    return project
-
-
-def get_project_documents(project_id: UUID, db: Session, current_user: User):
-    _ensure_project_access(project_id, db, current_user)
-
-    documents = db.query(Document).filter(Document.project_id == project_id, Document.deleted_at.is_(None)).all()
-    return [
-        {"id": str(d.id), "title": d.title, "created_at": d.created_at}
-        for d in documents
-    ]
-
-
-def get_project_tasks(project_id: UUID, db: Session, current_user: User):
-    _ensure_project_access(project_id, db, current_user)
-
-    tasks = (
-        db.query(Task)
-        .filter(Task.project_id == project_id)
-        .order_by(Task.label.asc(), Task.created_at.desc())
-        .all()
-    )
-    for task in tasks:
-        if task.assignee and task.assignee.user:
-            task.assignee_name = task.assignee.user.name or task.assignee.user.email
-    return tasks
-
-
-def _normalize_task_complexity(value: str | None) -> TaskComplexity:
-    normalized = (value or "medium").strip().lower()
-    if normalized == "critical":
-        return TaskComplexity.HIGH
-    try:
-        return TaskComplexity(normalized)
-    except ValueError:
-        return TaskComplexity.MEDIUM
-
-
-def _normalize_task_status(value: str | None) -> TaskStatus:
-    normalized = (value or TaskStatus.TODO.value).strip().lower()
-    try:
-        return TaskStatus(normalized)
-    except ValueError:
-        return TaskStatus.TODO
-
-
-def create_project_task(
-    project_id: UUID, data: schemas.TaskCreate, db: Session, current_user: User
-):
-    project = _ensure_project_access(project_id, db, current_user)
-
-    # Get the next label (sequence number) for this project
-    max_label = db.query(func.max(Task.label)).filter(Task.project_id == project_id).scalar()
-    next_label = (max_label or 0) + 1
-
-    task_kwargs = dict(
-        title=data.title,
-        description=data.description,
-        label=next_label,
-        complexity=_normalize_task_complexity(data.complexity),
-        category=TaskCategory.BACKEND,
-        priority=TaskPriority.MEDIUM,
-        project_id=project.id,
-        project_member_id=data.project_member_id,
-        status=TaskStatus.TODO,
-    )
-    if "deadline" in Task.__table__.columns.keys():
-        task_kwargs["deadline"] = data.deadline
-
-    new_task = Task(**task_kwargs)
-    db.add(new_task)
-    db.commit()
-    db.refresh(new_task)
-    
-    # Enrich with assignee_name for the immediate response
-    if new_task.assignee and new_task.assignee.user:
-        new_task.assignee_name = new_task.assignee.user.name or new_task.assignee.user.email
-        
-    return new_task
 
 
 def add_project_member(
@@ -238,36 +139,6 @@ def add_project_member(
     }
 
 
-def _find_or_create_user(email: str, db: Session) -> User:
-    user = db.query(User).filter(User.email == email).first()
-    if not user:
-        user = User(
-            name=email.split("@")[0],
-            email=email,
-            password_hash=None,
-            status=UserStatus.INVITED
-        )
-        db.add(user)
-        db.flush()
-    return user
-
-
-def _check_membership_exists(project_id: UUID, user: User, owner_id: UUID, db: Session):
-    existing_member = (
-        db.query(ProjectMember)
-        .filter(
-            ProjectMember.project_id == project_id,
-            ProjectMember.user_id == user.id,
-        )
-        .first()
-    )
-    if existing_member or user.id == owner_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, 
-            detail="User is already a member of this project"
-        )
-
-
 def get_project_members(project_id: UUID, db: Session, current_user: User):
     _ensure_project_access(project_id, db, current_user)
     
@@ -288,8 +159,8 @@ def get_project_members(project_id: UUID, db: Session, current_user: User):
                 if slack_user and slack_user.get("id"):
                     pm_obj.slack_id = slack_user.get("id")
                     db.commit()
-            except Exception:
-                pass
+            except Exception as e:
+                raise f"Slack lookup failed for {user_obj.email}: {e}"
             
         result.append({
             "id": pm_obj.id,
@@ -301,6 +172,78 @@ def get_project_members(project_id: UUID, db: Session, current_user: User):
         })
     return result
 
+
+def get_project_task(project_id: UUID, task_id: UUID, db: Session, current_user: User):
+    _ensure_project_access(project_id, db, current_user)
+    
+    task = db.query(Task).filter(Task.id == task_id, Task.project_id == project_id).first()
+    if not task:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Task not found"
+        )
+        
+    if task.assignee and task.assignee.user:
+        task.assignee_name = task.assignee.user.name or task.assignee.user.email
+    return task
+
+def get_project_documents(project_id: UUID, db: Session, current_user: User):
+    _ensure_project_access(project_id, db, current_user)
+
+    documents = db.query(Document).filter(Document.project_id == project_id, Document.deleted_at.is_(None)).all()
+    return [
+        {"id": str(d.id), "title": d.title, "created_at": d.created_at}
+        for d in documents
+    ]
+
+
+def get_project_tasks(project_id: UUID, db: Session, current_user: User):
+    _ensure_project_access(project_id, db, current_user)
+
+    tasks = (
+        db.query(Task)
+        .filter(Task.project_id == project_id)
+        .order_by(Task.label.asc(), Task.created_at.desc())
+        .all()
+    )
+    for task in tasks:
+        if task.assignee and task.assignee.user:
+            task.assignee_name = task.assignee.user.name or task.assignee.user.email
+    return tasks
+
+def create_project_task(
+    project_id: UUID, data: schemas.TaskCreate, db: Session, current_user: User
+):
+    project = _ensure_project_access(project_id, db, current_user)
+
+    # Get the next label (sequence number) for this project
+    max_label = db.query(func.max(Task.label)).filter(Task.project_id == project_id).scalar()
+    next_label = (max_label or 0) + 1
+
+    task_kwargs = dict(
+        title=data.title,
+        description=data.description,
+        label=next_label,
+        complexity=_normalize_task_complexity(data.complexity),
+        category=TaskCategory.BACKEND,
+        priority=TaskPriority.MEDIUM,
+        project_id=project.id,
+        project_member_id=data.project_member_id,
+        status=TaskStatus.TODO,
+    )
+    if "deadline" in Task.__table__.columns.keys():
+        task_kwargs["deadline"] = data.deadline
+
+    new_task = Task(**task_kwargs)
+    db.add(new_task)
+    db.commit()
+    db.refresh(new_task)
+    
+    # Enrich with assignee_name for the immediate response
+    if new_task.assignee and new_task.assignee.user:
+        new_task.assignee_name = new_task.assignee.user.name or new_task.assignee.user.email
+        
+    return new_task
 
 def get_task_logs(task_id: UUID, db: Session, current_user: User):
     # Security: Ensure user has access to the project this task belongs to
@@ -320,21 +263,6 @@ def get_project_standups(project_id: UUID, db: Session, current_user: User):
     _ensure_project_access(project_id, db, current_user)
     
     return db.query(Standup).filter(Standup.project_id == project_id).order_by(Standup.created_at.desc()).all()
-
-
-def get_project_task(project_id: UUID, task_id: UUID, db: Session, current_user: User):
-    _ensure_project_access(project_id, db, current_user)
-    
-    task = db.query(Task).filter(Task.id == task_id, Task.project_id == project_id).first()
-    if not task:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, 
-            detail="Task not found"
-        )
-        
-    if task.assignee and task.assignee.user:
-        task.assignee_name = task.assignee.user.name or task.assignee.user.email
-    return task
 
 
 def update_project_task(
@@ -389,12 +317,7 @@ def update_project_task(
 
 
 def delete_project(project_id: UUID, db: Session, current_user: User):
-    project = db.query(Project).filter(Project.id == project_id, Project.deleted_at.is_(None)).first()
-    if not project:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, 
-            detail="Project not found"
-        )
+    project = _get_project_or_404(project_id,db)
 
     if project.created_by != current_user.id:
         raise HTTPException(
@@ -422,35 +345,6 @@ def delete_project(project_id: UUID, db: Session, current_user: User):
 
     db.commit()
     return {"message": "Project and related documentation deleted successfully"}
-
-
-def update_project_status(project_id: UUID, data: schemas.ProjectStatusUpdate, db: Session, current_user: User):
-    project = db.query(Project).filter(Project.id == project_id, Project.deleted_at.is_(None)).first()
-    if not project:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, 
-            detail="Project not found"
-        )
-
-    if project.created_by != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, 
-            detail="Only the project creator can update the status"
-        )
-
-    try:
-        new_status = ProjectStatus(data.status.lower())
-        project.status = new_status
-        db.commit()
-        db.refresh(project)
-        # Convert enum to string for the response
-        project.status = project.status.value
-        return project
-    except ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid status. Must be one of: {[e.value for e in ProjectStatus]}"
-        )
 
 
 def get_slack_join_url(project_id: UUID, db: Session, current_user: User) -> dict:
@@ -484,3 +378,82 @@ def set_slack_channel(
     db.refresh(project)
     project.status = project.status.value if project.status else "active"
     return project
+
+def _get_project_or_404(project_id: UUID, db: Session) -> Project:
+    project = db.query(Project).filter(
+        Project.id == project_id,
+        Project.deleted_at.is_(None)
+    ).first()
+
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Project not found"
+        )
+    return project
+
+
+def _ensure_project_access(project_id: UUID, db: Session, current_user: User) -> Project:
+    project = _get_project_or_404(project_id, db)
+
+    is_member = db.query(ProjectMember).filter(
+        ProjectMember.project_id == project_id,
+        ProjectMember.user_id == current_user.id,
+    ).first()
+
+    if not is_member:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied"
+        )
+
+    return project
+
+
+
+def _check_membership_exists(project_id: UUID, user: User, db: Session):
+    existing_member = (
+        db.query(ProjectMember)
+        .filter(
+            ProjectMember.project_id == project_id,
+            ProjectMember.user_id == user.id,
+        )
+        .first()
+    )
+    if existing_member:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="User is already a member of this project"
+        )
+
+
+def _find_or_create_user(email: str, db: Session) -> User:
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        user = User(
+            name=email.split("@")[0],
+            email=email,
+            password_hash=None,
+            status=UserStatus.INVITED
+        )
+        db.add(user)
+        db.flush()
+    return user
+
+
+def _normalize_task_complexity(value: str | None) -> TaskComplexity:
+    normalized = (value or "medium").strip().lower()
+    if normalized == "critical":
+        return TaskComplexity.HIGH
+    try:
+        return TaskComplexity(normalized)
+    except ValueError:
+        return TaskComplexity.MEDIUM
+
+
+def _normalize_task_status(value: str | None) -> TaskStatus:
+    normalized = (value or TaskStatus.TODO.value).strip().lower()
+    try:
+        return TaskStatus(normalized)
+    except ValueError:
+        return TaskStatus.TODO
