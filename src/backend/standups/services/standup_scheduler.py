@@ -59,7 +59,7 @@ class StandupScheduler:
         # misfire_grace_time=3600 → fires even if server starts up to 1 hour late
         self.scheduler.add_job(
             self.morning_job,
-            CronTrigger(day_of_week='mon-fri', hour=11, minute=26, timezone='Asia/Kolkata'),
+            CronTrigger(day_of_week='mon-fri', hour=9, minute=30, timezone='Asia/Kolkata'),
             id='morning_standup',
             replace_existing=True,
             misfire_grace_time=3600
@@ -68,7 +68,7 @@ class StandupScheduler:
         # Evening finalization Mon-Fri IST
         self.scheduler.add_job(
             self.evening_job,
-            CronTrigger(day_of_week='mon-fri', hour=9, minute=38, timezone='Asia/Kolkata'),
+            CronTrigger(day_of_week='mon-fri', hour=18, minute=30, timezone='Asia/Kolkata'),
             id='evening_standup',
             replace_existing=True,
             misfire_grace_time=3600
