@@ -20,14 +20,14 @@ class ConnectionManager:
         self.MAX_EDITORS = 30
 
     async def connect(self, websocket: WebSocket, document_id: str, user_id: str) -> tuple[str, str]:
-        await websocket.accept()
-        if document_id not in self.active_connections:
+        await websocket.accept() #stablish handshake connection 
+        if document_id not in self.active_connections: # inisilize the room for the document id
             self.active_connections[document_id] = {}
         
         # Count existing editors safely using the new dictionary structure
         current_editors = sum(1 for meta in self.active_connections[document_id].values() if meta["role"] == "editor")
         
-        role = "editor" if current_editors < self.MAX_EDITORS else "viewer"
+        role = "editor" if current_editors < self.MAX_EDITORS else "viewer" # provide role to user
         
         # Generate a globally unique connection ID so cross-worker messaging actually works blindly
         connection_id = str(uuid.uuid4())

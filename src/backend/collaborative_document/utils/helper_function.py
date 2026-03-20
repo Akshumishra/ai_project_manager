@@ -5,6 +5,7 @@ import uuid
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 
+from src.backend.db.database import get_session_local
 from src.backend.model.document import Document,DocumentBlock
 from src.backend.model.project import Project, ProjectMember
 
@@ -69,3 +70,35 @@ def verify_document_access(document_id: UUID, user_id: UUID, db: Session):
         )
 
     return document
+
+def fetch_init_data_sync(doc_uuid):
+    with get_session_local()() as db:
+        document = db.query(Document).filter(Document.id == doc_uuid).first()
+        if document:
+            blocks = (
+                db.query(DocumentBlock)
+                .filter(DocumentBlock.doc_id == doc_uuid)
+                .order_by(cast(DocumentBlock.position_key, Float))
+                .all()
+            )
+            return {
+                "document_id": str(doc_uuid),
+                "title": document.title,
+                "blocks": [
+                    {
+                        "block_id": str(b.id),
+                        "position_key": b.position_key,
+                        "content": b.content,
+                        "type": b.type,
+                    }
+                    for b in blocks
+                ],
+            }
+        return {"error": "Document not found."}
+
+def check_block_sync(block_id, doc_uuid):
+    with get_session_local()() as db:
+        return db.query(DocumentBlock).filter(
+            DocumentBlock.id == block_id,
+            DocumentBlock.doc_id == doc_uuid
+        ).first() is not None

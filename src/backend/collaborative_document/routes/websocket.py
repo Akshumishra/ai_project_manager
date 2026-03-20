@@ -2,50 +2,16 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 import json, time
 from jose import jwt, JWTError
 from uuid import UUID
-from sqlalchemy import cast, Float
 import logging
 
 logger = logging.getLogger(__name__)
 
 from src.backend.db.database import get_session_local
-from src.backend.model.document import Document, DocumentBlock
 from src.backend.db.redis import redis_client
 from src.backend.config import settings
 from src.backend.collaborative_document.services.websocket import ConnectionManager
 from src.backend.collaborative_document.utils import helper_function
-import asyncio
 
-def fetch_init_data_sync(doc_uuid):
-    with get_session_local()() as db:
-        document = db.query(Document).filter(Document.id == doc_uuid).first()
-        if document:
-            blocks = (
-                db.query(DocumentBlock)
-                .filter(DocumentBlock.doc_id == doc_uuid)
-                .order_by(cast(DocumentBlock.position_key, Float))
-                .all()
-            )
-            return {
-                "document_id": str(doc_uuid),
-                "title": document.title,
-                "blocks": [
-                    {
-                        "block_id": str(b.id),
-                        "position_key": b.position_key,
-                        "content": b.content,
-                        "type": b.type,
-                    }
-                    for b in blocks
-                ],
-            }
-        return {"error": "Document not found."}
-
-def check_block_sync(block_id, doc_uuid):
-    with get_session_local()() as db:
-        return db.query(DocumentBlock).filter(
-            DocumentBlock.id == block_id,
-            DocumentBlock.doc_id == doc_uuid
-        ).first() is not None
 
 manager = ConnectionManager()
 
@@ -94,7 +60,7 @@ async def websocket_endpoint(
                 pass
                 
         if not init_data:
-            init_data = await asyncio.to_thread(fetch_init_data_sync, doc_uuid)
+            init_data = helper_function.fetch_init_data_sync(doc_uuid)
             if "error" not in init_data:
                 redis_client.set(f"doc:{doc_uuid}", json.dumps(init_data), ex=3000)
  
@@ -124,7 +90,7 @@ async def websocket_endpoint(
 
                 try:
                     # Validate block belongs to document asynchronously safely
-                    block_exists = await asyncio.to_thread(check_block_sync, block_id, doc_uuid)
+                    block_exists = helper_function.check_block_sync (block_id, doc_uuid)
                     
                     if not block_exists:
                         pending = redis_client.get(f"pending_insert:{block_id}")
