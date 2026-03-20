@@ -216,12 +216,7 @@ def add_project_member(
     
     _check_membership_exists(project_id, target_user, project.created_by, db)
 
-    new_member = ProjectMember(
-        project_id=project_id, 
-        user_id=target_user.id,
-        background=data.background
-    )
-
+    new_member = ProjectMember(project_id=project_id, user_id=target_user.id)
     db.add(new_member)
     db.commit()
     db.refresh(new_member)

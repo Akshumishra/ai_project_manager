@@ -46,8 +46,6 @@ class ProjectStatusRead(BaseModel):
 
 class AddMemberRequest(BaseModel):
     email: str
-    background: Optional[str] = "technical"
-
 
 
 class TaskBase(BaseModel):
