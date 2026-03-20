@@ -115,7 +115,7 @@ def add_project_member(
     target_email = data.email.lower().strip()
     target_user = _find_or_create_user(target_email, db)
     
-    _check_membership_exists(project_id, target_user, project.created_by, db)
+    _check_membership_exists(project_id, target_user, db)
 
     new_member = ProjectMember(project_id=project_id, user_id=target_user.id)
     db.add(new_member)

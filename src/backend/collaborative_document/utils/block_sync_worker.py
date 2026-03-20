@@ -1,10 +1,13 @@
 import json
 import uuid
+import logging
 from sqlalchemy.orm import Session
 
 from src.backend.db.redis import redis_client
 from src.backend.db.database import get_session_local
 from src.backend.model.document import DocumentBlock
+
+logger = logging.getLogger(__name__)
 
 def flush_dirty_blocks():
     db: Session = get_session_local()()
@@ -35,6 +38,7 @@ def flush_dirty_blocks():
                 if not existing:
                     new_key = data["position_key"]
                     MAX_COLLISION_RETRIES = 3
+                    inserted = False
                     for attempt in range(MAX_COLLISION_RETRIES):
                         try:
                             block = DocumentBlock(
@@ -46,23 +50,30 @@ def flush_dirty_blocks():
                             )
                             db.add(block)
                             db.commit()
+                            inserted = True
                             break
                         except Exception as e:
                             db.rollback()
                             if "uq_doc_position" in str(e).lower():
                                 import random
                                 new_key = str(float(new_key) + random.uniform(0.0001, 0.0099))
-                                if attempt == MAX_COLLISION_RETRIES - 1:
-                                    print(f"Permanent collision for {b_id} at {new_key}")
                             else:
                                 raise e
+                    
+                    if not inserted:
+                        # All collision retries exhausted — move to dead letter
+                        # DO NOT remove pending_insert key so the block stays visible
+                        logger.error(f"Permanent collision for {b_id} after {MAX_COLLISION_RETRIES} attempts")
+                        redis_client.sadd("dead_letter_inserts", b_id)
+                        redis_client.srem("pending_inserts", b_id)
+                        continue
                 
                 # Success or already exists - remove from queue
                 redis_client.srem("pending_inserts", b_id)
                 redis_client.delete(f"pending_insert:{b_id}")
             except Exception as e:
                 db.rollback()
-                print(f"Critical sync error for {b_id}:", e)
+                logger.error(f"Critical sync error for {b_id}: {e}")
                 # Move to dead-letter queue instead of just deleting
                 redis_client.sadd("dead_letter_inserts", b_id)
                 redis_client.srem("pending_inserts", b_id)
@@ -89,7 +100,7 @@ def flush_dirty_blocks():
                 redis_client.zrem("dirty_blocks", *block_ids)
             except Exception as e:
                 db.rollback()
-                print("Edit sync error:", e)
+                logger.error(f"Edit sync error: {e}")
 
         # 3. Process Pending Deletes
         delete_ids = redis_client.smembers("pending_deletes")
@@ -102,9 +113,9 @@ def flush_dirty_blocks():
                 redis_client.srem("pending_deletes", b_id)
             except Exception as e:
                 db.rollback()
-                print(f"Delete error for {b_id}:", e)
+                logger.error(f"Delete error for {b_id}: {e}")
 
     except Exception as e:
-        print("Worker loop error:", e)
+        logger.error(f"Worker loop error: {e}")
     finally:
         db.close()

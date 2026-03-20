@@ -53,26 +53,71 @@ def get_document(document_id: UUID, db: Session, current_user: User):
     redis_key = f"doc:{document_id}"
     cached = redis_client.get(redis_key)
     if cached:
-        doc_data = json.loads(cached)
-        if "title" in doc_data:
-            return doc_data
+        try:
+            doc_data = json.loads(cached)
+            if "title" in doc_data:
+                return doc_data
+        except json.JSONDecodeError:
+            pass
 
     blocks = (
         db.query(DocumentBlock)
-        .filter(DocumentBlock.doc_id == document_id)
+        .filter(DocumentBlock.doc_id == document_id, DocumentBlock.deleted_at.is_(None))
         .order_by(cast(DocumentBlock.position_key, Float))
         .all()
     )
 
-    result_blocks = [
-        {
+    result_blocks = []
+    for b in blocks:
+        block_data = {
             "block_id": str(b.id),
             "position_key": b.position_key,
             "content": b.content,
             "type": b.type,
         }
-        for b in blocks
-    ]
+        # Overlay any pending Redis edits that haven't been flushed to DB yet
+        pending_edit = redis_client.get(f"block_update:{b.id}")
+        if pending_edit:
+            try:
+                edit = json.loads(pending_edit)
+                block_data["content"] = edit.get("content", block_data["content"])
+                if edit.get("type"):
+                    block_data["type"] = edit["type"]
+            except json.JSONDecodeError:
+                pass
+        result_blocks.append(block_data)
+
+    # Also include pending inserts that haven't been flushed to DB yet
+    pending_insert_ids = redis_client.smembers("pending_inserts") or set()
+    for pid in pending_insert_ids:
+        insert_json = redis_client.get(f"pending_insert:{pid}")
+        if insert_json:
+            try:
+                insert_data = json.loads(insert_json)
+                if insert_data.get("doc_id") == str(document_id):
+                    # Only add if not already in the list from DB
+                    if not any(b["block_id"] == insert_data["block_id"] for b in result_blocks):
+                        block_data = {
+                            "block_id": insert_data["block_id"],
+                            "position_key": insert_data["position_key"],
+                            "content": insert_data.get("content", ""),
+                            "type": insert_data.get("type", "paragraph"),
+                        }
+                        # Overlay any pending edits typed after block creation
+                        pending_edit = redis_client.get(f"block_update:{insert_data['block_id']}")
+                        if pending_edit:
+                            try:
+                                edit = json.loads(pending_edit)
+                                block_data["content"] = edit.get("content", block_data["content"])
+                                if edit.get("type"):
+                                    block_data["type"] = edit["type"]
+                            except json.JSONDecodeError:
+                                pass
+                        result_blocks.append(block_data)
+            except json.JSONDecodeError:
+                pass
+
+    result_blocks.sort(key=lambda x: float(x["position_key"]))
 
     response = {
         "document_id": str(document_id),
@@ -283,19 +328,26 @@ def _remove_from_doc_cache(doc_id: UUID, block_id: str):
 
 
 def _find_doc_id_for_block(block_id: str, db: Session) -> UUID:
-    # Check Redis first
+    # Check Redis pending_insert first
     cached = redis_client.get(f"pending_insert:{block_id}")
     if cached:
         return UUID(json.loads(cached)["doc_id"])
     
-    # Fallback to DB
+    # Check DB
     block = db.query(DocumentBlock).filter(DocumentBlock.id == block_id).first()
-    if not block:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, 
-            detail="Block not found"
-        )
-    return block.doc_id
+    if block:
+        return block.doc_id
+    
+    # Check dead_letter as last resort
+    if redis_client.sismember("dead_letter_inserts", block_id):
+        # Clean up the phantom block from dead letter
+        redis_client.srem("dead_letter_inserts", block_id)
+        redis_client.delete(f"pending_insert:{block_id}")
+    
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND, 
+        detail="Block not found"
+    )
 
 
 def _sync_title_to_cache(doc_id: UUID, title: str):
