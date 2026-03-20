@@ -74,7 +74,7 @@ def check_agent_prerequisites(
             return {
                 "status": "prerequisite_missing",
                 "redirect": f"/{prereq_workflow.replace('_', '-')}",
-                "message": f"Please complete the {prereq_workflow.replace('_', ' ').title()} phase first."
+                "content": f"Please complete the {prereq_workflow.replace('_', ' ').title()} phase first."
             }
             
     return None
@@ -103,9 +103,11 @@ def handle_agent_resumption(
             return {"messages": history, "status": "resumed", "thinking": True}
     
     if history and not is_interrupted:
+        last_msg = history[-1]["content"] if history[-1]["role"] == "assistant" else ""
         return {
             "status": "resumed",
-            "messages": history
+            "messages": history,
+            "content": last_msg
         }
 
     return None

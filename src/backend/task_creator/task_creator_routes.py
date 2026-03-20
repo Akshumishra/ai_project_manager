@@ -14,52 +14,6 @@ from src.backend.config import settings
 
 router = APIRouter(prefix="/api/task-creator", tags=["Task Creator"])
 
-@router.post(
-    "/projects/{project_id}/generate",
-    status_code=status.HTTP_202_ACCEPTED,
-    response_model=TaskGenerationResponse
-)
-async def generate_project_tasks(
-    project_id: UUID,
-    background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    """
-    Manually trigger AI-driven task generation for a specific project.
-    Uses Redis Queue (RQ) if available, falling back to BackgroundTasks.
-    """
-    try:
-        # Try to use RQ
-        queue = get_queue()
-        if settings.USE_REDIS and queue:
-            queue.enqueue(
-                task_creator_services.generate_and_save_tasks,
-                project_id,
-                current_user.id,
-                job_id=f"task-gen-{project_id}",
-                job_timeout=600,   # 10 minutes — AI generation can take time
-                result_ttl=86400,  # Keep result for 24h
-                failure_ttl=86400, # Keep failed job info for 24h for debugging
-            )
-            message = "Task generation has been initiated via background queue."
-        else:
-            # Fallback to local background tasks if Redis/RQ is not available or disabled
-            background_tasks.add_task(task_creator_services.generate_and_save_tasks, project_id, current_user.id)
-            message = "Task generation has been initiated."
-
-        return {
-            "status": "success",
-            "message": message
-        }
-    except HTTPException as e:
-        raise e
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"An unexpected error occurred: {str(e)}"
-        )
-
 
 @router.get(
     "/projects/{project_id}/status",

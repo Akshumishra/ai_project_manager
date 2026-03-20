@@ -146,7 +146,7 @@ export default function RequirementAgentPage() {
         }
 
         const background = getUserBackground(user.id);
-        const res = await startRequirementAgentRequest(activeProjectId, user.id, background);
+        const res = await startRequirementAgentRequest(activeProjectId, background);
 
         if (res.status === "completed") {
           navigate(`/tech-doc?project_id=${encodeURIComponent(activeProjectId)}`);
@@ -212,7 +212,7 @@ export default function RequirementAgentPage() {
     pollingIntervalRef.current = setInterval(async () => {
       try {
         const background = getUserBackground(user.id);
-        const res = await startRequirementAgentRequest(activeProjectId, user.id, background);
+        const res = await startRequirementAgentRequest(activeProjectId, background);
 
         if (!res.thinking) {
           clearInterval(pollingIntervalRef.current);
@@ -279,7 +279,7 @@ export default function RequirementAgentPage() {
 
     try {
       setChatStatus("Assistant is thinking...");
-      const res = await sendRequirementAgentMessage(activeProjectId, text, user.id);
+      const res = await sendRequirementAgentMessage(activeProjectId, text);
 
       setMessages([...newMessages, { role: "assistant", content: res.content }]);
 
@@ -346,7 +346,7 @@ export default function RequirementAgentPage() {
     setIsCompleting(true);
     setChatStatus("Finalizing requirement phase...");
     try {
-      await completeRequirementStepRequest(activeProjectId, user.id);
+      await completeRequirementStepRequest(activeProjectId);
       navigate(`/tech-doc?project_id=${encodeURIComponent(activeProjectId)}`);
     } catch (err) {
       console.error("Failed to complete step:", err);

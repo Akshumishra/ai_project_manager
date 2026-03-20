@@ -5,7 +5,6 @@ import {
   startTechDocAgentRequest,
   sendTechDocAgentMessage,
   saveTechDocRequest,
-  generateTasksRequest,
 } from "../api";
 import { useAuth } from "../context/AuthContext";
 import { getActiveProject } from "../utils/storage";
@@ -110,7 +109,7 @@ export default function TechDocPage() {
 
     pollingIntervalRef.current = setInterval(async () => {
       try {
-        const data = await startTechDocAgentRequest(activeProjectId, user?.id);
+        const data = await startTechDocAgentRequest(activeProjectId);
         if (data.status !== "thinking") {
           clearInterval(pollingIntervalRef.current);
           pollingIntervalRef.current = null;
@@ -153,7 +152,7 @@ export default function TechDocPage() {
     const init = async () => {
       setInitializing(true);
       try {
-        const data = await startTechDocAgentRequest(activeProjectId, user.id);
+        const data = await startTechDocAgentRequest(activeProjectId);
 
         if (data.status === "prerequisite_missing") {
           navigate(`/requirement-agent?project_id=${activeProjectId}`);
@@ -227,7 +226,7 @@ export default function TechDocPage() {
     setChatStatus("Thinking...");
 
     try {
-      const res = await sendTechDocAgentMessage(activeProjectId, text, documentMarkdown, user.id);
+      const res = await sendTechDocAgentMessage(activeProjectId, text, documentMarkdown);
       
       if (res.thinking) {
           startPolling();
@@ -280,7 +279,7 @@ export default function TechDocPage() {
     setSaving(true);
     setChatStatus("Saving document...");
     try {
-      await saveTechDocRequest(activeProjectId, documentMarkdown, user.id);
+      await saveTechDocRequest(activeProjectId, documentMarkdown);
       setChatStatus("Document saved! Tasks are generating in background...");
       setTimeout(() => {
         navigate(`/project/${activeProjectId}`);

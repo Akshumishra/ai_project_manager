@@ -7,5 +7,5 @@ class StandardResponse(BaseModel):
     message: str
 
 class AgentRequest(BaseModel):
-    user_id: UUID
+    user_id: Optional[UUID] = None
     message: str

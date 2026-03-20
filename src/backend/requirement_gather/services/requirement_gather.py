@@ -56,11 +56,8 @@ def _run_agent(
                 "messages": get_chat_history(db, project_id),
                 "status": "resumed",
                 "saved": response.get("saved", False),
-                "document": response.get("doc"),
+                "document": response.get("document"),
             }
-
-        if "doc" in response:
-            response["document"] = response.pop("doc")
 
         wf = get_workflow_status(db, project_id, AgentConst.WORKFLOW_NAME)
         if wf:

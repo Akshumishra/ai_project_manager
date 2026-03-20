@@ -7,13 +7,12 @@ class TechDocAgentRequest(AgentRequest):
     current_document_markdown: Optional[str] = None
 
 class SaveTechDocRequest(BaseModel):
-    user_id: UUID
-    document_markdown: str
+    user_id: Optional[UUID] = None
+    document_markdown: Optional[str] = None
 
 class TechDocResponseSchema(BaseModel):
     status: str
     content: Optional[str] = None
-    message: Optional[str] = None
     document: Optional[str] = None
 
     messages: Optional[list] = None
