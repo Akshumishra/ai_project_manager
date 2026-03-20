@@ -3,20 +3,23 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 from src.backend.model.meeting import Meeting, MeetingStatus, MeetingType
-from src.backend.meeting_bot.services.meeting.session import get_db_session, get_meeting_by_session
+from src.backend.meeting_bot.services.meeting.session import (
+    get_db_session,
+    get_meeting_by_session,
+)
 from src.backend.meeting_bot.constants import (
-    DEFAULT_MEETING_DURATION_MINS, 
-    IST_TIMEZONE_OFFSET_HOURS,
-    IST_TIMEZONE_OFFSET_MINS,
+    DEFAULT_MEETING_DURATION_MINS,
     SCHEDULE_MEETING_OFFSET_MINS,
-    BOT_SESSION_ID_PREFIX
+    BOT_SESSION_ID_PREFIX,
 )
 
 logger = logging.getLogger(__name__)
+
 
 async def schedule_meeting(
     project_id: UUID,
@@ -28,14 +31,16 @@ async def schedule_meeting(
 ) -> tuple[UUID, str]:
     """
     Coordination layer that schedules a meeting via Google Calendar and persists it to the DB.
-    
+
     This centralizes the meeting creation flow for both Slack and API callers.
     """
     from src.backend.meeting_bot.services.calendar_service import create_calendar_meet
 
     # 1. Calculate the scheduled datetime (using fixed project constants)
-    ist = timezone(timedelta(hours=IST_TIMEZONE_OFFSET_HOURS, minutes=IST_TIMEZONE_OFFSET_MINS))
-    scheduled_at_dt = datetime.now(ist) + timedelta(minutes=SCHEDULE_MEETING_OFFSET_MINS)
+    ist = ZoneInfo("Asia/Kolkata")
+    scheduled_at_dt = datetime.now(ist) + timedelta(
+        minutes=SCHEDULE_MEETING_OFFSET_MINS
+    )
 
     # 2. Call Google Calendar Service (blocking I/O)
     meet_url, _ = await asyncio.to_thread(
@@ -83,11 +88,17 @@ def create_meeting(
     """
     with get_db_session() as db:
         if scheduled_meeting_id:
-             meeting = db.query(Meeting).filter(Meeting.id == scheduled_meeting_id).first()
-             if meeting:
-                  meeting.bot_session_id = bot_session_id
-                  logger.info("Picked up scheduled meeting: id=%s new_bot_session=%s", meeting.id, bot_session_id)
-                  return meeting.id
+            meeting = (
+                db.query(Meeting).filter(Meeting.id == scheduled_meeting_id).first()
+            )
+            if meeting:
+                meeting.bot_session_id = bot_session_id
+                logger.info(
+                    "Picked up scheduled meeting: id=%s new_bot_session=%s",
+                    meeting.id,
+                    bot_session_id,
+                )
+                return meeting.id
 
         meeting = Meeting(
             project_id=project_id,
@@ -114,7 +125,9 @@ def mark_meeting_ended(bot_session_id: str) -> None:
     with get_db_session() as db:
         meeting = get_meeting_by_session(db, bot_session_id)
         if meeting is None:
-            logger.warning("mark_meeting_ended: no row for bot_session=%s", bot_session_id)
+            logger.warning(
+                "mark_meeting_ended: no row for bot_session=%s", bot_session_id
+            )
             return
         meeting.status = MeetingStatus.COMPLETED
         meeting.ended_at = datetime.now(timezone.utc)
