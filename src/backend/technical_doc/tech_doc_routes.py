@@ -17,7 +17,6 @@ from src.backend.utils.queue_utils import get_queue
 from src.backend.config import settings
 from .schemas import (
     TechDocAgentRequest,
-    SaveTechDocRequest,
     TechDocResponseSchema,
     TechDocSaveResponseSchema,
 )
@@ -56,7 +55,6 @@ async def run_tech_doc_turn(
 @router.post("/{project_id}/tech-doc", response_model=TechDocSaveResponseSchema)
 async def save_tech_doc(
     project_id: UUID,
-    request: SaveTechDocRequest,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -65,16 +63,6 @@ async def save_tech_doc(
     Finalize and save the technical document.
     Triggers task generation and Slack channel setup in the background.
     """
-    if request.document_markdown:
-        upsert_document(
-            db=db,
-            project_id=project_id,
-            user_id=current_user.id,
-            document_type=DocumentType.TECHNICAL,
-            markdown_content=request.document_markdown,
-            title_label=AgentConst.TECH_DOC_LABEL,
-        )
-
     set_workflow_status(db, project_id, AgentConst.WORKFLOW_NAME, "completed")
     db.commit()
 

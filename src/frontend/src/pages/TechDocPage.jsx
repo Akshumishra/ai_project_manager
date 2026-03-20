@@ -279,7 +279,7 @@ export default function TechDocPage() {
     setSaving(true);
     setChatStatus("Saving document...");
     try {
-      await saveTechDocRequest(activeProjectId, documentMarkdown);
+      await saveTechDocRequest(activeProjectId);
       setChatStatus("Document saved! Tasks are generating in background...");
       setTimeout(() => {
         navigate(`/project/${activeProjectId}`);
