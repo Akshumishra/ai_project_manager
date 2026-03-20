@@ -1,6 +1,9 @@
 PROMPT_TEMPLATE = """
 You are an expert resume parser.
 
+Resume text:
+{resume}
+
 Extract the following fields from the resume text provided below:
 
 1. skills: List of strings
