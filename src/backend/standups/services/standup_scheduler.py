@@ -58,7 +58,7 @@ class StandupScheduler:
         # Morning standup Mon-Fri IST (9:00 AM)
         self.scheduler.add_job(
             self.morning_job,
-            CronTrigger(day_of_week='mon-fri', hour=2, minute=26, timezone='Asia/Kolkata'),
+            CronTrigger(day_of_week='mon-fri', hour=10, minute=13, timezone='Asia/Kolkata'),
             id='morning_standup',
             replace_existing=True,
             misfire_grace_time=3600
@@ -67,7 +67,7 @@ class StandupScheduler:
         # Evening finalization Mon-Fri IST (6:00 PM)
         self.scheduler.add_job(
             self.evening_job,
-            CronTrigger(day_of_week='mon-fri', hour=2, minute=28, timezone='Asia/Kolkata'),
+            CronTrigger(day_of_week='mon-fri', hour=10, minute=15, timezone='Asia/Kolkata'),
             id='evening_standup',
             replace_existing=True,
             misfire_grace_time=3600

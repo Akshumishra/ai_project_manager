@@ -112,5 +112,5 @@ class Task(BaseModel):
     )
 # Register SQLAlchemy event listeners
 from sqlalchemy import event
-from src.backend.db.listeners.task_listeners import set_next_label
+from src.backend.utils.task_listeners import set_next_label
 event.listen(Task, "before_insert", set_next_label)

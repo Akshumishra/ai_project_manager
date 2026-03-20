@@ -42,6 +42,7 @@ class Blocker(BaseModel):
     blocked_by: Optional[str] = Field(None, description="Who or what is causing the delay.")
     reason: str = Field(..., description="The reason for the block or delay.")
     impact: str = Field(..., description="The impact of this blocker on work.")
+    task_title: Optional[str] = Field(None, description="The title of the task being blocked.")
     type: str = Field(..., description="Type: 'EXPLICIT' or 'INFERRED'.")
 class ResolvedBlocker(BaseModel):
     task_id: Optional[str] = Field(None, description="The ID of the task being unblocked.")

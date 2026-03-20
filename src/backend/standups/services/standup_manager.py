@@ -167,7 +167,7 @@ class StandupManager:
             logger.info("Step 3: Calling AI Agent and applying updates")
             try:
                 # Remove non-agent arguments from context
-                agent_args = {k: v for k, v in agent_context.items() if k != "selected_task"}
+                agent_args = {k: v for k, v in agent_context.items() if k not in ["selected_task", "intelligent_blk"]}
                 parsed = await self.agent.parse_reply(**agent_args)
                 logger.info(f"Agent parsed reply. Extracted {len(parsed.updates)} updates, {len(parsed.blockers)} blockers")
                 
@@ -176,6 +176,30 @@ class StandupManager:
                     logger.info(f"Logging task selection for task {agent_context['selected_task'].id}")
                     StandupUtils.log_task_selection_action(self.db, update.id, agent_context["selected_task"])
                 
+                # Integrate intelligent blocker if detected and not already captured
+                intelligent_blk = agent_context.get("intelligent_blk")
+                if intelligent_blk and intelligent_blk.blocker_detected:
+                    # Check if this blocker is already in parsed.blockers (by fuzzy task name or reason)
+                    is_redundant = False
+                    for b in parsed.blockers:
+                        if (intelligent_blk.task_name and b.task_title and intelligent_blk.task_name.lower() in b.task_title.lower()) or \
+                           (intelligent_blk.blocker_text and b.reason and intelligent_blk.blocker_text.lower() in b.reason.lower()):
+                            is_redundant = True
+                            break
+                    
+                    if not is_redundant:
+                        from src.backend.standups.standup_agent.agent import Blocker as BlockerSchema
+                        new_blk = BlockerSchema(
+                            task_id=intelligent_blk.task_id,
+                            task_title=intelligent_blk.task_name or "General",
+                            reason=intelligent_blk.blocker_text,
+                            blocked_by=None,
+                            impact="medium", # Default
+                            type="INFERRED"
+                        )
+                        parsed.blockers.append(new_blk)
+                        logger.info(f"Integrated inferred blocker from intelligent detection: {intelligent_blk.blocker_text}")
+
                 await self.action_service.apply_parsed_updates(update.id, parsed)
                 logger.info("Action application complete")
                 
@@ -233,7 +257,29 @@ class StandupManager:
 
             # Post summary
             try:
-                summary_text = await self.generator.generate_standup_summary(str(standup.project_id), "Project", summary_updates, session_blockers, None, session_insights)
+                # 1. Fetch active blockers for the summary
+                from src.backend.model.blocker import Blocker
+                active_blockers = self.db.query(Blocker).filter(
+                    Blocker.project_id == standup.project_id,
+                    Blocker.resolved_at.is_(None)
+                ).all()
+                
+                formatted_active = []
+                for b in active_blockers:
+                    formatted_active.append({
+                        "user": b.user.name if b.user else "Unknown",
+                        "reason": b.reason,
+                        "label": b.task.label if b.task else None
+                    })
+
+                summary_text = await self.generator.generate_standup_summary(
+                    str(standup.project_id), 
+                    "Project", 
+                    summary_updates, 
+                    session_blockers, 
+                    formatted_active, 
+                    session_insights
+                )
                 self.slack_service.post_message(standup.slack_channel_id, summary_text, thread_ts=standup.message_ts)
             except Exception as e:
                 logger.error(f"Slack summary post failed for standup {standup_id}: {e}")
@@ -272,15 +318,34 @@ class StandupManager:
         intelligent_blk = await self.agent.identify_blocker(standup_message=text, members_with_active_tasks=json.dumps(active_tasks), standup_summaries=past_summaries, todo_tasks=past_todos)
         
         selected_task = StandupUtils.detect_task_selection(self.db, text, member, standup.project_id)
+        
+        # Fetch active blockers to provide context for resolutions
+        from src.backend.model.blocker import Blocker
+        active_blockers = []
+        blocker_records = self.db.query(Blocker).filter(
+            Blocker.project_id == standup.project_id,
+            Blocker.user_id == member.user_id,
+            Blocker.resolved_at.is_(None)
+        ).all()
+        
+        for b in blocker_records:
+            active_blockers.append({
+                "id": str(b.id),
+                "reason": b.reason,
+                "blocked_by": b.blocked_by,
+                "task_label": b.task.label if b.task else None
+            })
 
         return {
             "user_name": user_name,
             "reply_text": text,
             "active_tasks": user_tasks + user_suggestions + unassigned,
+            "active_blockers": active_blockers,
             "has_in_progress_tasks": any(t.get("status") == "in_progress" for t in user_tasks),
             "team_members": [u.name for u in self.db.query(User).join(ProjectMember).filter(ProjectMember.project_id == standup.project_id).all()],
             "message_date": datetime.now(timezone.utc), # simplified
-            "selected_task": selected_task
+            "selected_task": selected_task,
+            "intelligent_blk": intelligent_blk
         }
 
     def _parse_action_for_summary(self, action, user, summary, blockers, insights, seen):

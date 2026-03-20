@@ -31,6 +31,11 @@ class StandupActionService:
                 logger.error(f"StandupUpdate {update_id} not found.")
                 return
 
+            # Log the parsed response for debugging
+            logger.info(f"Applying parsed updates for {update_id}. Parsed: {parsed.model_dump_json()}")
+            with open("/tmp/slack_events.log", "a") as f:
+                f.write(f"[{datetime.now().ctime()}] Parsed Response: {parsed.model_dump_json()}\n")
+
             standup = self.db.query(Standup).get(standup_update.standup_id)
             member = self.db.query(ProjectMember).filter(
                 ProjectMember.project_id == standup.project_id,
@@ -127,12 +132,28 @@ class StandupActionService:
                 t = self.db.query(Task).filter(Task.project_id == standup.project_id, Task.label == blk.task_label, Task.deleted_at.is_(None)).first()
                 if t: target_task_id = t.id
 
+            # Enhanced matching using task_id, task_label, or task_title
             matched_blocker = None
             ignore_words = {"the", "a", "an", "is", "are", "was", "were", "to", "for", "in", "on", "at", "by", "with", "from", "blocked", "resolved", "fixed", "no", "longer", "issue"}
-            for eb in existing_active_blockers:
-                if (target_task_id and eb.task_id == target_task_id) or (not target_task_id and eb.task_id is None and (eb.reason == blk.reason or (set(re.findall(r'\w+', blk.reason.lower())) - ignore_words).intersection(set(re.findall(r'\w+', eb.reason.lower())) - ignore_words))):
-                    matched_blocker = eb
-                    break
+            
+            # 1. Try matching by task_id
+            if target_task_id:
+                matched_blocker = next((eb for eb in existing_active_blockers if eb.task_id == target_task_id), None)
+            
+            # 2. Try matching by task_label or reason overlap
+            if not matched_blocker:
+                for eb in existing_active_blockers:
+                    # Match by task_label if both have it
+                    if hasattr(blk, 'task_label') and blk.task_label and eb.task and eb.task.label == blk.task_label:
+                        matched_blocker = eb
+                        break
+                    
+                    # Fuzzy match by reason overlap
+                    eb_words = set(re.findall(r'\w+', eb.reason.lower())) - ignore_words
+                    blk_words = set(re.findall(r'\w+', blk.reason.lower())) - ignore_words
+                    if eb_words and blk_words and len(eb_words.intersection(blk_words)) >= min(len(eb_words), len(blk_words), 3):
+                        matched_blocker = eb
+                        break
             
             if matched_blocker:
                 matched_blocker.reason = blk.reason
@@ -145,8 +166,14 @@ class StandupActionService:
                     task = self.db.query(Task).get(target_task_id)
                     if task: task.status = TaskStatus.BLOCKED
 
-            label_str = f" in [Task {blk.task_label}]" if blk.task_label else ""
-            await self._log_action(update_id, f"BLOCKER ({blk.type}): Blocked" + (f" by {blk.blocked_by}" if blk.blocked_by else "") + f"{label_str} due to: {blk.reason}. Impact: {blk.impact}.")
+            label_or_title = ""
+            if hasattr(blk, 'task_label') and blk.task_label:
+                label_or_title = f" in [Task {blk.task_label}]"
+            elif hasattr(blk, 'task_title') and blk.task_title and blk.task_title != "General":
+                label_or_title = f" in task '{blk.task_title}'"
+
+            log_msg = f"BLOCKER ({blk.type}): Blocked" + (f" by {blk.blocked_by}" if blk.blocked_by else "") + f"{label_or_title} due to: {blk.reason}. Impact: {blk.impact}."
+            await self._log_action(update_id, log_msg)
         except Exception as e:
             logger.error(f"Error applying blocker update: {e}")
 

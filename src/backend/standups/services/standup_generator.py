@@ -499,8 +499,10 @@ class StandupGenerator:
                     message += " (see new blockers below).\n"
                 else:
                     message += ".\n"
-        else:
-            message += "No updates were recorded for this session.\n"
+        if session_blockers:
+            message += "\n🚧 *New Blockers Reported:* \n"
+            for blk in session_blockers:
+                message += f"• {blk}\n"
 
         # Consolidated Blocker Section
         if all_active_blockers:
