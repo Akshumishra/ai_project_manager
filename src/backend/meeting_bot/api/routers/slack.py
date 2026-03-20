@@ -3,6 +3,7 @@ import httpx
 from typing import Optional
 
 from fastapi import APIRouter, Form, status, BackgroundTasks
+from sqlalchemy import text
 
 from src.backend.db.database import SessionLocal
 from src.backend.model.project import ProjectSlackDetail, ProjectMember
@@ -80,7 +81,13 @@ async def schedule_and_notify_slack(
 
         project_id = slack_channel_map.project_id
 
-        # ── 3. Member Lookup ──────────────────────────────────────────────────
+        # ── 3. RLS Context & Member Lookup ────────────────────────────────────
+        # SET LOCAL app.project_id is required for RLS policies
+        db.execute(
+            text("SET LOCAL app.project_id = :project_id"),
+            {"project_id": str(project_id)}
+        )
+
         member_map = (
             db.query(ProjectMember)
             .filter(
