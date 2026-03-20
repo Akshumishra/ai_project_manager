@@ -1,11 +1,69 @@
+from __future__ import annotations
+
+import asyncio
 import logging
-from datetime import datetime, timezone
+import uuid
+from datetime import datetime, timezone, timedelta
 from uuid import UUID
 
 from src.backend.model.meeting import Meeting, MeetingStatus, MeetingType
 from src.backend.meeting_bot.services.meeting.session import get_db_session, get_meeting_by_session
+from src.backend.meeting_bot.constants import (
+    DEFAULT_MEETING_DURATION_MINS, 
+    IST_TIMEZONE_OFFSET_HOURS,
+    IST_TIMEZONE_OFFSET_MINS,
+    SCHEDULE_MEETING_OFFSET_MINS,
+    BOT_SESSION_ID_PREFIX
+)
 
 logger = logging.getLogger(__name__)
+
+async def schedule_meeting(
+    project_id: UUID,
+    created_by: UUID,
+    title: str,
+    agenda: str | None = None,
+    duration_minutes: int = DEFAULT_MEETING_DURATION_MINS,
+    task_id: UUID | None = None,
+) -> tuple[UUID, str]:
+    """
+    Coordination layer that schedules a meeting via Google Calendar and persists it to the DB.
+    
+    This centralizes the meeting creation flow for both Slack and API callers.
+    """
+    from src.backend.meeting_bot.services.calendar_service import create_calendar_meet
+
+    # 1. Calculate the scheduled datetime (using fixed project constants)
+    ist = timezone(timedelta(hours=IST_TIMEZONE_OFFSET_HOURS, minutes=IST_TIMEZONE_OFFSET_MINS))
+    scheduled_at_dt = datetime.now(ist) + timedelta(minutes=SCHEDULE_MEETING_OFFSET_MINS)
+
+    # 2. Call Google Calendar Service (blocking I/O)
+    meet_url, _ = await asyncio.to_thread(
+        create_calendar_meet,
+        title=title,
+        scheduled_at=scheduled_at_dt,
+        duration_minutes=duration_minutes,
+    )
+
+    if not meet_url:
+        raise RuntimeError("Google Calendar failed to generate a Meet link.")
+
+    # 3. Persist meeting record to DB
+    bot_session_id = f"{BOT_SESSION_ID_PREFIX}{uuid.uuid4().hex[:8]}"
+    meeting_id = await asyncio.to_thread(
+        create_meeting,
+        project_id=project_id,
+        created_by=created_by,
+        title=title,
+        meet_url=meet_url,
+        bot_session_id=bot_session_id,
+        task_id=task_id,
+        agenda=agenda,
+        scheduled_at=scheduled_at_dt,
+    )
+
+    return meeting_id, meet_url
+
 
 def create_meeting(
     *,
@@ -61,4 +119,3 @@ def mark_meeting_ended(bot_session_id: str) -> None:
         meeting.status = MeetingStatus.COMPLETED
         meeting.ended_at = datetime.now(timezone.utc)
     logger.info("Meeting ended: bot_session=%s", bot_session_id)
-

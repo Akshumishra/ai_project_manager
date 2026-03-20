@@ -35,16 +35,13 @@ async def _send_slack_ephemeral_message(response_url: str, text_msg: str) -> Non
 def _parse_slack_command_text(text_input: Optional[str]) -> tuple[int, str, str]:
     """Parse duration, title, and agenda with direct partitioning and indexing."""
     parts = (text_input or "").strip().split(None, 2)
-    
-    # 1. Provide safe defaults for missing parts
+
     duration_raw = parts[0] if len(parts) > 0 else str(DEFAULT_MEETING_DURATION_MINS)
     title = parts[1] if len(parts) > 1 else "Scheduled Meeting"
     agenda = parts[2] if len(parts) > 2 else ""
 
-    # 2. Strict duration conversion with fallback
     duration = int(duration_raw) if duration_raw.isdigit() else DEFAULT_MEETING_DURATION_MINS
 
-    # 3. Apply bounding limits from constants
     duration = max(MIN_MEETING_DURATION_MINS, min(duration, MAX_MEETING_DURATION_MINS))
     return duration, title, agenda
 
@@ -55,7 +52,7 @@ async def schedule_and_notify_slack(
     text_input: Optional[str],
 ):
     """Background task to resolve project details, schedule the meeting, and notify Slack."""
-    from src.backend.meeting_bot.api.routers.sessions import schedule_meeting_calendar
+    from src.backend.meeting_bot.services.meeting import schedule_meeting
 
     db = SessionLocal()
     try:
@@ -80,13 +77,7 @@ async def schedule_and_notify_slack(
 
         project_id = slack_channel_map.project_id
 
-        # ── 3. RLS Context & Member Lookup ────────────────────────────────────
-        # SET LOCAL app.project_id is required for RLS policies
-        db.execute(
-            text("SET LOCAL app.project_id = :project_id"),
-            {"project_id": str(project_id)}
-        )
-
+        # ── 3. Member Lookup ──────────────────────────────────────────────────
         member_map = (
             db.query(ProjectMember)
             .filter(
@@ -97,7 +88,7 @@ async def schedule_and_notify_slack(
         )
 
         if not member_map:
-            logger.warning("Slack user %s not found in project %s member list (RLS active)", user_id, project_id)
+            logger.warning("Slack user %s not found in project %s member list", user_id, project_id)
             await _send_slack_ephemeral_message(
                 response_url, 
                 f"Your Slack ID (`{user_id}`) is not in this project's member list. Please contact your administrator."
@@ -106,17 +97,14 @@ async def schedule_and_notify_slack(
 
         created_by_uuid = member_map.user_id
 
-        # ── 4. Schedule Meeting ───────────────────────────────────────────────
-        request_wrapper = ScheduleCalendarMeetingRequest(
+        # ── 4. Orchestrate Meeting Scheduling ───────────────────────────────
+        _, meet_url = await schedule_meeting(
             project_id=project_id,
             created_by=created_by_uuid,
             title=title,
             agenda=agenda or "",
             duration_minutes=duration_minutes,
         )
-
-        response_dict = await schedule_meeting_calendar(request=request_wrapper)
-        meet_url = response_dict.get("meet_url", DEFAULT_MEET_URL)
 
         # Broadcast the success back to the entire channel
         message_text = SLACK_MEETING_SUCCESS_TEMPLATE.format(
@@ -139,6 +127,7 @@ async def schedule_and_notify_slack(
         await _send_slack_ephemeral_message(response_url, f"🚨  Scheduling failed: {exc}")
     finally:
         db.close()
+
 
 
 @router.post("/slack/meet", status_code=status.HTTP_200_OK)
