@@ -24,8 +24,8 @@ def get_pending_tasks(project_id: str) -> str:
     """
     with get_db_session() as db:
         result = db.execute(
-            text(f"SELECT id, title, description, status FROM tasks WHERE project_id = :pid AND status = '{TASK_STATUS_IN_PROGRESS}'"),
-            {"pid": project_id}
+            text("SELECT id, title, description, status FROM tasks WHERE project_id = :pid AND status = :status"),
+            {"pid": project_id, "status": TASK_STATUS_IN_PROGRESS}
         )
         tasks = [
             {
@@ -52,12 +52,23 @@ def create_task(
     """
     with get_db_session() as db:
         db.execute(
-            text(f"INSERT INTO tasks (deleted_at, project_id, id, created_at, updated_at, deadline, status, description, title, category, label, priority, complexity) VALUES (NULL, :pid, gen_random_uuid(), :now, :now, NULL, '{TASK_STATUS_TODO}', :desc, :title, '{TASK_CATEGORY_BACKEND}', 1, '{TASK_PRIORITY_MEDIUM}', 'medium')"),
+            text("""
+                INSERT INTO tasks (
+                    deleted_at, project_id, id, created_at, updated_at, deadline, 
+                    status, description, title, category, label, priority, complexity
+                ) VALUES (
+                    NULL, :pid, gen_random_uuid(), :now, :now, NULL, 
+                    :status, :desc, :title, :cat, 1, :priority, 'medium'
+                )
+            """),
             {
                 "pid": project_id,
                 "now": datetime.now(timezone.utc),
+                "status": TASK_STATUS_TODO,
                 "desc": f"[{type.upper()}] {description} (Tags: {','.join(tags or [])})",
-                "title": title
+                "title": title,
+                "cat": TASK_CATEGORY_BACKEND,
+                "priority": TASK_PRIORITY_MEDIUM
             }
         )
         db.commit()

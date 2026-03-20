@@ -16,30 +16,6 @@ from src.backend.meeting_bot.constants import DEFAULT_TRANSCRIPT_LANGUAGE
 logger = logging.getLogger(__name__)
 
 
-def create_transcript_record(bot_session_id: str) -> UUID | None:
-    """Create a MeetingTranscript stub with status=PENDING."""
-    with get_db_session() as db:
-        meeting = get_meeting_by_session(db, bot_session_id)
-        if meeting is None:
-            logger.warning(
-                "create_transcript_record: no row for bot_session=%s", bot_session_id
-            )
-            return None
-
-        transcript = MeetingTranscript(
-            meeting_id=meeting.id,
-            status=TranscriptStatus.PENDING,
-        )
-        db.add(transcript)
-        db.flush()
-        transcript_id = transcript.id
-
-    logger.info(
-        "Transcript stub created: id=%s meeting_id=%s", transcript_id, meeting.id
-    )
-    return transcript_id
-
-
 def _sync_meeting_participants(db, meeting_id: UUID, project_id: UUID, attendees: list[dict], segments: list[dict]) -> None:
     """Helper to resolve attendee emails to project members, sync DB, and enrich segments."""
     from src.backend.model.project import ProjectMember
