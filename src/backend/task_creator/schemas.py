@@ -1,5 +1,4 @@
-from pydantic import BaseModel
+from src.backend.schemas.common import StandardResponse
 
-class TaskGenerationResponse(BaseModel):
-    status: str
-    message: str
+class TaskGenerationResponse(StandardResponse):
+    pass

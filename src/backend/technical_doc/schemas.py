@@ -1,10 +1,9 @@
 from pydantic import BaseModel
 from uuid import UUID
 from typing import Optional
+from src.backend.schemas.common import AgentRequest, StandardResponse
 
-class TechDocAgentRequest(BaseModel):
-    user_id: UUID
-    message: str
+class TechDocAgentRequest(AgentRequest):
     current_document_markdown: Optional[str] = None
 
 class SaveTechDocRequest(BaseModel):
@@ -16,12 +15,12 @@ class TechDocResponseSchema(BaseModel):
     content: Optional[str] = None
     message: Optional[str] = None
     document: Optional[str] = None
-    doc: Optional[str] = None # For backward compatibility
+
     messages: Optional[list] = None
     thinking: Optional[bool] = False
     saved: Optional[bool] = False
     redirect: Optional[str] = None
 
-class TechDocSaveResponseSchema(BaseModel):
-    status: str
-    message: str
+class TechDocSaveResponseSchema(StandardResponse):
+    pass
+

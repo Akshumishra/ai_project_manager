@@ -93,7 +93,6 @@ List any assumptions made about missing high-level details.
 
 3. **After calling the tool**, read the tool's return value:
    - If the response contains **"saved successfully"**, the save was successful. Do NOT say "failed to save".
-   - If the response contains **"Save failed"**, only then tell the user: "Saving failed. Please try after some time."
 """
 
 USER_PROMPT = """

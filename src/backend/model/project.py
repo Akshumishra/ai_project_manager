@@ -14,6 +14,11 @@ class ProjectStatus(enum.Enum):
     COMPLETED = "completed"
     HOLD = "hold"
 
+class WorkflowStatus(enum.Enum):
+    IN_PROGRESS = "in_progress"
+    THINKING = "thinking"
+    COMPLETED = "completed"
+
 class Project(BaseModel):
     __tablename__ = "projects"
 
@@ -43,6 +48,9 @@ class Project(BaseModel):
     )
     requirement_chats = relationship(
         "RequirementChat", back_populates="project", cascade="all, delete-orphan"
+    )
+    tech_doc_chats = relationship(
+        "TechDocChat", back_populates="project", cascade="all, delete-orphan"
     )
 
 
@@ -78,7 +86,11 @@ class ProjectWorkflowStatus(BaseModel):
 
     project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
     workflow_name = Column(String, nullable=False)
-    status = Column(String, nullable=False)
+    status = Column(
+        Enum(WorkflowStatus, name="workflowstatus", values_callable=lambda x: [e.value for e in x]), 
+        default=WorkflowStatus.IN_PROGRESS,
+        nullable=False
+    )
 
     __table_args__ = (
         UniqueConstraint("project_id", "workflow_name", name="unique_project_workflow"),

@@ -1,3 +1,4 @@
+import logging
 from typing import List, Dict, Any
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
@@ -7,104 +8,119 @@ from src.backend.requirement_gather.requirement_agent.agent import RequirementAg
 from src.backend.requirement_gather.services.chat_history import (
     get_chat_history,
     save_chat_message,
-    build_initial_user_prompt
+    build_initial_user_prompt,
 )
 from src.backend.utils.workflow_utils import (
     set_workflow_status,
-    check_completion_and_redirect,
-    handle_thinking_lock
+    check_agent_prerequisites,
+    handle_agent_resumption,
+    get_workflow_status,
 )
+from src.backend.utils.doc_utils import get_document_content
+from src.backend.model.document import DocumentType
 from src.backend.requirement_gather.constants import RequirementAgentConstants
-from src.backend.utils.workflow_utils import get_workflow_status
-from src.backend.requirement_gather.requirement_agent.tools.get_current_requirement_draft import get_requirement_draft_tool
+
+logger = logging.getLogger(__name__)
+AgentConst = RequirementAgentConstants
 
 
-AGENT_CONST = RequirementAgentConstants
+def _run_agent(
+    db: Session,
+    user_id: UUID,
+    project_id: UUID,
+    messages: List[Dict[str, str]],
+    is_recovering: bool = False,
+) -> Dict[str, Any]:
+    """
+    Execute one agent turn, persist the assistant reply, and return the response.
 
-def _execute_agent_run(db: Session, user_id: UUID, project_id: UUID, run_messages: List[Dict[str, str]], is_recovering: bool = False) -> Dict[str, Any]:
-    """Internal helper to execute the agent, save output, and manage thinking lock."""
-    set_workflow_status(db, project_id, AGENT_CONST.WORKFLOW_NAME, "thinking")
+    Args:
+        is_recovering: True when resuming after an interrupted turn (last message was user).
+                       Changes the returned status to "resumed" and attaches full history.
+    """
+    set_workflow_status(db, project_id, AgentConst.WORKFLOW_NAME, "thinking")
     agent = RequirementAgent(user_id, project_id)
-    
+
     try:
-        response = agent.run(run_messages)
+        response = agent.run(messages)
         content = response.get("content")
-        
+
         if not content:
             raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Agent returned empty response")
-        
+
         save_chat_message(db=db, project_id=project_id, role="assistant", content=content)
-        
-        set_workflow_status(db, project_id, AGENT_CONST.WORKFLOW_NAME, "in_progress")
-            
+        set_workflow_status(db, project_id, AgentConst.WORKFLOW_NAME, "in_progress")
+
         if is_recovering:
             return {
                 "messages": get_chat_history(db, project_id),
                 "status": "resumed",
                 "saved": response.get("saved", False),
-                "document": response.get("doc")
+                "document": response.get("doc"),
             }
-        
-        workflow_status = get_workflow_status(db, project_id, AGENT_CONST.WORKFLOW_NAME)
-        if workflow_status:
-            response["status"] = workflow_status.status
-        
+
         if "doc" in response:
             response["document"] = response.pop("doc")
+
+        wf = get_workflow_status(db, project_id, AgentConst.WORKFLOW_NAME)
+        if wf:
+            response["status"] = wf.status
 
         return response
 
     except Exception as e:
-        set_workflow_status(db, project_id, AGENT_CONST.WORKFLOW_NAME, "in_progress")
+        set_workflow_status(db, project_id, AgentConst.WORKFLOW_NAME, "in_progress")
         if isinstance(e, HTTPException):
-            raise e
+            raise
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Agent failed: {str(e)}")
 
-def start_requirement_agent(db: Session, user_id: UUID, project_id: UUID, background: str = None):
-    """Entry point for starting or resuming the requirement gathering session."""
-    
-    redirect = check_completion_and_redirect(db, project_id, AGENT_CONST.WORKFLOW_NAME, AGENT_CONST.REDIRECT_PATH)
+
+def start_requirement_agent(db: Session, user_id: UUID, project_id: UUID) -> Dict[str, Any]:
+    """Start or resume the requirement gathering session."""
+    redirect = check_agent_prerequisites(db, project_id, AgentConst.WORKFLOW_NAME, redirect_path=AgentConst.REDIRECT_PATH)
     if redirect:
         return redirect
 
-    if handle_thinking_lock(db, project_id, AGENT_CONST.WORKFLOW_NAME):
-        history = get_chat_history(db, project_id)
-        return {"messages": history, "status": "resumed", "thinking": True}
-
     history = get_chat_history(db, project_id)
-    is_interrupted = history and history[-1]["role"] == "user"
-        
+    resumption = handle_agent_resumption(db, project_id, AgentConst.WORKFLOW_NAME, history, is_start=True)
 
-    if history and not is_interrupted:
-        get_draft_tool = get_requirement_draft_tool(project_id)
-        current_doc = get_draft_tool.invoke({})
-        if "draft found" in current_doc or "no content" in current_doc or "Error" in current_doc:
-            current_doc = ""
+    if resumption:
+        if not resumption.get("thinking"):
+            resumption["document"] = get_document_content(db, project_id, DocumentType.REQUIREMENT)
+        return resumption
 
-        return {
-            "messages": history, 
-            "status": "resumed",
-            "document": current_doc
-        }
+    is_recovering = bool(history and history[-1]["role"] == "user")
+    context = build_initial_user_prompt(db, project_id, user_id=user_id)
+    messages = [{"role": "user", "content": context}, *history]
 
-    project_context = build_initial_user_prompt(db, project_id, background)
-    run_messages = [{"role": "user", "content": project_context}]
-    if history:
-        run_messages.extend(history)
-    
-    result = _execute_agent_run(db, user_id, project_id, run_messages, is_recovering=is_interrupted)
-    if not is_interrupted:
+    result = _run_agent(db, user_id, project_id, messages, is_recovering=is_recovering)
+    if not is_recovering:
         result["status"] = "started"
     return result
 
-def run_requirement_agent(db: Session, user_id: UUID, project_id: UUID, user_message: str, background: str = None):
+
+def run_requirement_agent(db: Session, user_id: UUID, project_id: UUID, user_message: str) -> Dict[str, Any]:
     """Process a new user message in the requirement gathering session."""
-    
     save_chat_message(db=db, project_id=project_id, role="user", content=user_message, user_id=user_id)
-    
+
     history = get_chat_history(db, project_id)
-    project_context = build_initial_user_prompt(db, project_id, background)
-    
-    run_messages = [{"role": "user", "content": project_context}, *history]
-    
-    return _execute_agent_run(db, user_id, project_id, run_messages)
+    context = build_initial_user_prompt(db, project_id, user_id=user_id)
+    messages = [{"role": "user", "content": context}, *history]
+
+    return _run_agent(db, user_id, project_id, messages)
+
+def complete_requirement_step(db: Session, project_id: UUID) -> Dict[str, Any]:
+    """
+    Updates the workflow status to completed for the requirement step.
+    """
+    try:
+        set_workflow_status(db, project_id, AgentConst.WORKFLOW_NAME, "completed")
+        db.commit()
+        return {"status": "success", "message": "Requirement step marked as completed."}
+    except Exception as e:
+        db.rollback()
+        logger.exception(f"Failed to complete requirement step for project {project_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to complete requirement step: {str(e)}"
+        )

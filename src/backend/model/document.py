@@ -1,10 +1,15 @@
-from sqlalchemy import Column, String, Text, ForeignKey
+from sqlalchemy import Column, String, Text, ForeignKey, Enum
 from sqlalchemy.orm import relationship
 from sqlalchemy import UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
+import enum
 
 from src.backend.model.base import BaseModel
 
+class DocumentType(str, enum.Enum):
+    REQUIREMENT = "requirement"
+    TECHNICAL = "technical"
+    GENERAL = "general"
 
 class Document(BaseModel):
     __tablename__ = "documents"
@@ -12,6 +17,11 @@ class Document(BaseModel):
     project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
     title = Column(String, index=True, nullable=True)
     created_by = Column(UUID(as_uuid=True), nullable=True)
+    document_type = Column(
+        Enum(DocumentType, name="document_type_enum", values_callable=lambda x: [e.value for e in x]),
+        nullable=False,
+        default=DocumentType.GENERAL
+    )
 
     project = relationship("Project", back_populates="documents")
     blocks = relationship(

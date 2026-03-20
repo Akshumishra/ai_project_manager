@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     # ── App Metadata ─────────────────────────────────────────────────────────
     APP_TITLE: str = "AI Project Manager API"
     APP_ENVIRONMENT: str = "development"
+    USE_REDIS: bool = False
+
 
     # ── Database ─────────────────────────────────────────────────────────────
     DATABASE_URL: str
@@ -78,6 +80,5 @@ class Settings(BaseSettings):
     def is_production(self) -> bool:
         """Return True when running in production mode."""
         return self.APP_ENVIRONMENT == "production"
-
 
 settings = Settings()

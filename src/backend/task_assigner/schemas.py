@@ -2,10 +2,10 @@ from pydantic import BaseModel, Field
 from uuid import UUID
 from datetime import datetime
 from typing import List, Optional
+from src.backend.schemas.common import AgentRequest, StandardResponse
 
 
-class TaskAssignerAgentRequest(BaseModel):
-    user_id: UUID
+class TaskAssignerAgentRequest(AgentRequest):
     message: Optional[str] = None
 
 
@@ -27,8 +27,3 @@ class TaskAssignerResponseSchema(BaseModel):
     messages: Optional[list] = None
     thinking: Optional[bool] = False
     redirect: Optional[str] = None
-
-
-class StandardResponse(BaseModel):
-    success: bool
-    message: str

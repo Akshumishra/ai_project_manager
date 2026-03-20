@@ -65,10 +65,6 @@ export const sendRequirementAgentMessage = async (projectId, message, userId) =>
   return data;
 };
 
-export const saveRequirementDocRequest = async (projectId, payload) => {
-  const { data } = await api.post(`/api/agent/projects/${projectId}/requirement-doc`, payload);
-  return data;
-};
 
 export const completeRequirementStepRequest = async (projectId, userId = null) => {
   let url = `/api/agent/projects/${projectId}/requirement-complete`;

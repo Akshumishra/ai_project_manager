@@ -8,6 +8,7 @@ const MAX_POLL_ATTEMPTS = 200; // Allow up to 10 minutes for granular task gener
 const STATUS_MESSAGES = {
   not_started: 'Initiating task generation...',
   generating: 'AI is analyzing your Technical Specification and generating tasks...',
+  thinking: 'AI is analyzing your Technical Specification and generating tasks...',
   completed: 'Tasks generated successfully! Redirecting...',
   failed: 'Task generation failed. Please try again from the Technical Specification page.',
   failed_missing_docs: 'Requirement or Technical Specification is missing. Please complete them first.',

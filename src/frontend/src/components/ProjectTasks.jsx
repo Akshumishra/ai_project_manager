@@ -10,6 +10,7 @@ const MAX_POLL_ATTEMPTS = 20;
 const STATUS_LABELS = {
   not_started: null,
   generating: 'AI is generating tasks from your documents...',
+  thinking: 'AI is analyzing your Technical Specification and generating tasks...',
   completed: 'Tasks generated successfully!',
   failed: 'Task generation failed. Please try again.',
   failed_missing_docs: 'Missing required documents. Please complete Requirement and Technical Specifications first.',
@@ -133,7 +134,7 @@ export default function ProjectTasks({ project, tasks, members = [], onCreateTas
     }
   };
 
-  const isBusy = genStatus === 'generating';
+  const isBusy = genStatus === 'thinking' || genStatus === 'generating' || genStatus === 'started';
   const isGenError = genStatus === 'failed' || genStatus === 'failed_missing_docs';
   const isGenSuccess = genStatus === 'completed';
 
@@ -188,9 +189,9 @@ export default function ProjectTasks({ project, tasks, members = [], onCreateTas
           background: bannerBg,
           border: `1.5px solid ${bannerBorder}`,
           borderRadius: '14px',
-          marginBottom: '12px',
+          marginBottom: '20px',
           display: 'flex',
-          alignItems: 'center',
+          alignItems: 'flex-start',
           gap: '14px',
         }}>
           {isBusy && (
@@ -200,16 +201,19 @@ export default function ProjectTasks({ project, tasks, members = [], onCreateTas
               borderTop: '3px solid var(--brand-600)',
               borderRadius: '50%',
               flexShrink: 0,
+              marginTop: '2px',
               animation: 'spin 1s linear infinite',
             }} />
           )}
           <div style={{ flex: 1 }}>
             <p style={{ margin: 0, color: bannerText, fontWeight: '600', fontSize: '14px' }}>
-              {STATUS_LABELS[genStatus] || genStatus}
+              {isBusy ? 'AI is analyzing your Technical Specification and generating tasks...' :
+               isGenSuccess ? 'Tasks generated successfully!' :
+               STATUS_LABELS[genStatus] || genStatus}
             </p>
             {isBusy && (
               <p style={{ margin: '4px 0 0', color: 'var(--brand-600)', fontSize: '12px' }}>
-                This can take up to a minute. The task list will refresh automatically.
+                This can take up to a minute. The task list will refresh automatically once complete.
               </p>
             )}
           </div>
@@ -223,6 +227,7 @@ export default function ProjectTasks({ project, tasks, members = [], onCreateTas
           )}
         </div>
       )}
+
 
       {/* Task Assignment Status Banner */}
       {assignStatus && (

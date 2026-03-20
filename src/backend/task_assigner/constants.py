@@ -1,9 +1,7 @@
-class TaskAssignerConstants:
-    """
-    Constants for the Task Assigner Agent.
-    """
-    MODEL = "gpt-4.1-mini"
-    TEMPERATURE = 0
-    AGENT_NAME = "Task Assigner Agent"
-    WORKFLOW_NAME = "task_assignment"
+from src.backend.constants import DefaultConstants
+
+class TaskAssignerConstants(DefaultConstants):
+    WORKFLOW_NAME = DefaultConstants.WF_TASK_ASSIGN
     REDIRECT_PATH = "/task-board"
+    MODEL = "gpt-4.1-mini"
+    AGENT_NAME = "Task Assigner Agent"

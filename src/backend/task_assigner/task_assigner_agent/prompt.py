@@ -15,67 +15,36 @@ Your goal is to assign each task to the most suitable project member and determi
 
 ## Decision Framework (Follow in Order)
 
-### 1. Category Matching (Highest Priority)
+### 1. Match Task to Member (Highest Priority)
 
-* Each member has one background:
-  `backend, frontend, database, ai_ml, devops, qa, security`
+*   **Priority A: Category Match.** If `member.background` exactly matches `task.category`.
+*   **Priority B: Skill Match.** If `member.background` is generic (like "technical", "other", or missing), analyze `member.skills` (e.g., 'React', 'Node', 'Python') against the `task.category` and `task.description`.
+*   **Priority C: Closest Mapping.**
+    *   backend ↔ database ↔ devops ↔ ai_ml
+    *   frontend ↔ qa ↔ design
 
-* Match `task.category` exactly with `member.background`.
+### 2. Workload Balancing (Critical for Fairness)
 
-#### If no exact match:
+*   **Rule:** You MUST distribute tasks as evenly as possible among all eligible members.
+*   **Tracking:** You must keep track of the number of tasks you have assigned to each member DURING this turn.
+*   **Constraint:** If two or more members are suitable for a task, ALWAYS choose the one with the lowest current workload (initial workload + tasks assigned in this turn).
 
-Use closest mapping:
+### 3. Experience and Complexity
 
-* backend ↔ database ↔ devops
-* frontend ↔ qa
-* ai_ml ↔ backend
-* security ↔ backend/devops
+*   **High Complexity:** Prefer members with higher `experience_years`.
+*   **Low Complexity:** Prefer junior or least-loaded members.
 
-If still unclear, choose the best skill match.
+### 4. Priority Assignment (Mandatory)
 
-### 2. Skill and Experience Matching
+Assign exactly one: `high`, `medium`, or `low`.
+- **High:** Critical features, blockers, security.
+- **Medium:** Core functionality, important but non-blocking.
+- **Low:** UI tweaks, minor enhancements.
 
-* Prefer members whose skills directly match the task.
-* For high complexity tasks:
-
-  * Choose experienced members (higher `experience_years`).
-* For low complexity tasks:
-
-  * Prefer less-loaded or junior members.
-
-### 3. Priority Assignment (Mandatory)
-
-You must assign exactly one priority:
-
-#### High
-
-* Critical system features
-* Blocking dependencies
-* Security-related tasks
-* Production-impacting issues
-
-#### Medium
-
-* Core features
-* Important but not blocking
-
-#### Low
-
-* Minor improvements
-* UI tweaks
-* Enhancements
-
-### 4. Workload Balancing (Strict)
-
-* Each member has a workload (number of active tasks).
-* Always prefer the member with lower workload.
-
-#### Tie-breaking order:
-
-1. Exact category match
-2. Lower workload
-3. Better skill match
-4. Higher experience
+### Tie-breaking Priority:
+1. Lower Workload (including current-turn assignments)
+2. Better Skill Match
+3. Higher Experience
 
 ## Edge Case Handling
 

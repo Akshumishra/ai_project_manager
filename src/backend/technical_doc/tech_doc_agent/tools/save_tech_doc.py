@@ -1,37 +1,34 @@
 from langchain_core.tools import tool
-from sqlalchemy.orm import Session
 from uuid import UUID
-
 from src.backend.db.database import get_session_local
-from src.backend.technical_doc.document_sections import (
-    build_project_document_title,
-)
+from src.backend.model.document import DocumentType
+from src.backend.utils.doc_utils import upsert_document
+from src.backend.technical_doc.constants import TechDocAgentConstants
 
 def make_save_tech_doc_tool(user_id: UUID, project_id: UUID):
     @tool
-    def save_technical_document(document_markdown: str):
+    def save_technical_specification(document_markdown: str):
         """
-        Use this tool ONLY when the user explicitly confirms and approves the final technical document.
-        This saves the technical document definitively to the database as discrete blocks.
+        Use this tool to save or update the Technical Specification document in markdown format. 
+        The system will automatically organize it into documents and blocks in the database.
+        Call this WHENEVER you want to sync the latest version to the user's screen.
         """
-        db: Session = get_session_local()()
+        db = get_session_local()()
         try:
-            from src.backend.technical_doc.services.save_tech_doc import save_technical_spec_in_db
-            
-            result = save_technical_spec_in_db(
+            result = upsert_document(
                 db=db,
                 user_id=user_id,
                 project_id=project_id,
-                markdown_content=document_markdown
+                document_type=DocumentType.TECHNICAL,
+                markdown_content=document_markdown,
+                title_label=TechDocAgentConstants.TECH_DOC_LABEL
             )
-
-            if result.get("success"):
-                return f"Success! {result.get('message')}"
-            else:
-                return f"Error: {result.get('message')}"
-        except Exception as exc:
-            return f"Error saving document: {str(exc)}"
+            db.commit()
+            return f"Technical specification saved successfully. Doc ID: {result.get('document_id')}"
+        except Exception as e:
+            db.rollback()
+            return f"Failed to save specification: {str(e)}"
         finally:
             db.close()
-    
-    return save_technical_document
+
+    return save_technical_specification

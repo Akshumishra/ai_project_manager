@@ -10,6 +10,7 @@ from .schemas import TaskGenerationResponse
 from .constants import TaskCreatorConstants
 
 from src.backend.utils.queue_utils import get_queue
+from src.backend.config import settings
 
 router = APIRouter(prefix="/api/task-creator", tags=["Task Creator"])
 
@@ -31,7 +32,7 @@ async def generate_project_tasks(
     try:
         # Try to use RQ
         queue = get_queue()
-        if queue:
+        if settings.USE_REDIS and queue:
             queue.enqueue(
                 task_creator_services.generate_and_save_tasks,
                 project_id,
@@ -43,9 +44,9 @@ async def generate_project_tasks(
             )
             message = "Task generation has been initiated via background queue."
         else:
-            # Fallback to local background tasks if Redis/RQ is not available
+            # Fallback to local background tasks if Redis/RQ is not available or disabled
             background_tasks.add_task(task_creator_services.generate_and_save_tasks, project_id, current_user.id)
-            message = "Task generation has been initiated (local fallback)."
+            message = "Task generation has been initiated."
 
         return {
             "status": "success",
@@ -78,13 +79,15 @@ async def get_task_generation_status(
         return {"status": "not_started", "message": "Task generation has not been initiated yet."}
 
     status_map = {
-        "generating": "Task generation is in progress...",
+        "thinking": "Task generation is in progress...",
         "completed": "Tasks have been generated successfully.",
-        "failed": "Task generation failed. Please try again.",
-        "failed_missing_docs": "Missing required documents (Requirement or Technical Specification). Please complete them first.",
+        "in_progress": "Ready to generate tasks.",
     }
 
+    # Ensure we return a string status for the frontend
+    current_status = wf_status.status.value if hasattr(wf_status.status, "value") else str(wf_status.status)
+
     return {
-        "status": wf_status.status,
-        "message": status_map.get(wf_status.status, wf_status.status),
+        "status": current_status,
+        "message": status_map.get(current_status, current_status),
     }

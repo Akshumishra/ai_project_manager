@@ -47,11 +47,11 @@ export default function ProjectDetail({ projectId, onSelectDocument, onBack }) {
         const currentStatus = data.status;
         
         // Only show status when actively generating or recently completed
-        if (currentStatus === 'generating' || currentStatus === 'started') {
+        if (currentStatus === 'thinking' || currentStatus === 'generating' || currentStatus === 'started') {
           setTaskGenStatus(currentStatus);
         } else if (currentStatus === 'completed') {
           setTaskGenStatus(prev => {
-            if (prev === 'generating' || prev === 'started') {
+            if (prev === 'thinking' || prev === 'generating' || prev === 'started') {
               setTimeout(() => setTaskGenStatus(null), 4000);
               return 'completed';
             }
@@ -59,7 +59,7 @@ export default function ProjectDetail({ projectId, onSelectDocument, onBack }) {
           });
           refreshTasks();
           clearInterval(pollInterval);
-        } else if (currentStatus === 'failed' || currentStatus === 'not_started' || currentStatus === 'failed_missing_docs') {
+        } else if (currentStatus === 'failed' || currentStatus === 'not_started' || currentStatus === 'failed_missing_docs' || currentStatus === 'in_progress') {
           setTaskGenStatus(null);
           clearInterval(pollInterval);
         }
@@ -198,7 +198,7 @@ export default function ProjectDetail({ projectId, onSelectDocument, onBack }) {
               <span style={{ fontSize: '20px' }}>✅</span>
             )}
             <span style={{ fontWeight: '500' }}>
-              {(taskGenStatus === 'generating' || taskGenStatus === 'started') 
+              {(taskGenStatus === 'thinking' || taskGenStatus === 'generating' || taskGenStatus === 'started') 
                 ? 'Tasks are generating in the background...' 
                 : 'Tasks generated successfully!'}
             </span>

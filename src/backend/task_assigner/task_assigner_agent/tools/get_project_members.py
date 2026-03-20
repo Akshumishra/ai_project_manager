@@ -3,6 +3,7 @@ from src.backend.db.database import get_session_local
 from src.backend.model.project import ProjectMember
 from src.backend.model.user_detail import UserDetail
 from uuid import UUID
+from src.backend.model.task import Task, TaskStatus
 
 
 def make_get_project_members_tool(project_id: UUID):
@@ -20,7 +21,6 @@ def make_get_project_members_tool(project_id: UUID):
             for m in members:
                 details = db.query(UserDetail).filter(UserDetail.user_id == m.user_id).first()
                 # Fetch current workload (count of incomplete tasks)
-                from src.backend.model.task import Task, TaskStatus
                 workload = db.query(Task).filter(
                     Task.project_member_id == m.id,
                     Task.status != TaskStatus.COMPLETED,

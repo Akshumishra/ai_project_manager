@@ -21,7 +21,7 @@ from src.backend.collaborative_document.routes import block as block_routes
 from src.backend.collaborative_document.routes import websocket as ws_routes
 from src.backend.collaborative_document.utils.scheduler import start_scheduler
 from src.backend.collaborative_document.utils.block_sync_worker import flush_dirty_blocks
-from src.backend.requirement_gather import project_routes as requirement_routes
+from src.backend.requirement_gather import requirement_gather_route as requirement_routes
 from src.backend.project import routes as project_routes
 from src.backend.technical_doc import tech_doc_routes
 from src.backend.resume_parsing import routes as resume_routes
@@ -105,11 +105,11 @@ app.include_router(ws_routes.router)
 app.include_router(slack_routes.router)
 
 # ── Agentic Workflows ────────────────────────────────────────────────────────
-app.include_router(requirement_routes.router, prefix="/api/agent")
-app.include_router(tech_doc_routes.router, prefix="/api/agent")
+app.include_router(requirement_routes.router)
+app.include_router(tech_doc_routes.router)
 app.include_router(task_creator_routes.router)
 app.include_router(task_assigner_router)
-app.include_router(api_router)
+app.include_router(api_router, prefix="/api")
 
 # ── Slack & Standup Features ──────────────────────────────────────────────────
 # Unified Slack Request URL: POST /api/slack/events

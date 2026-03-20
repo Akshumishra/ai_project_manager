@@ -1,7 +1,5 @@
-class TaskCreatorConstants:
-    """
-    Constants for the Task Creator Agent.
-    """
-    WORKFLOW_NAME = "task_generation"
+from src.backend.constants import DefaultConstants
+
+class TaskCreatorConstants(DefaultConstants):
+    WORKFLOW_NAME = DefaultConstants.WF_TASK_GEN
     MODEL = "gpt-4.1-mini"
-    TEMPERATURE = 0

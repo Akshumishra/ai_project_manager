@@ -5,19 +5,19 @@ from src.backend.db.database import get_session_local
 from src.backend.model.document import DocumentType
 from src.backend.utils.doc_utils import get_document_content
 
-def get_requirement_draft_tool(project_id: UUID):
+def make_get_tech_doc_draft_tool(project_id: UUID):
 
     @tool
-    def get_current_requirement_draft():
+    def get_current_technical_doc_draft():
         """
-        Retrieves the current saved draft of the Requirement Specification for this project.
+        Retrieves the current saved draft of the Technical Specification for this project.
         Use this to see what has been already documented and saved.
         """
         db = get_session_local()()
         try:
-            content = get_document_content(db, project_id, DocumentType.REQUIREMENT)
+            content = get_document_content(db, project_id, DocumentType.TECHNICAL)
             if not content:
-                return "No requirement document draft found yet or it has no content."
+                return "No technical document draft found yet or it has no content."
             return content
 
         except Exception as e:
@@ -25,4 +25,4 @@ def get_requirement_draft_tool(project_id: UUID):
         finally:
             db.close()
 
-    return get_current_requirement_draft
+    return get_current_technical_doc_draft
