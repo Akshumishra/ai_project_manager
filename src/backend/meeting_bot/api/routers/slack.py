@@ -3,7 +3,6 @@ import httpx
 from typing import Optional
 
 from fastapi import APIRouter, Form, status, BackgroundTasks
-from sqlalchemy import text
 
 from src.backend.db.database import SessionLocal
 from src.backend.model.project import ProjectSlackDetail, ProjectMember
@@ -32,6 +31,7 @@ async def _send_slack_ephemeral_message(response_url: str, text_msg: str) -> Non
             }
         )
 
+
 def _parse_slack_command_text(text_input: Optional[str]) -> tuple[int, str, str]:
     """Parse duration, title, and agenda with direct partitioning and indexing."""
     parts = (text_input or "").strip().split(None, 2)
@@ -40,10 +40,13 @@ def _parse_slack_command_text(text_input: Optional[str]) -> tuple[int, str, str]
     title = parts[1] if len(parts) > 1 else "Scheduled Meeting"
     agenda = parts[2] if len(parts) > 2 else ""
 
-    duration = int(duration_raw) if duration_raw.isdigit() else DEFAULT_MEETING_DURATION_MINS
+    duration = (
+        int(duration_raw) if duration_raw.isdigit() else DEFAULT_MEETING_DURATION_MINS
+    )
 
     duration = max(MIN_MEETING_DURATION_MINS, min(duration, MAX_MEETING_DURATION_MINS))
     return duration, title, agenda
+
 
 async def schedule_and_notify_slack(
     channel_id: str,
@@ -70,8 +73,8 @@ async def schedule_and_notify_slack(
         if not slack_channel_map:
             logger.warning("Slack channel %s not mapped to any project", channel_id)
             await _send_slack_ephemeral_message(
-                response_url, 
-                f"This Slack channel (ID: `{channel_id}`) is not connected to any project dashboard. Please configure the app integration first."
+                response_url,
+                f"This Slack channel (ID: `{channel_id}`) is not connected to any project dashboard. Please configure the app integration first.",
             )
             return
 
@@ -88,10 +91,12 @@ async def schedule_and_notify_slack(
         )
 
         if not member_map:
-            logger.warning("Slack user %s not found in project %s member list", user_id, project_id)
+            logger.warning(
+                "Slack user %s not found in project %s member list", user_id, project_id
+            )
             await _send_slack_ephemeral_message(
-                response_url, 
-                f"Your Slack ID (`{user_id}`) is not in this project's member list. Please contact your administrator."
+                response_url,
+                f"Your Slack ID (`{user_id}`) is not in this project's member list. Please contact your administrator.",
             )
             return
 
@@ -111,7 +116,7 @@ async def schedule_and_notify_slack(
             title=title,
             duration_minutes=duration_minutes,
             meet_url=meet_url,
-            agenda=agenda or 'None provided.'
+            agenda=agenda or "None provided.",
         )
         payload = {
             "response_type": "in_channel",
@@ -124,10 +129,11 @@ async def schedule_and_notify_slack(
 
     except Exception as exc:
         logger.exception("Slack background scheduler failed")
-        await _send_slack_ephemeral_message(response_url, f"🚨  Scheduling failed: {exc}")
+        await _send_slack_ephemeral_message(
+            response_url, f"🚨  Scheduling failed: {exc}"
+        )
     finally:
         db.close()
-
 
 
 @router.post("/slack/meet", status_code=status.HTTP_200_OK)
@@ -142,7 +148,11 @@ async def slack_meeting_command(
     Slack Slash Command handler for scheduling a Google Calendar meeting.
     Acknowledges immediately to avoid Slack timeouts.
     """
-    logger.info("Slack slash command received (async) from channel=%s user=%s", channel_id, user_id)
+    logger.info(
+        "Slack slash command received (async) from channel=%s user=%s",
+        channel_id,
+        user_id,
+    )
 
     background_tasks.add_task(
         schedule_and_notify_slack,
