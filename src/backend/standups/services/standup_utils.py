@@ -8,6 +8,8 @@ from sqlalchemy.orm import Session
 from src.backend.model.task import Task, TaskStatus, TaskPriority, TaskComplexity
 from src.backend.model.project import ProjectMember
 from src.backend.model.standup import Standup
+from src.backend.model.task_log import TaskLog
+from src.backend.model.standup_action_log import StandupActionLog
 
 try:
     from dateutil import parser as date_parser
@@ -113,11 +115,29 @@ class StandupUtils:
 
     @staticmethod
     def find_existing_task(db: Session, project_id: uuid.UUID, title: str, member_id: Optional[uuid.UUID]) -> Optional[Task]:
-        if not title or not member_id:
+        """
+        Finds a task by project, title, and member. 
+        If member_id is provided, checks for tasks assigned to them first.
+        If no match is found, checks for unassigned tasks with the same title.
+        """
+        if not title:
             return None
+            
+        # 1. Try finding task assigned to this member
+        if member_id:
+            task = db.query(Task).filter(
+                Task.project_id == project_id,
+                Task.project_member_id == member_id,
+                Task.title.ilike(title.strip()),
+                Task.deleted_at.is_(None)
+            ).first()
+            if task:
+                return task
+
+        # 2. Try finding unassigned task with the same title
         return db.query(Task).filter(
             Task.project_id == project_id,
-            Task.project_member_id == member_id,
+            Task.project_member_id.is_(None),
             Task.title.ilike(title.strip()),
             Task.deleted_at.is_(None)
         ).first()
@@ -160,10 +180,11 @@ class StandupUtils:
         reply_lower = reply_text.lower()
         best_task = None
         best_score = 0.0
+        stop_words = {"task", "project", "issue", "ticket"}
 
         for t in todo_tasks:
             if not t.title: continue
-            title_words = [w for w in re.split(r'\W+', t.title.lower()) if len(w) > 3]
+            title_words = [w for w in re.split(r'\W+', t.title.lower()) if len(w) > 3 and w not in stop_words]
             if not title_words: continue
             matched = sum(1 for w in title_words if w in reply_lower)
             score = matched / len(title_words)

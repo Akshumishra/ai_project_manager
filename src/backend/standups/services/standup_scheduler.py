@@ -14,29 +14,29 @@ class StandupScheduler:
         db = SessionStandup()
         return StandupManager(db), db
 
-    async def morning_job(self):
+    async def initiate_daily_standups(self):
         logger.info("CRON: Starting morning standup initiation...")
         manager, db = self._get_manager()
         try:
             results = await manager.initiate_all_standups()
             logger.info(f"CRON: Morning standups initiated for {len(results)} projects.")
         except Exception as e:
-            logger.error(f"CRON: Error in morning job: {e}")
+            logger.error(f"CRON: Error in initiate_daily_standups: {e}")
         finally:
             db.close()
 
-    async def evening_job(self):
+    async def finalize_daily_standups(self):
         logger.info("CRON: Starting evening standup finalization...")
         manager, db = self._get_manager()
         try:
             results = await manager.finalize_all_active_standups()
             logger.info(f"CRON: Evening standups finalized: {results}")
         except Exception as e:
-            logger.error(f"CRON: Error in evening job: {e}")
+            logger.error(f"CRON: Error in finalize_daily_standups: {e}")
         finally:
             db.close()
 
-    async def startup_finalize_job(self):
+    async def run_startup_finalization_check(self):
         """
         Runs once on startup. Finalizes any standups that were created today but
         not yet summarized — handles cases where the evening cron was missed.
@@ -55,19 +55,19 @@ class StandupScheduler:
             db.close()
 
     def start(self):
-        # Morning standup Mon-Fri IST (9:00 AM)
+        # Morning standup Mon-Fri IST (9:30 AM)
         self.scheduler.add_job(
-            self.morning_job,
-            CronTrigger(day_of_week='mon-fri', hour=10, minute=13, timezone='Asia/Kolkata'),
+            self.initiate_daily_standups,
+            CronTrigger(day_of_week='mon-sun', hour=18, minute=9, timezone='Asia/Kolkata'),
             id='morning_standup',
             replace_existing=True,
             misfire_grace_time=3600
         )
         
-        # Evening finalization Mon-Fri IST (6:00 PM)
+        # Evening finalization Mon-Fri IST (6:30 PM)
         self.scheduler.add_job(
-            self.evening_job,
-            CronTrigger(day_of_week='mon-fri', hour=10, minute=15, timezone='Asia/Kolkata'),
+            self.finalize_daily_standups,
+            CronTrigger(day_of_week='mon-sun', hour=18, minute=10, timezone='Asia/Kolkata'),
             id='evening_standup',
             replace_existing=True,
             misfire_grace_time=3600
@@ -79,7 +79,7 @@ class StandupScheduler:
         from datetime import datetime, timezone, timedelta
         run_at = datetime.now(timezone.utc) + timedelta(seconds=5)
         self.scheduler.add_job(
-            self.startup_finalize_job,
+            self.run_startup_finalization_check,
             DateTrigger(run_date=run_at),
             id='startup_finalize',
             replace_existing=True

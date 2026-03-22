@@ -15,11 +15,7 @@ class Settings(BaseSettings):
     Centralized configuration management with type validation and environment loading.
     """
     model_config = SettingsConfigDict(
-        env_file=(
-            str(_project_root / ".env"),
-            str(_backend_root / ".env"),
-            ".env",
-        ),
+        env_file=(_backend_root / ".env", _project_root / ".env"),
         env_file_encoding="utf-8",
         extra="ignore",
     )
@@ -59,7 +55,6 @@ class Settings(BaseSettings):
     SLACK_SIGNING_SECRET: Optional[str] = None
     BOT_USER_ID: Optional[str] = None
     SLACK_API_BASE_URL: str = "https://slack.com/api"
-    STANDUP_DATABASE_URL: str = "sqlite:///./standup.db"
 
     # ── Misc / Optional integrations ─────────────────────────────────────────
     FIREFLIES_API_KEY: Optional[str] = None

@@ -29,7 +29,7 @@ from src.backend.task_creator import task_creator_routes
 from src.backend.task_assigner.routes.task_assigner_routes import router as task_assigner_router
 from src.backend.slack import slack_routes
 from src.backend.meeting_bot.api.routers import router as api_router
-from src.backend.qa_chatbot.routes import slack_events as merged_slack_events
+from src.backend.slack.routes.events import router as slack_events_router
 from src.backend.standups.routes import standup_routes
 from src.backend.standups.services.standup_scheduler import standup_scheduler
 
@@ -113,7 +113,7 @@ app.include_router(api_router)
 
 # ── Slack & Standup Features ──────────────────────────────────────────────────
 # Unified Slack Request URL: POST /api/slack/events
-app.include_router(merged_slack_events.router, tags=["Slack Events"])
+app.include_router(slack_events_router, tags=["Slack Events"])
 
 # Standup Management API
 app.include_router(standup_routes.router)

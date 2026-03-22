@@ -1,4 +1,6 @@
+from sqlalchemy import select, bindparam
 from src.backend.config import settings
+from src.backend.model.project import ProjectSlackDetail, ProjectMember
 
 class SlackConstants:
     POST_MESSAGE_URL = f"{settings.SLACK_API_BASE_URL}/chat.postMessage"
@@ -29,19 +31,13 @@ class QAAgentConstants:
     }
 
 class QAQueries:
-    GET_PROJECT_ID_BY_CHANNEL = """
-        SELECT project_id
-        FROM project_slack_details
-        WHERE channel_id = :channel_id
-          AND deleted_at IS NULL
-        LIMIT 1
-    """
+    GET_PROJECT_ID_BY_CHANNEL = select(ProjectSlackDetail.project_id).where(
+        ProjectSlackDetail.channel_id == bindparam("channel_id"),
+        ProjectSlackDetail.deleted_at.is_(None)
+    ).limit(1)
     
-    GET_PROJECT_MEMBER_ID = """
-        SELECT id
-        FROM project_members
-        WHERE project_id = :project_id
-          AND slack_id   = :slack_id
-          AND deleted_at IS NULL
-        LIMIT 1
-    """
+    GET_PROJECT_MEMBER_ID = select(ProjectMember.id).where(
+        ProjectMember.project_id == bindparam("project_id"),
+        ProjectMember.slack_id == bindparam("slack_id"),
+        ProjectMember.deleted_at.is_(None)
+    ).limit(1)

@@ -51,9 +51,9 @@ def setup_permissions():
                 # 4. Setup app_user (The primary backend user)
                 print("Setting up app_user grants...")
                 for table in all_tables:
-                    conn.execute(text(f"GRANT ALL PRIVILEGES ON {table} TO app_user"))
-                    print(f"Granted ALL access on {table} to app_user")
-                
+                    conn.execute(text(f"GRANT SELECT ON {table} TO app_user"))
+                    print(f"Granted SELECT access on {table} to app_user")
+               
                 # Sequences for app_user too
                 conn.execute(text("GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO app_user"))
                 

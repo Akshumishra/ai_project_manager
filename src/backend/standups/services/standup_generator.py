@@ -276,7 +276,7 @@ class StandupGenerator:
 
         # 1. Dedicated Blocker Section (From persistent blockers table)
         if active_blockers:
-            message += "🚧 *Current Member Blockers:*\n"
+            message += "🚧 *Current Member Blockers ABC:*\n"
             for member, blockers in active_blockers.items():
                 message += f"• *{member}*:\n"
                 for blk in blockers:

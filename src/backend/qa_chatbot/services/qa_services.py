@@ -57,7 +57,7 @@ def get_project_id_from_channel(channel_id: str) -> Optional[str]:
     session = factory()
     try:
         row = session.execute(
-            text(QAQueries.GET_PROJECT_ID_BY_CHANNEL), 
+            QAQueries.GET_PROJECT_ID_BY_CHANNEL, 
             {"channel_id": channel_id}
         ).fetchone()
         
@@ -88,7 +88,7 @@ def get_project_member_id(project_id: str, slack_user_id: str) -> Optional[str]:
         )
         
         row = session.execute(
-            text(QAQueries.GET_PROJECT_MEMBER_ID),
+            QAQueries.GET_PROJECT_MEMBER_ID,
             {"project_id": project_id, "slack_id": slack_user_id}
         ).fetchone()
         
