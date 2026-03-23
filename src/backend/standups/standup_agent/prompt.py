@@ -38,6 +38,7 @@ Rules:
     - `reason`: A concise explanation of why work is delayed.
     - `impact`: Assessment of risk ('high', 'medium', 'low').
     - `type`: 'EXPLICIT' or 'INFERRED'.
+  - **CRITICAL**: If a blocker is being **resolved, fixed, or is no longer an issue**, you MUST NOT put it in the 'blockers' list. It belongs ONLY in 'resolved_blockers'.
 - **Blocker Resolutions**: Identify if the developer mentions that any previously reported issues, blockers, or dependencies are now **resolved, fixed, or no longer an issue**. Put these into `resolved_blockers`. 
   - If they mention a task label (e.g. "task 4 is resolved"), you MUST set `task_label` to 4.
 - If they mention updating documentation, requirements, or project notes, extract it into 'doc_updates'.

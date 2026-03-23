@@ -127,6 +127,11 @@ class StandupActionService:
 
     async def _process_blocker(self, blk, standup, standup_update, existing_active_blockers, update_id):
         try:
+            # Skip if explicitly marked as RESOLVED (should be in resolved_blockers list instead)
+            if hasattr(blk, 'type') and blk.type and str(blk.type).upper() == "RESOLVED":
+                logger.info(f"Skipping blocker in 'blockers' list because type is RESOLVED for task {getattr(blk, 'task_label', 'general')}")
+                return
+
             target_task_id = uuid.UUID(blk.task_id) if blk.task_id and blk.task_id != "null" else None
             if not target_task_id and hasattr(blk, 'task_label') and blk.task_label:
                 t = self.db.query(Task).filter(Task.project_id == standup.project_id, Task.label == blk.task_label, Task.deleted_at.is_(None)).first()

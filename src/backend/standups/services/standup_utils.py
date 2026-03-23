@@ -145,6 +145,8 @@ class StandupUtils:
     @staticmethod
     def detect_task_selection(db: Session, reply_text: str, member: ProjectMember, project_id: uuid.UUID) -> Optional[Task]:
         """Detects if the reply is selecting a suggested task."""
+        reply_lower = reply_text.lower()
+        
         action_words = (
             r"do|doing|take|taking|going\s+with|be\s+going\s+with|working\s+on|work\s+on|"
             r"pick(?:ing)?\s+up|start(?:ing)?|handle|handling|proceeding\s+with|"
@@ -170,14 +172,24 @@ class StandupUtils:
             if task:
                 return StandupUtils.activate_selected_task(db, task, member)
 
-        # Keyword matching
+        # Keyword matching fallback - only if selection intent is detected
+        selection_intent_patterns = [
+            r"i('m|'ll| am| will)? (take|taking|pick|start|work on|handle)",
+            r"going to (do|take|work on|handle)",
+            r"picking up",
+            r"would like to (do|take|work on)"
+        ]
+        has_selection_intent = any(re.search(p, reply_lower) for p in selection_intent_patterns)
+        
+        if not has_selection_intent:
+            return None
+
         todo_tasks = db.query(Task).filter(
             Task.project_id == project_id,
             Task.status == TaskStatus.TODO,
             Task.deleted_at.is_(None)
         ).all()
 
-        reply_lower = reply_text.lower()
         best_task = None
         best_score = 0.0
         stop_words = {"task", "project", "issue", "ticket"}

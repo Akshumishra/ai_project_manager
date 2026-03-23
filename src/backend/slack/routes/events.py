@@ -117,7 +117,13 @@ async def _orchestrate_dispatch(event_data: Dict[str, Any]):
 
     if dispatch_type == "standup":
         from src.backend.standups.services.reply_handler import handle_standup_reply
-        await handle_standup_reply(channel_id, thread_ts, slack_user_id, user_text, ts)
+        await handle_standup_reply(
+                channel_id=channel_id,
+                thread_ts=thread_ts,
+                slack_user_id=slack_user_id,
+                user_text=user_text,
+                ts=ts
+            )
     elif dispatch_type == "qa":
         from src.backend.qa_chatbot.services.mention_handler import handle_qa_mention
         await handle_qa_mention(channel_id, thread_ts, slack_user_id, user_text)
@@ -126,7 +132,12 @@ async def _orchestrate_dispatch(event_data: Dict[str, Any]):
 async def slack_events(request: Request, background_tasks: BackgroundTasks):
     """Main entry point for Slack Event Subscriptions."""
     body_bytes = await request.body()
-    logger.info(f"Incoming Slack request: {body_bytes.decode()[:500]}...")
+    decoded_body = body_bytes.decode()
+    
+    with open("/tmp/slack_requests.log", "a") as f:
+        f.write(f"[{time.ctime()}] RAW (processed_ts size: {len(processed_ts)}): {decoded_body[:1000]}\n")
+        
+    logger.info(f"Incoming Slack request: {decoded_body[:500]}...")
     
     await verify_slack_signature(request, body_bytes)
     try:
