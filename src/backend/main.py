@@ -21,9 +21,8 @@ from src.backend.task_assigner.routes.task_assigner_routes import router as task
 from src.backend.config import settings
 from src.backend.slack import slack_routes
 
-from src.backend.meeting_bot.api.routers import router as api_router
+from src.backend.meeting_bot.api.routers import router as meeting_router
 from collections.abc import AsyncGenerator
-from contextlib import asynccontextmanager
 from src.backend.qa_chatbot.routes import slack_events
 
 create_tables()
@@ -93,7 +92,7 @@ app.include_router(requirement_routes.router, prefix="/api/agent")
 app.include_router(tech_doc_routes.router, prefix="/api/agent")
 app.include_router(task_creator_routes.router)
 app.include_router(task_assigner_router)
-app.include_router(api_router)
+app.include_router(meeting_router)
 app.include_router(slack_events.router)
 
 

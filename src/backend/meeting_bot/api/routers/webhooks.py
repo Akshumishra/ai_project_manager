@@ -1,43 +1,14 @@
 from __future__ import annotations
 
-import asyncio
 import logging
 
 from fastapi import APIRouter, HTTPException, status
 
 from src.backend.meeting_bot.api.schemas import FirefliesWebhookPayload
-from src.backend.meeting_bot.services.fireflies_client import FirefliesClient
-from src.backend.meeting_bot.services.meeting import (
-    mark_meeting_ended,
-    upsert_transcript,
-)
+from src.backend.meeting_bot.services.fireflies_client import FirefliesWebhookService
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Webhooks"])
-
-
-def _map_fireflies_sentences(sentences: list[dict]) -> tuple[list[dict], str]:
-    """Extracted helper to parse raw FF logic into internal format."""
-    mapped_segments = [
-        {
-            "sequence": s.get("index", 0),
-            "start_ms": int(float(s.get("start_time", 0)) * 1000)
-            if s.get("start_time")
-            else 0,
-            "end_ms": int(float(s.get("end_time", 0)) * 1000)
-            if s.get("end_time")
-            else 0,
-            "speaker_label": s.get("speaker_name", "Unknown"),
-            "speaker_member_id": None,
-            "text": s.get("text", ""),
-        }
-        for s in sentences
-    ]
-
-    raw_text_concat = "\n".join(
-        f"{s.get('speaker_name', 'Unknown')}: {s.get('text', '')}" for s in sentences
-    )
-    return mapped_segments, raw_text_concat
 
 
 @router.post("/webhooks/fireflies/transcript", status_code=status.HTTP_200_OK)
@@ -45,70 +16,39 @@ async def fireflies_transcript_webhook(
     payload: FirefliesWebhookPayload,
 ) -> dict:
     """
-    Webhook target for Fireflies.ai when a transcript is completed.
-
-    Flow:
-    1. Fetch full transcript securely from Fireflies API.
-    2. Map to internal schema and persist.
-    3. Trigger AI analysis pipeline.
+    Webhook target for Fireflies.ai.
     """
-    ffl_client = FirefliesClient()
-
     target_id = payload.transcript_id or payload.meeting_id
     if not target_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Missing both transcriptId and meetingId in webhook payload.",
+            detail="Missing both transcriptId and meetingId.",
         )
 
+    service = FirefliesWebhookService()
+
     try:
-        raw_data = await ffl_client.fetch_transcript(target_id)
-    except Exception:
-        logger.exception("Failed to fetch transcript from Fireflies for %s", target_id)
+        data = await service.fetch_and_map_transcript(target_id)
+        if data["status"] == "empty":
+            return {"status": "ignored", "reason": "empty_transcript"}
+
+        resolved_session_id = await service.ingest_transcript(
+            payload.bot_session_id, data
+        )
+
+        logger.info(
+            "Successfully ingested transcript for session %s", resolved_session_id
+        )
+        return {"status": "success", "message": "Transcript processed."}
+
+    except RuntimeError as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Failed to fetch transcript from upstream provider.",
+            detail=str(exc),
         )
-
-    sentences = raw_data.get("sentences", [])
-    if not sentences:
-        logger.warning(
-            "Webhook received but no sentences found for transcript %s", target_id
-        )
-        return {"status": "ignored", "reason": "empty_transcript"}
-
-    mapped_segments, raw_text_concat = _map_fireflies_sentences(sentences)
-
-    meet_url = raw_data.get("meeting_link")
-    meeting_attendees = raw_data.get("meeting_attendees", [])
-    logger.info("Received %d attendees from Fireflies API", len(meeting_attendees))
-
-    try:
-        resolved_bot_session_id = await asyncio.to_thread(
-            upsert_transcript,
-            bot_session_id=payload.bot_session_id,
-            raw_text=raw_text_concat,
-            segments=mapped_segments,
-            provider="fireflies",
-            meet_url=meet_url,
-            meeting_attendees=meeting_attendees,
-        )
-
-        if resolved_bot_session_id:
-            await asyncio.to_thread(mark_meeting_ended, resolved_bot_session_id)
-
     except Exception:
-        logger.exception("Failed to persist Fireflies transcript to DB")
+        logger.exception("Unexpected error in transcript webhook")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Transcript processing failed. Please contact support.",
+            detail="Transcript processing failed.",
         )
-
-    logger.info(
-        "Successfully ingested Fireflies transcript for session %s",
-        resolved_bot_session_id or "unknown",
-    )
-    return {
-        "status": "success",
-        "message": "Transcript fetched and AI analysis triggered.",
-    }

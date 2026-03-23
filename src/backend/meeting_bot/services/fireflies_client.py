@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 import logging
+from typing import Optional
 
 import httpx
 
@@ -8,6 +10,10 @@ from src.backend.config import settings
 from src.backend.meeting_bot.constants import (
     FIREFLIES_API_BASE_URL,
     FIREFLIES_FETCH_TIMEOUT,
+)
+from src.backend.meeting_bot.services.meeting import (
+    mark_meeting_ended,
+    upsert_transcript,
 )
 
 logger = logging.getLogger(__name__)
@@ -35,9 +41,6 @@ class FirefliesClient:
     async def fetch_transcript(self, transcript_id: str) -> dict:
         """
         Securely fetch a completed transcript from the Fireflies GraphQL API.
-
-        This re-fetches from the API rather than trusting webhook payloads,
-        preventing payload spoofing attacks.
         """
         query = """
         query Transcript($id: String!) {
@@ -104,3 +107,77 @@ class FirefliesClient:
                 "Failed to fetch Fireflies transcript %s: %s", transcript_id, exc
             )
             raise RuntimeError("Transcription fetch failed") from exc
+
+
+class FirefliesWebhookService:
+    """Handles Fireflies transcript webhooks and orchestrates DB persistence."""
+
+    def __init__(self):
+        self._client = FirefliesClient()
+
+    def _map_sentences(self, sentences: list[dict]) -> tuple[list[dict], str]:
+        """Maps raw Fireflies sentence logic into internal format."""
+        mapped_segments = [
+            {
+                "sequence": s.get("index", 0),
+                "start_ms": int(float(s.get("start_time", 0)) * 1000)
+                if s.get("start_time")
+                else 0,
+                "end_ms": int(float(s.get("end_time", 0)) * 1000)
+                if s.get("end_time")
+                else 0,
+                "speaker_label": s.get("speaker_name", "Unknown"),
+                "speaker_member_id": None,
+                "text": s.get("text", ""),
+            }
+            for s in sentences
+        ]
+
+        raw_text_concat = "\n".join(
+            f"{s.get('speaker_name', 'Unknown')}: {s.get('text', '')}"
+            for s in sentences
+        )
+        return mapped_segments, raw_text_concat
+
+    async def fetch_and_map_transcript(self, transcript_id: str) -> dict:
+        """Fetches transcript details and maps them to internal schema."""
+        try:
+            raw_data = await self._client.fetch_transcript(transcript_id)
+            sentences = raw_data.get("sentences", [])
+            if not sentences:
+                return {"status": "empty"}
+
+            mapped_segments, raw_text = self._map_sentences(sentences)
+            return {
+                "status": "success",
+                "raw_text": raw_text,
+                "segments": mapped_segments,
+                "meet_url": raw_data.get("meeting_link"),
+                "attendees": raw_data.get("meeting_attendees", []),
+            }
+        except Exception:
+            logger.exception("Failed to fetch transcript: %s", transcript_id)
+            raise RuntimeError("Upstream Fireflies fetch failed")
+
+    async def ingest_transcript(
+        self, bot_session_id: Optional[str], transcript_data: dict
+    ) -> str | None:
+        """Persists transcript and marks meeting as ended."""
+        try:
+            resolved_id = await asyncio.to_thread(
+                upsert_transcript,
+                bot_session_id=bot_session_id,
+                raw_text=transcript_data["raw_text"],
+                segments=transcript_data["segments"],
+                provider="fireflies",
+                meet_url=transcript_data["meet_url"],
+                meeting_attendees=transcript_data["attendees"],
+            )
+
+            if resolved_id:
+                await asyncio.to_thread(mark_meeting_ended, resolved_id)
+
+            return resolved_id
+        except Exception:
+            logger.exception("Transcript ingestion failed")
+            raise RuntimeError("Database persistence failed")
