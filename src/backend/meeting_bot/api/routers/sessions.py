@@ -41,7 +41,7 @@ async def schedule_meeting_calendar(
             duration_minutes=request.duration_minutes,
             task_id=request.task_id,
         )
-        
+
         return {
             "meeting_id": meeting_id,
             "meet_url": meet_url,

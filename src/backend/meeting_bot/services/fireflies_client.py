@@ -80,9 +80,7 @@ class FirefliesClient:
 
                 transcript = data.get("data", {}).get("transcript")
                 if not transcript:
-                    logger.warning(
-                        "Empty transcript returned for %s", transcript_id
-                    )
+                    logger.warning("Empty transcript returned for %s", transcript_id)
                     return {"sentences": []}
 
                 return transcript
@@ -99,9 +97,7 @@ class FirefliesClient:
                 f"Transcription fetch failed: HTTP {exc.response.status_code}"
             ) from exc
         except httpx.TimeoutException as exc:
-            logger.error(
-                "Fireflies transcript fetch timed out for %s", transcript_id
-            )
+            logger.error("Fireflies transcript fetch timed out for %s", transcript_id)
             raise RuntimeError("Transcription fetch timed out") from exc
         except Exception as exc:
             logger.error(

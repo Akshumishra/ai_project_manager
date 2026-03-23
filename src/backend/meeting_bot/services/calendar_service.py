@@ -12,11 +12,13 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 
 from src.backend.config import settings
-from src.backend.meeting_bot.constants import DEFAULT_MEETING_DURATION_MINS, FIREFLIES_BOT_EMAIL
+from src.backend.meeting_bot.constants import (
+    DEFAULT_MEETING_DURATION_MINS,
+    FIREFLIES_BOT_EMAIL,
+)
 
 logger = logging.getLogger(__name__)
 
-# If modifying these scopes, delete the file token.json.
 SCOPES = [
     "https://www.googleapis.com/auth/calendar",
     "https://www.googleapis.com/auth/meetings.space.settings",
@@ -38,7 +40,7 @@ def _write_token_securely(token_path: Path, creds: Credentials) -> None:
     fd = os.open(
         str(token_path),
         os.O_WRONLY | os.O_CREAT | os.O_TRUNC,
-        stat.S_IRUSR | stat.S_IWUSR,  # 0o600
+        stat.S_IRUSR | stat.S_IWUSR,
     )
     try:
         os.write(fd, creds.to_json().encode())
@@ -101,15 +103,12 @@ def create_calendar_meet(
 
     end_time = scheduled_at + timedelta(minutes=duration_minutes)
 
-    # ISO 8601 strings expected by Google APIs
     start_str = (
         scheduled_at.isoformat()
         if scheduled_at.tzinfo
         else scheduled_at.isoformat() + "Z"
     )
-    end_str = (
-        end_time.isoformat() if end_time.tzinfo else end_time.isoformat() + "Z"
-    )
+    end_str = end_time.isoformat() if end_time.tzinfo else end_time.isoformat() + "Z"
 
     event_body: dict = {
         "summary": title,
@@ -139,7 +138,9 @@ def create_calendar_meet(
     )
 
     entry_points = event.get("conferenceData", {}).get("entryPoints", [])
-    meet_url = next((e.get("uri") for e in entry_points if e.get("entryPointType") == "video"), None)
+    meet_url = next(
+        (e.get("uri") for e in entry_points if e.get("entryPointType") == "video"), None
+    )
 
     if not meet_url:
         logger.warning(

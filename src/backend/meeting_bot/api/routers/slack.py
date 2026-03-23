@@ -14,7 +14,7 @@ from src.backend.meeting_bot.constants import (
     MAX_MEETING_DURATION_MINS,
     DEFAULT_MEET_URL,
     SLACK_MEETING_SUCCESS_TEMPLATE,
-    SLACK_MEET_EPHEMERAL_SCHEDULING_MSG
+    SLACK_MEET_EPHEMERAL_SCHEDULING_MSG,
 )
 
 logger = logging.getLogger(__name__)
@@ -29,7 +29,7 @@ async def _send_slack_ephemeral_message(response_url: str, text_msg: str) -> Non
             json={
                 "response_type": "ephemeral",
                 "text": text_msg,
-            }
+            },
         )
 
 
@@ -60,11 +60,8 @@ async def schedule_and_notify_slack(
 
     db = SessionLocal()
     try:
-        # ── 1. Parse duration, title, and agenda ──────────────────────────────
         duration_minutes, title, agenda = _parse_slack_command_text(text_input)
 
-        # ── 2. Database Lookup ──────────────────────────────────────────────────
-        # Lookup project for the channel
         slack_channel_map = (
             db.query(ProjectSlackDetail)
             .filter(ProjectSlackDetail.channel_id == channel_id)
@@ -81,11 +78,9 @@ async def schedule_and_notify_slack(
 
         project_id = slack_channel_map.project_id
 
-        # ── 3. RLS Context & Member Lookup ────────────────────────────────────
-        # SET LOCAL app.project_id is required for RLS policies
         db.execute(
             text("SET LOCAL app.project_id = :project_id"),
-            {"project_id": str(project_id)}
+            {"project_id": str(project_id)},
         )
 
         member_map = (
@@ -109,7 +104,6 @@ async def schedule_and_notify_slack(
 
         created_by_uuid = member_map.user_id
 
-        # ── 4. Orchestrate Meeting Scheduling ───────────────────────────────
         _, meet_url = await schedule_meeting(
             project_id=project_id,
             created_by=created_by_uuid,
@@ -118,7 +112,6 @@ async def schedule_and_notify_slack(
             duration_minutes=duration_minutes,
         )
 
-        # Broadcast the success back to the entire channel
         message_text = SLACK_MEETING_SUCCESS_TEMPLATE.format(
             title=title,
             duration_minutes=duration_minutes,

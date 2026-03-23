@@ -3,9 +3,13 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 from src.backend.model.meeting import MeetingSummary, MeetingActionItem
-from src.backend.meeting_bot.services.meeting.session import get_db_session, get_meeting_by_session
+from src.backend.meeting_bot.services.meeting.session import (
+    get_db_session,
+    get_meeting_by_session,
+)
 
 logger = logging.getLogger(__name__)
+
 
 def save_summary(
     bot_session_id: str,
@@ -47,7 +51,9 @@ def add_action_items(bot_session_id: str, items: list[dict]) -> None:
     with get_db_session() as db:
         meeting = get_meeting_by_session(db, bot_session_id)
         if meeting is None:
-            logger.warning("add_action_items: no row for bot_session=%s", bot_session_id)
+            logger.warning(
+                "add_action_items: no row for bot_session=%s", bot_session_id
+            )
             return
 
         for item in items:
@@ -66,4 +72,6 @@ def add_action_items(bot_session_id: str, items: list[dict]) -> None:
                 )
             )
 
-    logger.info("Added %d action item(s) for bot_session=%s", len(items), bot_session_id)
+    logger.info(
+        "Added %d action item(s) for bot_session=%s", len(items), bot_session_id
+    )

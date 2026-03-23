@@ -10,19 +10,23 @@ from src.backend.model.meeting import (
     MeetingTranscript,
     TranscriptStatus,
 )
-from src.backend.meeting_bot.services.meeting.session import get_db_session, get_meeting_by_session
+from src.backend.meeting_bot.services.meeting.session import (
+    get_db_session,
+    get_meeting_by_session,
+)
 from src.backend.meeting_bot.constants import DEFAULT_TRANSCRIPT_LANGUAGE
 
 logger = logging.getLogger(__name__)
 
 
-def _sync_meeting_participants(db, meeting_id: UUID, project_id: UUID, attendees: list[dict], segments: list[dict]) -> None:
+def _sync_meeting_participants(
+    db, meeting_id: UUID, project_id: UUID, attendees: list[dict], segments: list[dict]
+) -> None:
     """Helper to resolve attendee emails to project members, sync DB, and enrich segments."""
     from src.backend.model.project import ProjectMember
     from src.backend.model.user import User
     from src.backend.model.meeting import MeetingParticipant
 
-    # 1. Fetch all project members and their emails for matching
     member_info = (
         db.query(ProjectMember.id, User.email)
         .join(User, ProjectMember.user_id == User.id)
@@ -31,7 +35,6 @@ def _sync_meeting_participants(db, meeting_id: UUID, project_id: UUID, attendees
     )
     email_to_member_id = {email.lower(): str(mid) for mid, email in member_info}
 
-    # 2. Resolve Fireflies attendees to internal member IDs
     logger.info("Syncing %d attendees for meeting %s", len(attendees), meeting_id)
     attendee_name_to_id = {}
     resolved_member_ids = set()
@@ -46,7 +49,6 @@ def _sync_meeting_participants(db, meeting_id: UUID, project_id: UUID, attendees
                 attendee_name_to_id[name] = member_id
             logger.debug("Resolved attendee %s to member %s", email, member_id)
 
-    # 3. Batch sync to meeting_participants table
     existing_participants = {
         str(p.project_member_id)
         for p in db.query(MeetingParticipant.project_member_id)
@@ -62,8 +64,7 @@ def _sync_meeting_participants(db, meeting_id: UUID, project_id: UUID, attendees
                     project_member_id=UUID(member_id_str),
                 )
             )
-    
-    # 4. Map speakers in segments for AI Agent context
+
     for seg in segments:
         label = seg.get("speaker_label")
         if label in attendee_name_to_id:
@@ -71,6 +72,7 @@ def _sync_meeting_participants(db, meeting_id: UUID, project_id: UUID, attendees
 
     db.flush()
     logger.info("Successfully synced %d participants to DB", len(resolved_member_ids))
+
 
 def upsert_transcript(
     bot_session_id: str | None = None,
@@ -124,14 +126,13 @@ def upsert_transcript(
             transcript = MeetingTranscript(meeting_id=meeting.id)
             db.add(transcript)
 
-        # ── Resolve and Sync Participants ────────────────────────────────────
         if meeting:
             _sync_meeting_participants(
                 db=db,
                 meeting_id=meeting.id,
                 project_id=meeting.project_id,
                 attendees=meeting_attendees or [],
-                segments=segments
+                segments=segments,
             )
 
         transcript.status = TranscriptStatus.COMPLETED
@@ -143,7 +144,6 @@ def upsert_transcript(
 
     logger.info("Transcript upserted for bot_session=%s", bot_session_id)
 
-    # ── Trigger Automatic AI Analysis Pipeline ───────────────────────────────
     _trigger_ai_analysis(bot_session_id, raw_text)
 
     return bot_session_id
@@ -161,7 +161,10 @@ def _trigger_ai_analysis(bot_session_id: str | None, raw_text: str) -> None:
 
     def _run_processor() -> None:
         try:
-            from src.backend.meeting_bot.services.llm.meeting_analysis import process_meeting_transcript
+            from src.backend.meeting_bot.services.llm.meeting_analysis import (
+                process_meeting_transcript,
+            )
+
             process_meeting_transcript(bot_session_id, raw_text)
         except Exception:
             logger.exception(

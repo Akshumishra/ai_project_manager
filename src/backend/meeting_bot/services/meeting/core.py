@@ -36,13 +36,11 @@ async def schedule_meeting(
     """
     from src.backend.meeting_bot.services.calendar_service import create_calendar_meet
 
-    # 1. Calculate the scheduled datetime (using fixed project constants)
     ist = ZoneInfo("Asia/Kolkata")
     scheduled_at_dt = datetime.now(ist) + timedelta(
         minutes=SCHEDULE_MEETING_OFFSET_MINS
     )
 
-    # 2. Call Google Calendar Service (blocking I/O)
     meet_url, _ = await asyncio.to_thread(
         create_calendar_meet,
         title=title,
@@ -53,7 +51,6 @@ async def schedule_meeting(
     if not meet_url:
         raise RuntimeError("Google Calendar failed to generate a Meet link.")
 
-    # 3. Persist meeting record to DB
     bot_session_id = f"{BOT_SESSION_ID_PREFIX}{uuid.uuid4().hex[:8]}"
     meeting_id = await asyncio.to_thread(
         create_meeting,
@@ -113,7 +110,7 @@ def create_meeting(
             scheduled_at=scheduled_at or datetime.now(timezone.utc),
         )
         db.add(meeting)
-        db.flush()  # Populate meeting.id before commit.
+        db.flush()
         meeting_id = meeting.id
 
     logger.info("Meeting created: id=%s bot_session=%s", meeting_id, bot_session_id)

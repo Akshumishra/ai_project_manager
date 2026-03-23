@@ -60,5 +60,3 @@ class MeetingAnalysis(BaseModel):
         default_factory=list,
         description="Actionable tasks extracted from discussion.",
     )
-
-

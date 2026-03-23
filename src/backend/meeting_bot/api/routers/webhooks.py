@@ -7,7 +7,10 @@ from fastapi import APIRouter, HTTPException, status
 
 from src.backend.meeting_bot.api.schemas import FirefliesWebhookPayload
 from src.backend.meeting_bot.services.fireflies_client import FirefliesClient
-from src.backend.meeting_bot.services.meeting import mark_meeting_ended, upsert_transcript
+from src.backend.meeting_bot.services.meeting import (
+    mark_meeting_ended,
+    upsert_transcript,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Webhooks"])
@@ -18,8 +21,12 @@ def _map_fireflies_sentences(sentences: list[dict]) -> tuple[list[dict], str]:
     mapped_segments = [
         {
             "sequence": s.get("index", 0),
-            "start_ms": int(float(s.get("start_time", 0)) * 1000) if s.get("start_time") else 0,
-            "end_ms": int(float(s.get("end_time", 0)) * 1000) if s.get("end_time") else 0,
+            "start_ms": int(float(s.get("start_time", 0)) * 1000)
+            if s.get("start_time")
+            else 0,
+            "end_ms": int(float(s.get("end_time", 0)) * 1000)
+            if s.get("end_time")
+            else 0,
             "speaker_label": s.get("speaker_name", "Unknown"),
             "speaker_member_id": None,
             "text": s.get("text", ""),
@@ -28,8 +35,7 @@ def _map_fireflies_sentences(sentences: list[dict]) -> tuple[list[dict], str]:
     ]
 
     raw_text_concat = "\n".join(
-        f"{s.get('speaker_name', 'Unknown')}: {s.get('text', '')}"
-        for s in sentences
+        f"{s.get('speaker_name', 'Unknown')}: {s.get('text', '')}" for s in sentences
     )
     return mapped_segments, raw_text_concat
 
@@ -48,7 +54,6 @@ async def fireflies_transcript_webhook(
     """
     ffl_client = FirefliesClient()
 
-    # ── 1. Fetch transcript payload securely ────────────────────────────────
     target_id = payload.transcript_id or payload.meeting_id
     if not target_id:
         raise HTTPException(
@@ -72,10 +77,8 @@ async def fireflies_transcript_webhook(
         )
         return {"status": "ignored", "reason": "empty_transcript"}
 
-    # ── 2. Map Fireflies schema to internal transcript schema ──────────────
     mapped_segments, raw_text_concat = _map_fireflies_sentences(sentences)
 
-    # ── 3. Upsert into DB ──────────────────────────────────────────────────
     meet_url = raw_data.get("meeting_link")
     meeting_attendees = raw_data.get("meeting_attendees", [])
     logger.info("Received %d attendees from Fireflies API", len(meeting_attendees))
@@ -105,4 +108,7 @@ async def fireflies_transcript_webhook(
         "Successfully ingested Fireflies transcript for session %s",
         resolved_bot_session_id or "unknown",
     )
-    return {"status": "success", "message": "Transcript fetched and AI analysis triggered."}
+    return {
+        "status": "success",
+        "message": "Transcript fetched and AI analysis triggered.",
+    }

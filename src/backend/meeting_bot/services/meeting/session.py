@@ -7,6 +7,7 @@ from src.backend.model.meeting import Meeting
 
 logger = logging.getLogger(__name__)
 
+
 @contextmanager
 def get_db_session() -> Generator[Session, None, None]:
     """Yield a transactional DB session; rolls back on error, always closes."""
@@ -20,6 +21,7 @@ def get_db_session() -> Generator[Session, None, None]:
         raise
     finally:
         db.close()
+
 
 def get_meeting_by_session(db: Session, bot_session_id: str) -> Meeting | None:
     """Fetch a Meeting by its bot_session_id within an open session."""

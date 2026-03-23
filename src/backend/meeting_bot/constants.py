@@ -1,6 +1,5 @@
 from typing import Dict, List
 
-# ── API & Network Constants ──────────────────────────────────────────────────
 FIREFLIES_API_BASE_URL: str = "https://api.fireflies.ai/graphql"
 FIREFLIES_FETCH_TIMEOUT: float = 30.0
 
@@ -13,7 +12,6 @@ SLACK_MEETING_SUCCESS_TEMPLATE: str = (
     "📝  **Agenda**: {agenda}"
 )
 
-# ── Meeting Scheduling Constants ──────────────────────────────────────────────
 DEFAULT_MEETING_DURATION_MINS: int = 45
 MIN_MEETING_DURATION_MINS: int = 5
 MAX_MEETING_DURATION_MINS: int = 480
@@ -25,12 +23,10 @@ SCHEDULE_MEETING_OFFSET_MINS: int = 2
 BOT_SESSION_ID_PREFIX: str = "ffl-"
 DEFAULT_TRANSCRIPT_LANGUAGE: str = "en"
 
-# ── LLM Constants ─────────────────────────────────────────────────────────────
 DEFAULT_AI_MODEL: str = "gpt-4o"
 DEFAULT_AI_TEMPERATURE: float = 0.1
 AGENT_MAX_ITERATIONS: int = 5
 
-# ── Task Mapper Agent Constants ───────────────────────────────────────────────
 TASK_STATUS_IN_PROGRESS: str = "in_progress"
 TASK_STATUS_TODO: str = "todo"
 TASK_PRIORITY_MEDIUM: str = "medium"
@@ -47,10 +43,9 @@ DOMAIN_MAPPING: Dict[str, str] = {
     "design": "non_technical",
     "product": "non_technical",
     "management": "non_technical",
-    "product manager": "non_technical"
+    "product manager": "non_technical",
 }
 
-# ── Slack Formatting Constants ────────────────────────────────────────────────
 SLACK_BLOCK_TEXT_PLAIN: str = "plain_text"
 SLACK_BLOCK_TEXT_MRKDWN: str = "mrkdwn"
 SLACK_BLOCK_TYPE_HEADER: str = "header"
