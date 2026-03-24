@@ -229,3 +229,7 @@ credentials.json
 token.json
 credentials.json
 src/backend/scripts/current_db_data.json
+token.json
+credentials.json
+src/backend/scripts/current_db_data.json
+src/backend/scripts/standalone_seed.py
