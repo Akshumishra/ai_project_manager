@@ -226,3 +226,6 @@ client_secret*.json
 server_log.txt
 token.json
 credentials.json
+token.json
+credentials.json
+src/backend/scripts/current_db_data.json
