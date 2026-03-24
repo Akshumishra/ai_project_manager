@@ -224,3 +224,5 @@ client_secret*.json
 *.pem
 *.key
 server_log.txt
+token.json
+credentials.json
